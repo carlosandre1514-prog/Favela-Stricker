@@ -1,0 +1,61 @@
+CRÉDITOS — modelos, texturas e código de terceiros usados no Motor 3D
+
+M4A1 (arma realista)
+  Autor: Firewarden3D — https://sketchfab.com/Firewarden3D
+  Modelo: "M4A1" no Sketchfab (página do modelo: sketchfab.com/3d-models/m4a1-40d8ef818c7549a896…)
+  Licença: Creative Commons Atribuição 4.0 (CC BY 4.0) — https://creativecommons.org/licenses/by/4.0/
+  Uso comercial permitido, com crédito ao autor.
+  Alterações: só uma das armas da cena, deitada para o jogo, texturas reduzidas para 1024 px.
+
+AK-47, M4 Colt e AK-74 (madeira e tática)
+  Modelos baixados do CGTrader pelo dono do projeto (autores e licenças a confirmar e completar aqui).
+  Alterações: só as malhas de uma arma montada, texturas reduzidas para 1024 px (tools/fbx_para_glb).
+
+Pistola TT-33 (kit/armas/tt33.glb) e as skins Crimson Forge, Nebula Shadow e Gold Relic (kit/armas/skins)
+  Enviadas pelo dono do projeto (autor e licença do modelo a confirmar e completar aqui).
+  Alterações: sem a bala solta que vinha no arquivo, texturas reduzidas para 1024 px (tools/fbx_para_glb).
+
+Acessórios de arma (mira red dot, trilho, coronha tática, empunhadura frontal) — arquivo "Low.fbx"
+  Autor: a confirmar (pacote gratuito enviado pelo dono do projeto).
+
+Soldado (traje tático): personagem "Vanguard" do Mixamo (Adobe), uso livre em jogos.
+
+Animações de captura de movimento (andar, correr, mirar, atirar, recarregar, morte, pulo...)
+  Mixamo (Adobe) — https://www.mixamo.com — uso livre em jogos e projetos, inclusive comerciais.
+
+Downtown City MegaKit (prédios, ruas, peças e texturas da cidade)
+  Autor: Quaternius — https://quaternius.com
+  Licença: CC0 1.0 (domínio público). Crédito não obrigatório, mas agradecemos.
+
+Texturas do chão (grama, campo, floresta, chão batido, areia, terra arada, seixos) e piso de pedra (dry_river_pebbles)
+  Poly Haven — https://polyhaven.com — Licença: CC0 (domínio público).
+
+Água (shader "ocean")
+  Autor: Jérémy Bouny (jbouny) — https://github.com/jbouny/ocean
+  Licença: MIT. Textura de ondas waternormals.jpg do mesmo projeto.
+
+Bibliotecas
+  GLM (MIT), tinygltf (MIT), nlohmann/json (MIT), stb_image / stb_image_write (domínio público / MIT),
+  ufbx (MIT / domínio público), Bullet Physics (zlib).
+
+Fontes das pichações e grafites (shaders/materials/fontes)
+  Permanent Marker — Font Diner — Licença Apache 2.0
+  Bangers — The Bangers Project Authors — SIL Open Font License 1.1
+  Rubik Wet Paint — The Rubik Filtered Project Authors — SIL Open Font License 1.1
+  (textos das licenças na mesma pasta; uso comercial permitido)
+
+Sons (app/src/main/assets/sons)
+  Sintetizados por tools/gerar_sons.py (tiros de cada arma, recarga, impacto, golpes, chuva e trovão): sem gravações de terceiros.
+
+Plantas (shaders/kit/vegetacao): árvores, arbustos, capins, forrações e floreiras
+  Kit enviado pelo dono do projeto (Obj.obj exportado do 3ds Max em 23/11/2024) — autor e licença a confirmar.
+  Convertido e simplificado por tools/converter_vegetacao.py (3 níveis de detalhe, cores por vértice).
+
+Personagem base (kit/personagens/base.glb): modelo masculino do Adobe Fuse com esqueleto Mixamo, enviado pelo
+dono do projeto. Convertido com tools/personagem_fbx (rosto mantido, sem os cílios). As texturas em
+kit/personagens/visual e o equipamento (kit/personagens/equip: colete, cinto com carregadores e radinho, capacete,
+boné, corrente, relógio, brincos) saem de tools/gerar_roupas.py e tools/gerar_equipamento.py.
+
+Skins de personagem (kit/personagens/skins: pm, civil, exercito, choque, especial, rubro, alvinegro, tricolor,
+canarinho, faixa): criadas e enviadas pelo dono do projeto. Convertidas por tools/converter_skin.py (esqueleto
+Mixamo único, pose de descanso, texturas 1024) sem reduzir triângulos, para não deformar corpo nem rosto.

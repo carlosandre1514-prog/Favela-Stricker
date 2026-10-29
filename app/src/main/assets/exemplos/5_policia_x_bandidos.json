@@ -1,0 +1,274 @@
+{
+ "ambiente": {
+  "chuva": "automatica",
+  "ciclo_min": 10.0,
+  "exposicao": 1.0,
+  "grade": true,
+  "hora": 16.5,
+  "neblina": 0.0017999999690800905,
+  "sol": 3.2
+ },
+ "camera": {
+  "alvo": [
+   0.0,
+   7.922,
+   0.0
+  ],
+  "distancia": 200.6,
+  "pitch": 0.75,
+  "yaw": 3.642
+ },
+ "formato": "motor3d-projeto",
+ "mapa": {
+  "semente": 5,
+  "tipo": "favela"
+ },
+ "nome": "Polícia x Bandidos",
+ "objetos": [
+  {
+   "aparencia": "aleatorio",
+   "jogador": true,
+   "nome": "Jogador",
+   "pos": [
+    0.0,
+    10.3,
+    52.0
+   ],
+   "rot_y": 180.0,
+   "semente": 38,
+   "tipo": "personagem"
+  },
+  {
+   "nome": "Base da Polícia",
+   "pos": [
+    0.0,
+    4.2,
+    106.0
+   ],
+   "time": "policia",
+   "tipo": "base"
+  },
+  {
+   "nome": "Base da Polícia",
+   "pos": [
+    -44.0,
+    4.2,
+    106.0
+   ],
+   "time": "policia",
+   "tipo": "base"
+  },
+  {
+   "loja": "armas",
+   "nome": "Loja de armas (polícia)",
+   "pos": [
+    -22.0,
+    4.2,
+    107.5
+   ],
+   "rot_y": 180.0,
+   "time": "policia",
+   "tipo": "loja"
+  },
+  {
+   "loja": "roupas",
+   "nome": "Loja de fardas (polícia)",
+   "pos": [
+    22.0,
+    4.2,
+    107.5
+   ],
+   "rot_y": 180.0,
+   "time": "policia",
+   "tipo": "loja"
+  },
+  {
+   "nome": "Base dos Bandidos",
+   "pos": [
+    -8.0,
+    23.5,
+    -44.0
+   ],
+   "time": "bandidos",
+   "tipo": "base"
+  },
+  {
+   "nome": "Base dos Bandidos",
+   "pos": [
+    13.0,
+    23.5,
+    -37.0
+   ],
+   "time": "bandidos",
+   "tipo": "base"
+  },
+  {
+   "loja": "armas",
+   "nome": "Loja de armas (bandidos)",
+   "pos": [
+    52.0,
+    8.5,
+    28.0
+   ],
+   "rot_y": -90.0,
+   "time": "bandidos",
+   "tipo": "loja"
+  },
+  {
+   "loja": "roupas",
+   "nome": "Loja de roupas (bandidos)",
+   "pos": [
+    -42.0,
+    11.5,
+    32.0
+   ],
+   "rot_y": 90.0,
+   "time": "bandidos",
+   "tipo": "loja"
+  },
+  {
+   "arquivo": "kit:personagens/skins/pm",
+   "nome": "Sgt. Rocha",
+   "personagem": true,
+   "pos": [
+    -6.0,
+    4.2,
+    104.0
+   ],
+   "rot_y": 180.0,
+   "roupa": 0,
+   "time": "policia",
+   "tipo": "modelo"
+  },
+  {
+   "arquivo": "kit:personagens/skins/rubro",
+   "nome": "Magrão",
+   "personagem": true,
+   "pos": [
+    -4.0,
+    23.5,
+    -38.0
+   ],
+   "roupa": 0,
+   "time": "bandidos",
+   "tipo": "modelo"
+  },
+  {
+   "arquivo": "kit:personagens/skins/civil",
+   "nome": "Cb. Lima",
+   "personagem": true,
+   "pos": [
+    -3.0,
+    4.2,
+    104.0
+   ],
+   "rot_y": 180.0,
+   "roupa": 1,
+   "time": "policia",
+   "tipo": "modelo"
+  },
+  {
+   "arquivo": "kit:personagens/skins/alvinegro",
+   "nome": "Baixinho",
+   "personagem": true,
+   "pos": [
+    -1.0,
+    23.5,
+    -38.0
+   ],
+   "roupa": 1,
+   "time": "bandidos",
+   "tipo": "modelo"
+  },
+  {
+   "arquivo": "kit:personagens/skins/exercito",
+   "nome": "Sd. Nunes",
+   "personagem": true,
+   "pos": [
+    0.0,
+    4.2,
+    104.0
+   ],
+   "rot_y": 180.0,
+   "roupa": 2,
+   "time": "policia",
+   "tipo": "modelo"
+  },
+  {
+   "arquivo": "kit:personagens/skins/tricolor",
+   "nome": "Cabeça",
+   "personagem": true,
+   "pos": [
+    2.0,
+    23.5,
+    -38.0
+   ],
+   "roupa": 2,
+   "time": "bandidos",
+   "tipo": "modelo"
+  },
+  {
+   "arquivo": "kit:personagens/skins/choque",
+   "nome": "Ten. Costa",
+   "personagem": true,
+   "pos": [
+    3.0,
+    4.2,
+    104.0
+   ],
+   "rot_y": 180.0,
+   "roupa": 3,
+   "time": "policia",
+   "tipo": "modelo"
+  },
+  {
+   "arquivo": "kit:personagens/skins/canarinho",
+   "nome": "Zóio",
+   "personagem": true,
+   "pos": [
+    5.0,
+    23.5,
+    -38.0
+   ],
+   "roupa": 3,
+   "time": "bandidos",
+   "tipo": "modelo"
+  },
+  {
+   "arquivo": "kit:personagens/skins/especial",
+   "nome": "Sd. Alves",
+   "personagem": true,
+   "pos": [
+    6.0,
+    4.2,
+    104.0
+   ],
+   "rot_y": 180.0,
+   "roupa": 4,
+   "time": "policia",
+   "tipo": "modelo"
+  },
+  {
+   "arquivo": "kit:personagens/skins/faixa",
+   "nome": "Bigode",
+   "personagem": true,
+   "pos": [
+    8.0,
+    23.5,
+    -38.0
+   ],
+   "roupa": 4,
+   "time": "bandidos",
+   "tipo": "modelo"
+  }
+ ],
+ "regras": {
+  "descricao": "5 contra 5 na favela. Abates dão $300: compre armas e roupas nas lojas do seu time. Vence quem fizer 25 abates.",
+  "objetivo": "times",
+  "quantidade": 25,
+  "tempo": 600.0,
+  "titulo": "Polícia x Bandidos",
+  "vida_jogador": 100.0
+ },
+ "versao": 1
+}

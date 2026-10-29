@@ -1,0 +1,49 @@
+name: APK do jogo
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Preparar SDK/NDK
+        run: |
+          yes | sdkmanager --licenses > /dev/null || true
+          sdkmanager "ndk;26.3.11579264" "cmake;3.22.1" "platforms;android-34" "build-tools;34.0.0" || true
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.7
+
+      - name: Compilar o APK
+        run: gradle assembleDebug --no-daemon --stacktrace
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: favela-stricker-apk
+          path: app/build/outputs/apk/debug/*.apk
+
+  # Motor no Linux (Mesa, sem celular): partida online simulada, para pegar erro antes de ir para o celular
+  teste:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Dependências (Mesa EGL/GLES)
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq libegl-dev libgles-dev libegl-mesa0 > /dev/null
+      - name: Compilar
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build -j4 --target mobile3d_headless
+      - name: Partida online simulada
+        run: |
+          mkdir -p saida
+          SO_ONLINE=1 ./build/mobile3d_headless shaders saida

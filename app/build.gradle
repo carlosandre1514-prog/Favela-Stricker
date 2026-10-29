@@ -1,0 +1,69 @@
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+}
+
+// Favela Stricker — o jogo Polícia x Bandidos (o motor 3D em C++ entra pelo CMake)
+android {
+    namespace 'com.mobile3d'
+    compileSdk 34
+    ndkVersion '26.3.11579264'
+
+    defaultConfig {
+        applicationId 'com.mobile3d.policiaxbandidos'
+        minSdk 26
+        targetSdk 34
+        versionCode 2
+        versionName '0.2'
+        ndk { abiFilters 'arm64-v8a' }
+        externalNativeBuild {
+            cmake {
+                arguments '-DANDROID_STL=c++_shared'
+                cppFlags '-std=c++20'
+            }
+        }
+    }
+
+    // Chave fixa do APK (jogo.keystore): cada APK novo instala por cima do anterior, sem desinstalar
+    signingConfigs {
+        jogo {
+            storeFile file('jogo.keystore')
+            storePassword 'favelastricker'
+            keyAlias 'jogo'
+            keyPassword 'favelastricker'
+        }
+    }
+    buildTypes {
+        debug { signingConfig signingConfigs.jogo }
+        release {
+            signingConfig signingConfigs.jogo
+            minifyEnabled false
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path file('../CMakeLists.txt')
+            version '3.22.1'
+        }
+    }
+
+    // Os arquivos do motor (shaders, modelos, animações, texturas) da pasta ../shaders viram assets do APK
+    sourceSets {
+        main { assets.srcDirs = ['src/main/assets', '../shaders'] }
+    }
+    androidResources {
+        noCompress 'glb', 'gltf', 'bin', 'wav', 'anim', 'ttf', 'fbx', 'jpg', 'png'
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    kotlinOptions { jvmTarget = '17' }
+}
+
+dependencies {
+    // WebSocket da partida em tempo real e do chat de voz (servidor no Render)
+    implementation 'com.squareup.okhttp3:okhttp:4.12.0'
+}
