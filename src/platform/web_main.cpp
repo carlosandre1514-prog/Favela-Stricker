@@ -32,7 +32,7 @@ EMSCRIPTEN_KEEPALIVE int web_iniciar(int quality) {
     a.minorVersion = 0;
     a.alpha = false;
     a.depth = true;
-    a.antialias = false;
+    a.antialias = quality >= 3;  // Ultra: bordas sem serrilhado
     a.powerPreference = EM_WEBGL_POWER_PREFERENCE_HIGH_PERFORMANCE;
     EMSCRIPTEN_WEBGL_CONTEXT_HANDLE ctx = emscripten_webgl_create_context("#tela", &a);
     if (ctx <= 0) return 0;

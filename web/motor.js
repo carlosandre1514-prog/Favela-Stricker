@@ -141,7 +141,8 @@ function ajustarCanvas() {
   if (ANDROID) return;
   const cv = document.getElementById('tela');
   const n = motor.nivel();
-  const escala = [0.55, 0.7, 0.85, 1][n] * Math.min(devicePixelRatio || 1, 1.5);
+  // Ultra: a resolução inteira da tela (até 2x em telas de alta densidade)
+  const escala = [0.55, 0.7, 0.85, 1][n] * Math.min(devicePixelRatio || 1, n >= 3 ? 2 : 1.5);
   cv.width = Math.max(1, Math.round(innerWidth * escala));
   cv.height = Math.max(1, Math.round(innerHeight * escala));
 }

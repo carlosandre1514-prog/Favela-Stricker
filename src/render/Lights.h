@@ -102,7 +102,7 @@ struct CascadeSet {
 
 // Cascaded Shadow Maps: divisão "prática" (mistura log/linear) + ajuste ortográfico ao slice
 // do frustum com snapping em texels para evitar tremulação ao mover a câmera.
-inline CascadeSet computeCascades(const Camera& cam, const glm::vec3& lightDir, float shadowDistance, float lambda = 0.75f) {
+inline CascadeSet computeCascades(const Camera& cam, const glm::vec3& lightDir, float shadowDistance, int mapSize = kShadowMapSize, float lambda = 0.75f) {
     CascadeSet out{};
     float n = cam.nearZ, f = std::min(cam.farZ, shadowDistance);
     float splits[kNumCascades + 1];
@@ -140,7 +140,7 @@ inline CascadeSet computeCascades(const Camera& cam, const glm::vec3& lightDir, 
         for (auto& v : corners) radius = std::max(radius, glm::length(v - center));
         radius = std::ceil(radius * 16.f) / 16.f;  // esfera envolvente: tamanho estável entre frames
 
-        float texel = (2.f * radius) / kShadowMapSize;
+        float texel = (2.f * radius) / float(mapSize);
         // Recua bastante a câmera de luz para pegar ocluidores fora do slice (ex.: prédios atrás da câmera)
         float back = std::max(radius * 2.f, 30.f);
         glm::mat4 lightView = glm::lookAt(center - L * back, center, up);

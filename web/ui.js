@@ -9,6 +9,9 @@ const fmt = (n) => Number(n || 0).toLocaleString('pt-BR');
 const dorme = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // ---------------- palco: desenhado em 844x390 e ajustado à tela ----------------
+// Ultra: acabamento extra da interface (transições, vidro desfocado); nos outros níveis fica desligado
+if (motor.nivel() >= 3) document.body.classList.add('ultra');
+
 const BASE_L = 844, BASE_A = 390;
 const palco = $('#palco');
 let escala = 1;

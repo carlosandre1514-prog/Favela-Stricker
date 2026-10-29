@@ -3,6 +3,7 @@
 #include <regex>
 #endif
 #include "render/Particles.h"
+#include "assets/TextureManager.h"
 #include <stb_image.h>
 #include <algorithm>
 #include <cstdio>
@@ -185,7 +186,7 @@ bool Renderer::init(const char* shaderDir) {
     // Shadow map: array de profundidade com comparação por hardware
     glGenTextures(1, &shadowTex_);
     glBindTexture(GL_TEXTURE_2D_ARRAY, shadowTex_);
-    glTexStorage3D(GL_TEXTURE_2D_ARRAY, 1, GL_DEPTH_COMPONENT24, kShadowMapSize, kShadowMapSize, kNumCascades);
+    glTexStorage3D(GL_TEXTURE_2D_ARRAY, 1, GL_DEPTH_COMPONENT24, shadowSize, shadowSize, kNumCascades);
     glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -196,10 +197,10 @@ bool Renderer::init(const char* shaderDir) {
 
     // Cubemap do ambiente (HDR, com mips = "pré-filtro" barato por rugosidade)
     envMips_ = 1;
-    for (int s = kEnvSize; s > 1; s >>= 1) ++envMips_;
+    for (int s = envSize; s > 1; s >>= 1) ++envMips_;
     glGenTextures(1, &envCube_);
     glBindTexture(GL_TEXTURE_CUBE_MAP, envCube_);
-    glTexStorage2D(GL_TEXTURE_CUBE_MAP, envMips_, GL_RGBA16F, kEnvSize, kEnvSize);
+    glTexStorage2D(GL_TEXTURE_CUBE_MAP, envMips_, GL_RGBA16F, envSize, envSize);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -317,7 +318,7 @@ void Renderer::updateEnvironment(const Environment& env) {
     static const glm::vec3 ups[6] = {{0, -1, 0}, {0, -1, 0}, {0, 0, 1}, {0, 0, -1}, {0, -1, 0}, {0, -1, 0}};
     glm::mat4 proj = glm::perspective(glm::radians(90.f), 1.f, 0.1f, 10.f);
     glBindFramebuffer(GL_FRAMEBUFFER, envFbo_);
-    glViewport(0, 0, kEnvSize, kEnvSize);
+    glViewport(0, 0, envSize, envSize);
     glDisable(GL_DEPTH_TEST);
     for (int f = 0; f < 6; ++f) {
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + f, envCube_, 0);
@@ -348,7 +349,7 @@ void Renderer::beginFrame(const Camera& cam, const DirectionalLight& sun) {
     stats_ = {};
     lineCount_[0] = lineCount_[1] = 0;
     camFrustum_ = cam.frustum();
-    cascades_ = computeCascades(cam, sun.direction, shadowDistance);
+    cascades_ = computeCascades(cam, sun.direction, shadowDistance, shadowSize);
     for (int c = 0; c < kNumCascades; ++c) cascadeFrustum_[c].extract(cascades_.viewProj[c]);
     if (!sun.castShadows) for (auto& f : cascadeFrustum_) f = Frustum{};
 }
@@ -443,7 +444,7 @@ bool Renderer::loadTerrainLayers(const char* const* names, int count) {
         while (glGetError() != GL_NO_ERROR) {}
         GLfloat aniso = 0.f;
         glGetFloatv(0x84FF /*GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT*/, &aniso);
-        if (glGetError() == GL_NO_ERROR && aniso > 1.f) glTexParameterf(GL_TEXTURE_2D_ARRAY, 0x84FE, std::min(aniso, 4.f));
+        if (glGetError() == GL_NO_ERROR && aniso > 1.f) glTexParameterf(GL_TEXTURE_2D_ARRAY, 0x84FE, std::min(aniso, std::max(4.f, TextureManager::instance().anisotropia)));
     }
     terrainAlb_ = ids[0]; terrainNh_ = ids[1];
     return true;
@@ -523,7 +524,7 @@ void Renderer::render(const Camera& cam, const DirectionalLight& sun, const Envi
 
 void Renderer::shadowPass(const CascadeSet& cs) {
     glBindFramebuffer(GL_FRAMEBUFFER, shadowFbo_);
-    glViewport(0, 0, kShadowMapSize, kShadowMapSize);
+    glViewport(0, 0, shadowSize, shadowSize);
     const GLenum none = GL_NONE;
     glDrawBuffers(1, &none);
     glDisable(GL_CULL_FACE);               // pega também planos finos / malhas abertas

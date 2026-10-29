@@ -243,3 +243,24 @@ body.toque .so-teclado { display: none !important; }
 #progresso { height: 100%; width: 0; background: var(--ouro); transition: width .2s; }
 #carregando .dica { color: var(--apagado); font-size: 12px; max-width: 460px; }
 .ouro { color: var(--ouro); } .azul { color: var(--azul-medio); } .verde { color: var(--verde); } .amarelo { color: var(--ouro-claro); } .vermelho { color: var(--vermelho); } .apagado { color: var(--apagado); }
+
+/* ---------- Ultra: acabamento extra da interface (só no nível Ultra, para não pesar nos outros) ---------- */
+body.ultra { text-rendering: optimizeLegibility; -webkit-font-smoothing: antialiased; }
+body.ultra .tela { animation: entrar .22s ease-out both; }
+body.ultra .camada { animation: aparecer .18s ease-out both; }
+body.ultra .camada .janela { animation: subir .22s cubic-bezier(.2, .9, .3, 1.2) both; }
+body.ultra .tela.sobre-mapa { background: rgba(8, 11, 18, 0.55); backdrop-filter: blur(6px) saturate(1.15); -webkit-backdrop-filter: blur(6px) saturate(1.15); }
+body.ultra .destaque, body.ultra .chip, body.ultra .chip-moedas, body.ultra .caixa, body.ultra #placar .faixa, body.ultra #abates span {
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+body.ultra .btn, body.ultra .item, body.ultra .lado, body.ultra .pacote, body.ultra .linha-arma, body.ultra .nivel, body.ultra .aba, body.ultra .redondo, body.ultra .slot {
+  transition: transform .12s ease, border-color .15s ease, background-color .15s ease, box-shadow .15s ease; }
+body.ultra .btn:active, body.ultra .item:active, body.ultra .lado:active, body.ultra .pacote:active, body.ultra .redondo:active { transform: scale(.96); }
+body.ultra .peca.redondo:active { transform: translate(-50%, -50%) scale(.94); }
+body.ultra .btn-ouro, body.ultra .tiro { box-shadow: 0 6px 22px rgba(251, 191, 36, 0.28); }
+body.ultra .tiro { box-shadow: 0 6px 22px rgba(220, 38, 38, 0.35); }
+body.ultra .item.sel, body.ultra .nivel.sel, body.ultra .slot.ativa { box-shadow: 0 0 0 1px var(--ouro), 0 8px 26px rgba(251, 191, 36, 0.22); }
+body.ultra .lado.pol:hover { box-shadow: 0 0 28px rgba(59, 130, 246, 0.35); }
+body.ultra .lado.ban:hover { box-shadow: 0 0 28px rgba(245, 158, 11, 0.35); }
+@keyframes entrar { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes aparecer { from { opacity: 0; } to { opacity: 1; } }
+@keyframes subir { from { opacity: 0; transform: translateY(14px) scale(.97); } to { opacity: 1; transform: none; } }

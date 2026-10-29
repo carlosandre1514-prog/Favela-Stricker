@@ -66,7 +66,7 @@ const NIVEIS = [
   { nome: 'Leve', info: 'Celulares de 3 a 4 GB (ex.: Galaxy A14). 30 quadros, sem sombras, personagens simplificados.' },
   { nome: 'Padrão', info: 'Celulares de 4 a 6 GB. 40 quadros, chão detalhado, mais luzes.' },
   { nome: 'Intermediária', info: 'Celulares de 6 a 8 GB. 50 quadros, sombras perto, texturas melhores.' },
-  { nome: 'Avançada', info: 'Celulares top e computadores. 60 quadros, tudo no máximo.' },
+  { nome: 'Ultra', info: 'Celulares top e computadores. Tudo liberado: texturas e modelos originais, sombras nítidas e longas, antisserrilhado, reflexos, visão longe, 60 quadros.' },
 ];
 
 // ---------------- configurações do jogador ----------------

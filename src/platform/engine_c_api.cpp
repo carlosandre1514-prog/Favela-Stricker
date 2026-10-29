@@ -66,28 +66,32 @@ void applyQualityLevel(Engine* e, int nivel) {
     static const int kCharMax[4] = {256, 512, 512, 0};
     static const int kTexMax[4] = {512, 512, 1024, 0};
     static const float kTris[4] = {0.25f, 0.35f, 0.5f, 1.f};
+    static const float kAniso[4] = {1.f, 2.f, 4.f, 16.f};
     e->quality = kQuality[nivel];
     e->nivel = nivel;
     e->lowTextures = nivel <= 1;
     TextureManager::instance().charMax = kCharMax[nivel];
     TextureManager::instance().modelMax = kTexMax[nivel];
     e->renderer.simplify = kTris[nivel];
+    TextureManager::instance().anisotropia = kAniso[nivel];
 }
 }  // namespace eng
 
 Engine* engine_create(const char* shader_dir) {
     eng::TextureManager::instance().forgetAll();  // contexto GL novo: ids antigos não valem
     Engine* e = new Engine();
-    if (!e->renderer.init(shader_dir)) { delete e; return nullptr; }
-    if (e->particles.init(e->renderer)) e->renderer.particles = &e->particles;
-    e->objects.reserve(Scene::kMaxObjects);
-    // qualidade escolhida no app (gravada antes de abrir): 0 = celular fraco
-    // qualidade.txt: 0 = Leve, 1 = Padrão, 2 = Intermediária, 3 = Avançada
+    // qualidade.txt: 0 = Leve, 1 = Padrão, 2 = Intermediária, 3 = Ultra (gravada pelo app antes de abrir)
     int nivel = 2;
     if (FILE* f = std::fopen((std::string(shader_dir) + "/qualidade.txt").c_str(), "r")) {
         if (std::fscanf(f, "%d", &nivel) != 1) nivel = 2;
         std::fclose(f);
     }
+    // Ultra: sombra com o dobro de resolução e reflexo do ambiente mais nítido
+    e->renderer.shadowSize = nivel >= 3 ? 2048 : eng::kShadowMapSize;
+    e->renderer.envSize = nivel >= 3 ? 256 : eng::Renderer::kEnvSize;
+    if (!e->renderer.init(shader_dir)) { delete e; return nullptr; }
+    if (e->particles.init(e->renderer)) e->renderer.particles = &e->particles;
+    e->objects.reserve(Scene::kMaxObjects);
     eng::applyQualityLevel(e, nivel);
     eng::loadMocapLibrary(std::string(shader_dir) + "/anim");  // animações capturadas (antes de criar personagens)
     eng::ensureBasics(e);
@@ -142,10 +146,10 @@ void engine_frame(Engine* e, float dt) {
     if (e->nearOverride > 0.f) e->camera.nearZ = e->nearOverride;
     e->camera.farZ = std::max(e->mapKind >= 0 ? 900.f : 200.f, d * 40.f);
     // jogando: vê até uma distância (o resto nem é enviado para a placa de vídeo); leve vê menos
-    // por nível (Leve, Padrão, Intermediária, Avançada): visão, sombras e quando os detalhes somem
-    static const float kViewDist[4] = {150.f, 220.f, 320.f, 700.f};
-    static const float kShadowMax[4] = {0.f, 0.f, 60.f, 160.f};  // 0 = sem sombra (o mapa desenhado de novo custa caro)
-    static const float kLod[4] = {0.5f, 0.65f, 0.85f, 1.f};
+    // por nível (Leve, Padrão, Intermediária, Ultra): visão, sombras e quando os detalhes somem
+    static const float kViewDist[4] = {150.f, 220.f, 320.f, 900.f};
+    static const float kShadowMax[4] = {0.f, 0.f, 60.f, 200.f};  // 0 = sem sombra (o mapa desenhado de novo custa caro)
+    static const float kLod[4] = {0.5f, 0.65f, 0.85f, 1.35f};  // Ultra: detalhes (plantas, objetos) aparecem mais longe
     const int nv = std::clamp(e->nivel, 0, 3);
     const float viewDist = !e->playing ? 1e9f : kViewDist[nv];
     if (e->playing) e->camera.farZ = std::min(e->camera.farZ, viewDist * 1.2f);

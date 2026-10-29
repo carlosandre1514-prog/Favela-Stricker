@@ -121,7 +121,7 @@ class JogoActivity : Activity() {
         }
         try { File(dirMotor, "qualidade.txt").writeText(nivelGrafico().toString()) } catch (_: Exception) {}
 
-        motorView = EngineView(this, dirMotor)
+        motorView = EngineView(this, dirMotor, if (nivelGrafico() >= 3) 4 else 0)  // Ultra: antisserrilhado 4x
         motorView.touchToEngine = false
         motorView.onReady = { abrirMapaDaPartida() }
         motorView.afterFrame = { quadro -> depoisDoQuadro(quadro) }
@@ -298,7 +298,7 @@ class JogoActivity : Activity() {
         arquivoErro.delete()
         if (texto.isBlank()) return
         val versao = try { packageManager.getPackageInfo(packageName, 0).versionName } catch (_: Exception) { "" }
-        val niveis = arrayOf("Leve", "Padrão", "Intermediária", "Avançada")
+        val niveis = arrayOf("Leve", "Padrão", "Intermediária", "Ultra")
         val info = "Favela Stricker $versao · Android ${Build.VERSION.RELEASE} · ${Build.MANUFACTURER} ${Build.MODEL} · " +
             "gráficos: ${niveis[nivelGrafico()]}\n\n$texto"
         AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)

@@ -25,7 +25,8 @@ class EngineSnapshot {
     @Volatile var teamMode = false
 }
 
-class EngineView(activity: Activity, private val shaderDir: String) : GLSurfaceView(activity) {
+// amostras > 0: antisserrilhado MSAA (qualidade Ultra); se o celular não tiver, cai para a tela normal
+class EngineView(activity: Activity, private val shaderDir: String, private val amostras: Int = 0) : GLSurfaceView(activity) {
     var touchToEngine = true  // jogo: o toque vira olhar pelos controles da tela, não vai direto ao motor
     var afterFrame: ((Int) -> Unit)? = null
     val snapshot = EngineSnapshot()
@@ -48,7 +49,7 @@ class EngineView(activity: Activity, private val shaderDir: String) : GLSurfaceV
 
     init {
         setEGLContextClientVersion(3)
-        setEGLConfigChooser(8, 8, 8, 8, 24, 0)
+        setEGLConfigChooser(EscolheConfig(amostras))
         preserveEGLContextOnPause = true  // evita recriar tudo ao voltar do segundo plano
         setRenderer(object : Renderer {
             private var last = 0L
@@ -128,5 +129,27 @@ class EngineView(activity: Activity, private val shaderDir: String) : GLSurfaceV
         val xyArr = xy.toFloatArray()
         queueEvent { NativeBridge.nativeTouch(action, idArr, xyArr) }
         return true
+    }
+}
+
+// Configuração da tela GL: RGBA8 + profundidade 24; com amostras > 0 tenta MSAA (bordas sem serrilhado)
+private class EscolheConfig(private val amostras: Int) : GLSurfaceView.EGLConfigChooser {
+    override fun chooseConfig(egl: javax.microedition.khronos.egl.EGL10, display: javax.microedition.khronos.egl.EGLDisplay): javax.microedition.khronos.egl.EGLConfig {
+        val es3 = 4  // EGL_OPENGL_ES2_BIT: o mesmo que o GLSurfaceView usa (o contexto ES 3 sai dele)
+        fun tenta(msaa: Int): javax.microedition.khronos.egl.EGLConfig? {
+            val base = intArrayOf(
+                javax.microedition.khronos.egl.EGL10.EGL_RED_SIZE, 8, javax.microedition.khronos.egl.EGL10.EGL_GREEN_SIZE, 8,
+                javax.microedition.khronos.egl.EGL10.EGL_BLUE_SIZE, 8, javax.microedition.khronos.egl.EGL10.EGL_ALPHA_SIZE, 8,
+                javax.microedition.khronos.egl.EGL10.EGL_DEPTH_SIZE, 24, javax.microedition.khronos.egl.EGL10.EGL_RENDERABLE_TYPE, es3)
+            val extra = if (msaa > 0) intArrayOf(javax.microedition.khronos.egl.EGL10.EGL_SAMPLE_BUFFERS, 1, javax.microedition.khronos.egl.EGL10.EGL_SAMPLES, msaa) else intArrayOf()
+            val attrs = base + extra + intArrayOf(javax.microedition.khronos.egl.EGL10.EGL_NONE)
+            val n = IntArray(1)
+            if (!egl.eglChooseConfig(display, attrs, null, 0, n) || n[0] <= 0) return null
+            val configs = arrayOfNulls<javax.microedition.khronos.egl.EGLConfig>(n[0])
+            egl.eglChooseConfig(display, attrs, configs, n[0], n)
+            return configs.firstOrNull()
+        }
+        return (if (amostras > 0) tenta(amostras) ?: tenta(2) else null) ?: tenta(0)
+            ?: throw IllegalStateException("sem configuração OpenGL ES 3 neste aparelho")
     }
 }

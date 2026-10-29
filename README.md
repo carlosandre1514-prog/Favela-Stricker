@@ -10,7 +10,7 @@ Jogo de tiro em primeira pessoa **Polícia x Bandidos** no mapa da favela.
 - **Lojas:** armas se compram **na partida**, na base do time, com o $ dos abates. Skins de arma e roupas se compram
   no **mercado**, com moedas. Cada lado tem as suas roupas (polícia só farda, bandido só roupa de bandido);
   quantos quiserem podem usar a mesma.
-- **Gráficos:** 4 qualidades — Leve, Padrão, Intermediária e Avançada (texturas, triângulos, sombras, visão e quadros).
+- **Gráficos:** 4 qualidades — Leve, Padrão, Intermediária e **Ultra** (no Ultra tudo liberado: texturas e modelos originais, sombras 2048, antisserrilhado 4x, filtro anisotrópico 16x, reflexos 256, visão de 900 m, 60 quadros e a interface com acabamento extra).
 - **Configurações:** sensibilidade da câmera, da mira e da luneta; som e voz; **HUD editável** (arrastar cada botão,
   mudar o tamanho e a transparência).
 

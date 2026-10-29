@@ -394,7 +394,7 @@ struct Engine {
     // perfil do último quadro (ms): mundo (carregar pedaços), montar a lista de desenho, render (CPU do GL)
     float profWorld = 0.f, profSubmit = 0.f, profRender = 0.f;
     int quality = 2;  // 0 desempenho (sem sombra, vê menos longe), 1 equilibrado, 2 alta
-    int nivel = 2;    // nível gráfico do jogo: 0 Leve, 1 Padrão, 2 Intermediária, 3 Avançada (applyQualityLevel)
+    int nivel = 2;    // nível gráfico do jogo: 0 Leve, 1 Padrão, 2 Intermediária, 3 Ultra (applyQualityLevel)
     bool lowTextures = false;  // celular fraco (qualidade.txt = 0 ao abrir): texturas na metade e terreno simples
     int statFrames = 0;
 };
@@ -405,7 +405,7 @@ int registerObject(Engine* e, Scene::Handle h);
 glm::mat4 renderMatrix(const Engine* e, const GameObject& go, const glm::mat4** palette);
 bool subtreeBounds(Engine* e, GameObject& root, AABB& out);
 void focusSceneOrSelection(Engine* e);
-void applyQualityLevel(Engine* e, int nivel);  // 0 Leve · 1 Padrão · 2 Intermediária · 3 Avançada
+void applyQualityLevel(Engine* e, int nivel);  // 0 Leve · 1 Padrão · 2 Intermediária · 3 Ultra
 void releaseComponents(Engine* e, GameObject& g);
 void ensureBasics(Engine* e);
 void clearScene(Engine* e);

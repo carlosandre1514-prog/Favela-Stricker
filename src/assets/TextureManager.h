@@ -54,6 +54,7 @@ public:
 
     int modelMax = 0;    // tamanho máximo das texturas de modelos (armas, objetos); 0 = sem limite
     int charMax = 0;     // o mesmo para personagens (vistos mais de longe: dá para usar menor)
+    float anisotropia = 1.f;  // filtro anisotrópico das texturas (1 = desligado)
     size_t bytes = 0;    // memória de vídeo estimada das texturas enviadas (com mipmaps)
 
     // KTX1 com formato comprimido (ASTC 4x4..12x12 ou ETC2). Mipmaps já embutidos no arquivo.
@@ -92,7 +93,7 @@ public:
         bytes = 0;
     }
     // Contexto GL perdido/recriado: os ids antigos não valem mais
-    void forgetAll() { created_.clear(); named_.clear(); white_ = flat_ = 0; }
+    void forgetAll() { created_.clear(); named_.clear(); white_ = flat_ = 0; maxAniso_ = -1.f; }
 
     // Textura já enviada, pelo caminho do arquivo (modelos que dividem as mesmas imagens, ex.: o kit da cidade)
     GLuint named(const std::string& key) const { auto it = named_.find(key); return it == named_.end() ? 0 : it->second; }
@@ -131,7 +132,18 @@ private:
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+        // filtro anisotrópico: chão e paredes nítidos de longe e na diagonal (Ultra: 16x)
+        if (anisotropia > 1.f) {
+            if (maxAniso_ < 0.f) {
+                while (glGetError() != GL_NO_ERROR) {}
+                GLfloat m = 0.f;
+                glGetFloatv(0x84FF /*GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT*/, &m);
+                maxAniso_ = glGetError() == GL_NO_ERROR ? m : 0.f;
+            }
+            if (maxAniso_ > 1.f) glTexParameterf(GL_TEXTURE_2D, 0x84FE /*GL_TEXTURE_MAX_ANISOTROPY_EXT*/, std::min(anisotropia, maxAniso_));
+        }
     }
+    float maxAniso_ = -1.f;
     GLuint white_ = 0, flat_ = 0;
     std::map<std::string, GLuint> named_;
     std::vector<GLuint> created_;

@@ -101,6 +101,9 @@ public:
     std::map<std::string, MeshId> meshCache;
     // fração dos triângulos que fica nos modelos carregados (qualidades leves < 1)
     float simplify = 1.f;
+    // resolução da sombra e do reflexo do ambiente (definidas antes do init; Ultra: 2048 e 256)
+    int shadowSize = kShadowMapSize;
+    int envSize = kEnvSize;
 
     // Frame: beginFrame -> submit* -> (linhas) -> render
     void beginFrame(const Camera& cam, const DirectionalLight& sun);
