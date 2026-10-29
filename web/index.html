@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0B0F17">
+<title>Favela Stricker</title>
+<link rel="icon" href="img/icone.png">
+<link rel="preload" href="fontes/bebas-neue-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fontes/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="estilo.css">
+</head>
+<body>
+<canvas id="tela" tabindex="-1"></canvas>
+<div id="ui"><div id="palco"></div></div>
+<div id="carregando">
+  <div class="logo"><span class="ouro">FAVELA</span><span class="azul">STRICKER</span></div>
+  <div class="barra"><div id="progresso"></div></div>
+  <div id="status">Abrindo…</div>
+  <div class="dica">Primeira vez: o jogo baixa uns 80 MB (fica guardado no navegador). Use o computador ou o celular deitado.</div>
+</div>
+<script src="config_jogo.js"></script>
+<script src="motor.js"></script>
+<script src="conta.js"></script>
+<script src="ui.js"></script>
+<script src="partida.js"></script>
+<script src="jogo.js"></script>
+</body>
+</html>

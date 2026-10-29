@@ -1,0 +1,15 @@
+{
+  "name": "favela-stricker-servidor",
+  "version": "0.2.0",
+  "description": "Site e partidas ao vivo (WebSocket) do Favela Stricker",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "ws": "8.18.0"
+  }
+}
