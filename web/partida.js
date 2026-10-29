@@ -76,7 +76,21 @@ function olharTela(dx, dy) {  // dx, dy em pixels de tela (CSS)
 let partida = null;  // {time, sala, hud, fim, loja}
 let lacoHud = null;
 
-function iniciarPartida(time, roupa, sala, armaPrincipal) {
+// Na primeira partida o mapa carrega (a tela inicial não carrega nada de 3D, para ficar leve)
+let iniciandoPartida = false;
+async function iniciarPartida(time, roupa, sala, armaPrincipal) {
+  if (iniciandoPartida || partida) return;
+  iniciandoPartida = true;
+  if (!motor.mapaPronto()) {
+    const c = html(`<div class="camada fixo"><div class="janela" style="align-items:center;text-align:center">
+      <span class="t">CARREGANDO A FAVELA…</span><span class="m">Só na primeira partida. Depois entra na hora.</span></div></div>`);
+    palco.appendChild(c);
+    await dorme(80);
+    motor.prepararPartida();
+    while (!motor.mapaPronto()) await dorme(150);
+    c.remove();
+  }
+  iniciandoPartida = false;
   motor.girarMenu(false);
   ctxAudio();
   partida = { time, sala, fim: false, agachado: false, mirando: false, danoAntes: false };

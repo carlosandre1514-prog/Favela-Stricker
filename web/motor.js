@@ -22,11 +22,18 @@ const wasm = (nome, ret, tipos, args) => (M ? M.ccall(nome, ret, tipos, args) : 
 const lerJson = (s, padrao) => { try { return s ? JSON.parse(s) : padrao; } catch (_) { return padrao; } };
 
 // estado de entrada aplicado a cada quadro no site (no APK o Kotlin faz isso na thread do motor)
-const entrada = { dx: 0, dy: 0, atirando: false, girando: true };
+const entrada = { dx: 0, dy: 0, atirando: false, girando: false };
+
+// Tela inicial leve: no menu aparece uma imagem fixa da favela e o motor fica parado (não desenha);
+// o mapa só é carregado quando a primeira partida vai começar.
+const modoMenu = (on) => document.body.classList.toggle('menu-fundo', !!on);
+let projetoPartida = null, mapaCarregado = false;
 
 const motor = ANDROID ? {
   pronto: () => Nativo.pronto(),
-  girarMenu: (on) => Nativo.girarMenu(!!on),
+  girarMenu: (on) => { modoMenu(on); Nativo.girarMenu(false); Nativo.desenhar(!on); },
+  prepararPartida: () => Nativo.prepararPartida(),
+  mapaPronto: () => Nativo.mapaPronto(),
   visaoGeral: () => Nativo.visaoGeral(),
   play: (on) => Nativo.play(!!on),
   primeiraPessoa: (on) => Nativo.primeiraPessoa(!!on),
@@ -59,7 +66,14 @@ const motor = ANDROID ? {
   sair: () => Nativo.sair(),
 } : {
   pronto: () => !!M,
-  girarMenu: (on) => { entrada.girando = !!on; },
+  girarMenu: (on) => { modoMenu(on); entrada.girando = false; },
+  prepararPartida: () => {
+    if (mapaCarregado || !M || !projetoPartida) return;
+    M.ccall('web_abrir_projeto', 'number', ['string'], [JSON.stringify(projetoPartida)]);
+    M.ccall('web_selecionar', null, ['number'], [-1]);
+    mapaCarregado = true;
+  },
+  mapaPronto: () => mapaCarregado,
   visaoGeral: () => wasm('web_camera', null, ['number', 'number', 'number', 'number', 'number', 'number'], [0, 8, 20, 3.6, 0.42, 115]),
   play: (on) => wasm('web_play', null, ['number'], [on ? 1 : 0]),
   primeiraPessoa: (on) => wasm('web_primeira_pessoa', null, ['number'], [on ? 1 : 0]),
@@ -175,10 +189,9 @@ async function iniciarMotor(aoProgresso) {
   aoProgresso && aoProgresso('Preparando o mapa…');
   await new Promise((r) => setTimeout(r, 30));
   if (!M.ccall('web_iniciar', 'number', ['number'], [motor.nivel()])) throw new Error('Seu navegador não tem WebGL 2. Use o Chrome ou o Firefox atualizados.');
-  const proj = await (await fetch('exemplos/5_policia_x_bandidos.json')).json();
+  // o mapa fica guardado e só abre na primeira partida (barracas de roupa fora: roupa é no mercado)
+  projetoPartida = await (await fetch('exemplos/5_policia_x_bandidos.json')).json();
+  projetoPartida.objetos = (projetoPartida.objetos || []).filter((o) => !(o.tipo === 'loja' && o.loja === 'roupas'));
   M.ccall('web_sem_editor', null, [], []);
-  M.ccall('web_abrir_projeto', 'number', ['string'], [JSON.stringify(proj)]);
-  M.ccall('web_selecionar', null, ['number'], [-1]);
-  motor.visaoGeral();
   return true;
 }

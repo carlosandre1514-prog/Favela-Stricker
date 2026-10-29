@@ -12,7 +12,7 @@ import java.util.concurrent.TimeUnit
 class PonteJogo(private val jogo: JogoActivity) {
     // estado lido pela thread GL a cada quadro
     @Volatile var atirando = false
-    @Volatile var girando = true
+    @Volatile var girando = false
     @Volatile var online = false
     private val olharLock = Any()
     private var olharX = 0f
@@ -23,7 +23,9 @@ class PonteJogo(private val jogo: JogoActivity) {
     @Volatile var lojaJson = ""
     @Volatile var redeEstado = ""
     val redeEventos = ConcurrentLinkedQueue<String>()
-    @Volatile var pronto = false
+    @Volatile var pronto = false          // motor criado
+    @Volatile var mapaPronto = false      // mapa da partida carregado
+    @Volatile var carregandoMapa = false
 
     fun pegarOlhar(): Pair<Float, Float> = synchronized(olharLock) { val p = olharX to olharY; olharX = 0f; olharY = 0f; p }
 
@@ -40,6 +42,15 @@ class PonteJogo(private val jogo: JogoActivity) {
     @JavascriptInterface fun versao(): String = jogo.versao()
     @JavascriptInterface fun fase(texto: String) { jogo.diag.fase = texto }
     @JavascriptInterface fun pronto(): Boolean = pronto
+    // o mapa só carrega quando a partida vai começar (a tela inicial fica leve); a página espera mapaPronto()
+    @JavascriptInterface fun prepararPartida() {
+        if (mapaPronto || carregandoMapa) return
+        carregandoMapa = true
+        jogo.desenhar(true)
+        gl { jogo.abrirMapaDaPartida() }
+    }
+    @JavascriptInterface fun mapaPronto(): Boolean = mapaPronto
+    @JavascriptInterface fun desenhar(on: Boolean) = jogo.desenhar(on)
     @JavascriptInterface fun girarMenu(on: Boolean) { girando = on }
     @JavascriptInterface fun visaoGeral() = gl { NativeBridge.nativeSetCamera(0f, 8f, 20f, 3.6f, 0.42f, 115f) }
     @JavascriptInterface fun play(on: Boolean) { if (!on) atirando = false; gl { NativeBridge.nativeSetPlay(on) } }

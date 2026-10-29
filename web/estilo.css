@@ -266,3 +266,7 @@ body.ultra .lado.ban:hover { box-shadow: 0 0 28px rgba(245, 158, 11, 0.35); }
 @keyframes subir { from { opacity: 0; transform: translateY(14px) scale(.97); } to { opacity: 1; transform: none; } }
 
 .versao { position: absolute; left: 8px; bottom: 4px; font-size: 10px; color: rgba(255, 255, 255, 0.35); pointer-events: none; }
+
+/* tela inicial leve: imagem fixa da favela no fundo dos menus (o motor 3D fica parado) */
+body.menu-fundo, body.android.menu-fundo { background: #0B0F17 url(img/fundo_menu.jpg) center / cover no-repeat; }
+body.menu-fundo canvas#tela { visibility: hidden; }

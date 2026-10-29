@@ -421,6 +421,7 @@ function telaMultiplayer() {
 }
 
 function ligarSala(s) {
+  setTimeout(() => motor.prepararPartida(), 300);  // já vai carregando o mapa enquanto espera na sala
   s.ouvir(
     () => { if (telaAtual() === 'sala') telaSala(); },
     (estado) => { if (sala === s && estado === 'jogo' && !partida) comecarOnline(s); },

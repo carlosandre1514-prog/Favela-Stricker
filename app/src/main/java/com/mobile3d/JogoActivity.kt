@@ -7,6 +7,7 @@ import android.app.AlertDialog
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.graphics.Color
+import android.opengl.GLSurfaceView
 import android.os.Build
 import android.os.Bundle
 import android.os.SystemClock
@@ -144,7 +145,13 @@ class JogoActivity : Activity() {
 
         motorView = EngineView(this, dirMotor, if (nivelGrafico() >= 3) 4 else 0)  // Ultra: antisserrilhado 4x
         motorView.touchToEngine = false
-        motorView.onReady = { abrirMapaDaPartida() }
+        // tela inicial leve: o motor abre vazio e parado; o mapa só carrega quando a partida vai começar
+        motorView.onReady = {
+            ponte.mapaPronto = false
+            ponte.carregandoMapa = false
+            ponte.pronto = true
+            diag.fase = "motor pronto (menu sem mapa)"
+        }
         motorView.afterFrame = { quadro -> depoisDoQuadro(quadro) }
         aplicarResolucao()
 
@@ -194,6 +201,7 @@ class JogoActivity : Activity() {
 
         val raiz = FrameLayout(this)
         raiz.addView(motorView, FrameLayout.LayoutParams(-1, -1))
+        motorView.renderMode = GLSurfaceView.RENDERMODE_WHEN_DIRTY  // no menu o motor não desenha (só na partida)
         raiz.addView(web, FrameLayout.LayoutParams(-1, -1))
         setContentView(raiz)
         web.loadUrl("https://jogo.local/index.html")
@@ -201,9 +209,8 @@ class JogoActivity : Activity() {
     }
 
     // Projeto da partida (o mesmo do editor); as barracas de roupa ficam de fora: roupa se compra no mercado
-    private fun abrirMapaDaPartida() {
+    fun abrirMapaDaPartida() {
         diag.fase = "abrindo o mapa"
-        ponte.pronto = false
         try {
             val json = JSONObject(assets.open("exemplos/5_policia_x_bandidos.json").bufferedReader().readText())
             val objs = json.getJSONArray("objetos")
@@ -221,7 +228,8 @@ class JogoActivity : Activity() {
             Log.e("FavelaStricker", "mapa da partida", e)
         }
         NativeBridge.nativeSetCamera(0f, 8f, 20f, 3.6f, 0.42f, 115f)
-        ponte.pronto = true
+        ponte.mapaPronto = true
+        ponte.carregandoMapa = false
         diag.fase = "mapa aberto"
     }
 
@@ -278,6 +286,12 @@ class JogoActivity : Activity() {
     fun versao(): String = try { packageManager.getPackageInfo(packageName, 0).versionName ?: "" } catch (_: Exception) { "" }
 
     fun configJogo(): String = try { assets.open("config_jogo.json").bufferedReader().readText() } catch (_: Exception) { "{}" }
+
+    // partida: o motor desenha sem parar; menu: parado (não gasta processador, vídeo nem bateria)
+    fun desenhar(on: Boolean) = runOnUiThread {
+        if (!::motorView.isInitialized) return@runOnUiThread
+        motorView.renderMode = if (on) GLSurfaceView.RENDERMODE_CONTINUOUSLY else GLSurfaceView.RENDERMODE_WHEN_DIRTY
+    }
 
     fun nivelGrafico() = prefs.getInt("nivel", 0).coerceIn(0, 3)
 
