@@ -88,7 +88,8 @@ void    engine_anim_edit_end(Engine*);
 // Estatísticas: out[0] fps, [1] ms por frame, [2] ms de CPU do motor, [3] draw calls, [4] triângulos, [5] objetos
 void    engine_get_stats(Engine*, float* out6);
 void    engine_get_profile(Engine*, float* out3);
-void    engine_set_quality(Engine*, int q);
+void    engine_memory_stats(Engine*, float* out4);           // texturas MB, malhas MB, nº de malhas
+void    engine_set_quality(Engine*, int q);                  // nível 0 Leve, 1 Padrão, 2 Intermediária, 3 Avançada
 // Converte a animação de um FBX (esqueleto Mixamo) para o esqueleto do motor e grava em .anim.
 // rootMode: 0 como veio (morte), 1 no lugar (andar/correr), 2 só pose (pulo). Retorna o nº de quadros (0 = erro).
 // armsDownDeg: abaixa os braços nos ombros (uma animação de mirar vira "pronto baixo"); 0 = como veio.

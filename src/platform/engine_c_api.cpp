@@ -56,6 +56,25 @@ static void recordEdit(Engine* e, const char* key, const std::string& value) {
 }
 
 // ---------- ciclo de vida ----------
+namespace eng {
+// Nível gráfico escolhido no jogo. Vale ao abrir o motor (texturas e modelos são preparados no carregamento).
+//   texturas dos personagens: 256 · 512 · 512 · original   armas: 512 · 512 · 1024 · original
+//   triângulos dos personagens: 25% · 35% · 50% · 100% (armas: no mínimo 50%)
+void applyQualityLevel(Engine* e, int nivel) {
+    nivel = std::clamp(nivel, 0, 3);
+    static const int kQuality[4] = {0, 0, 1, 2};
+    static const int kCharMax[4] = {256, 512, 512, 0};
+    static const int kTexMax[4] = {512, 512, 1024, 0};
+    static const float kTris[4] = {0.25f, 0.35f, 0.5f, 1.f};
+    e->quality = kQuality[nivel];
+    e->nivel = nivel;
+    e->lowTextures = nivel <= 1;
+    TextureManager::instance().charMax = kCharMax[nivel];
+    TextureManager::instance().modelMax = kTexMax[nivel];
+    e->renderer.simplify = kTris[nivel];
+}
+}  // namespace eng
+
 Engine* engine_create(const char* shader_dir) {
     eng::TextureManager::instance().forgetAll();  // contexto GL novo: ids antigos não valem
     Engine* e = new Engine();
@@ -63,11 +82,13 @@ Engine* engine_create(const char* shader_dir) {
     if (e->particles.init(e->renderer)) e->renderer.particles = &e->particles;
     e->objects.reserve(Scene::kMaxObjects);
     // qualidade escolhida no app (gravada antes de abrir): 0 = celular fraco
+    // qualidade.txt: 0 = Leve, 1 = Padrão, 2 = Intermediária, 3 = Avançada
+    int nivel = 2;
     if (FILE* f = std::fopen((std::string(shader_dir) + "/qualidade.txt").c_str(), "r")) {
-        int q = 1;
-        if (std::fscanf(f, "%d", &q) == 1) { e->quality = std::clamp(q, 0, 2); e->lowTextures = q == 0; }
+        if (std::fscanf(f, "%d", &nivel) != 1) nivel = 2;
         std::fclose(f);
     }
+    eng::applyQualityLevel(e, nivel);
     eng::loadMocapLibrary(std::string(shader_dir) + "/anim");  // animações capturadas (antes de criar personagens)
     eng::ensureBasics(e);
     return e;
@@ -121,13 +142,18 @@ void engine_frame(Engine* e, float dt) {
     if (e->nearOverride > 0.f) e->camera.nearZ = e->nearOverride;
     e->camera.farZ = std::max(e->mapKind >= 0 ? 900.f : 200.f, d * 40.f);
     // jogando: vê até uma distância (o resto nem é enviado para a placa de vídeo); leve vê menos
-    const float viewDist = !e->playing ? 1e9f : e->quality == 0 ? 170.f : e->quality == 1 ? 320.f : 700.f;
+    // por nível (Leve, Padrão, Intermediária, Avançada): visão, sombras e quando os detalhes somem
+    static const float kViewDist[4] = {150.f, 220.f, 320.f, 700.f};
+    static const float kShadowMax[4] = {0.f, 0.f, 60.f, 160.f};  // 0 = sem sombra (o mapa desenhado de novo custa caro)
+    static const float kLod[4] = {0.5f, 0.65f, 0.85f, 1.f};
+    const int nv = std::clamp(e->nivel, 0, 3);
+    const float viewDist = !e->playing ? 1e9f : kViewDist[nv];
     if (e->playing) e->camera.farZ = std::min(e->camera.farZ, viewDist * 1.2f);
     // sombras: só perto (de longe ninguém nota e custam o mapa inteiro desenhado de novo 3 vezes)
-    e->renderer.shadowDistance = std::clamp(d * 3.5f, e->playing ? 40.f : 12.f, e->quality >= 2 ? 160.f : 100.f);
+    e->renderer.shadowDistance = std::clamp(d * 3.5f, e->playing ? 40.f : 12.f, std::max(40.f, kShadowMax[nv]));
     eng::DirectionalLight sun = e->sun;
-    sun.castShadows = sun.castShadows && e->quality > 0 && (e->playing || d < 350.f) && !e->globeMode;
-    const float lodScale = e->quality == 0 ? 0.5f : e->quality == 1 ? 0.85f : 1.f;  // detalhes somem mais cedo
+    sun.castShadows = sun.castShadows && kShadowMax[nv] > 0.f && (e->playing || d < 350.f) && !e->globeMode;
+    const float lodScale = kLod[nv];  // detalhes somem mais cedo
     e->editorCam.apply(e->camera);
     e->scene.updateTransforms();
     eng::updateAttachments(e);
@@ -195,12 +221,12 @@ void engine_frame(Engine* e, float dt) {
 
     // luzes: as da cena + as mais relevantes dos efeitos (fogo, magia, explosões)
     eng::PointLight lights[eng::kMaxPointLights];
-    int nLights = eng::gatherLights(e, lights, e->quality == 0 ? 3 : eng::kMaxPointLights);  // leve: menos luzes no shader
+    int nLights = eng::gatherLights(e, lights, e->nivel <= 0 ? 3 : e->nivel == 1 ? 4 : eng::kMaxPointLights);  // leve: menos luzes no shader
     auto tr = std::chrono::steady_clock::now();
     eng::Environment env = e->env;
     float fog = e->renderer.fogDensity;
     eng::weatherLook(e, env, sun, fog);  // chuva: céu fechado, neblina, clarão dos raios
-    if (e->playing && e->quality == 0) fog = std::max(fog, 0.0075f);  // leve: neblina esconde onde a visão acaba
+    if (e->playing && e->nivel <= 1) fog = std::max(fog, e->nivel == 0 ? 0.0085f : 0.006f);  // leve: neblina esconde onde a visão acaba
     const float keepFog = e->renderer.fogDensity;
     e->renderer.fogDensity = fog;
     e->renderer.render(e->camera, sun, env, lights, nLights);
@@ -546,7 +572,8 @@ int engine_mocap_bake(const char* fbx, const char* outAnim, int rootMode, const 
     return eng::saveMocap(outAnim, c) ? c.frames : 0;
 }
 
-void engine_set_quality(Engine* e, int q) { if (e) e->quality = std::clamp(q, 0, 2); }
+// nível 0..3: visão, sombras e luzes mudam na hora; texturas e modelos na próxima abertura do jogo
+void engine_set_quality(Engine* e, int q) { if (e) eng::applyQualityLevel(e, q); }
 
 void engine_get_profile(Engine* e, float* o) {
     if (!e || !o) return;
@@ -558,6 +585,15 @@ void engine_get_stats(Engine* e, float* o) {
     const eng::FrameStats& s = e->renderer.stats();
     o[0] = e->fps; o[1] = e->frameMs; o[2] = e->cpuMs;
     o[3] = float(s.drawCalls); o[4] = float(s.triangles); o[5] = float(e->scene.count());
+}
+
+// memória: [0] texturas MB, [1] malhas MB, [2] malhas, [3] triângulos carregados (mil)
+void engine_memory_stats(Engine* e, float* o) {
+    if (!e || !o) return;
+    o[0] = float(double(eng::TextureManager::instance().bytes) / 1048576.0);
+    o[1] = float(double(e->renderer.meshBytes()) / 1048576.0);
+    o[2] = float(e->renderer.meshTotal());
+    o[3] = 0.f;
 }
 
 // ---------- criação procedural ----------

@@ -2,6 +2,7 @@ name: APK do jogo
 
 on:
   push:
+    branches: [main]
   workflow_dispatch:
 
 jobs:
@@ -47,3 +48,7 @@ jobs:
         run: |
           mkdir -p saida
           SO_ONLINE=1 ./build/mobile3d_headless shaders saida
+      - name: Memória no nível Leve (o mesmo mapa do APK)
+        run: |
+          echo 0 > shaders/qualidade.txt
+          SO_MEMORIA=app/src/main/assets/exemplos/5_policia_x_bandidos.json ./build/mobile3d_headless shaders saida

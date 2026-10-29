@@ -59,6 +59,10 @@ void pngToVec(void* ctx, void* data, int size) {
 
 // Lê uma textura da GPU (anexando a um FBO). Texturas 1x1 (padrão branco) não são exportadas.
 bool readTexture(GLuint tex, std::vector<uint8_t>& png) {
+#ifdef __EMSCRIPTEN__
+    (void)tex; (void)png;
+    return false;  // navegador (WebGL 2): sem leitura do tamanho da textura; o site não exporta modelos
+#else
     if (!tex) return false;
     GLint w = 0, h = 0, fmt = 0;
     glBindTexture(GL_TEXTURE_2D, tex);
@@ -94,6 +98,7 @@ bool readTexture(GLuint tex, std::vector<uint8_t>& png) {
     }
     png.clear();
     return stbi_write_png_to_func(pngToVec, &png, w, h, 4, px.data(), w * 4) != 0;
+#endif
 }
 
 }  // namespace

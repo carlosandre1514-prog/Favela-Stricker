@@ -9,6 +9,7 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtx/matrix_decompose.hpp>
 #include "assets/GltfLoader.h"
+#include "procgen/Simplify.h"
 #include "assets/MeshUtils.h"
 #include "assets/TextureManager.h"
 
@@ -174,6 +175,7 @@ bool loadGltf(const char* path, LoadContext& ctx, LoadedModel& out) {
 
     // Materiais PBR metallic-roughness. Cache: a mesma imagem vira uma única textura na VRAM.
     TextureManager& tex = TextureManager::instance();
+    const bool personagem = std::strstr(path, "/personagens/") != nullptr;
     std::map<std::pair<int, bool>, GLuint> texCache;
     auto texOf = [&](int ti, bool srgb, GLuint fallback) -> GLuint {
         if (ti < 0 || ti >= int(model.textures.size())) return fallback;
@@ -184,9 +186,10 @@ bool loadGltf(const char* path, LoadContext& ctx, LoadedModel& out) {
         if (it != texCache.end()) return it->second;
         const auto& im = model.images[src];
         // imagem externa: a mesma do disco é enviada uma vez só, mesmo entre arquivos diferentes
-        std::string named = im.uri.empty() ? std::string() : baseDir + "/" + im.uri + (srgb ? "#s" : "#l");
+        // imagem dentro do .glb: a mesma do mesmo arquivo também (10 lutadores com a mesma roupa = 1 textura)
+        std::string named = (im.uri.empty() ? std::string(path) + "#img" + std::to_string(src) : baseDir + "/" + im.uri) + (srgb ? "#s" : "#l");
         if (GLuint id = named.empty() ? 0 : tex.named(named)) return texCache[key] = id;
-        GLuint id = im.image.empty() ? fallback : tex.fromPixels(im.image.data(), im.width, im.height, im.component, srgb);
+        GLuint id = im.image.empty() ? fallback : tex.fromPixels(im.image.data(), im.width, im.height, im.component, srgb, personagem ? tex.charMax : tex.modelMax);
         if (!named.empty() && !im.image.empty()) tex.setNamed(named, id);
         texCache[key] = id;
         return id;
@@ -269,16 +272,26 @@ bool loadGltf(const char* path, LoadContext& ctx, LoadedModel& out) {
         if (n.mesh >= 0 && n.mesh < int(model.meshes.size()) && n.skin >= 0 && n.skin < int(model.skins.size())) meshSkin[n.mesh] = n.skin;
     std::vector<std::vector<std::pair<MeshId, MaterialId>>> meshPrims(model.meshes.size());
     for (size_t mi = 0; mi < model.meshes.size(); ++mi)
-        for (const auto& prim : model.meshes[mi].primitives) {
-            std::vector<Vertex> v; std::vector<uint32_t> idx; bool skinned = false;
-            if (!readPrimitive(model, prim, v, idx, skinned)) continue;
-            if (skinned && meshSkin[mi] >= 0) {
-                const auto& remap = skinRemap[meshSkin[mi]];
-                for (auto& vx : v)
-                    for (int k = 0; k < 4; ++k) vx.joints[k] = uint16_t(vx.joints[k] < remap.size() ? remap[vx.joints[k]] : 0);
+        for (size_t pi = 0; pi < model.meshes[mi].primitives.size(); ++pi) {
+            const auto& prim = model.meshes[mi].primitives[pi];
+            const std::string cacheKey = std::string(path) + "#" + std::to_string(mi) + "#" + std::to_string(pi);
+            auto cached = renderer.meshCache.find(cacheKey);
+            MeshId id = cached != renderer.meshCache.end() ? cached->second : kInvalidId;
+            if (id == kInvalidId) {
+                std::vector<Vertex> v; std::vector<uint32_t> idx; bool skinned = false;
+                if (!readPrimitive(model, prim, v, idx, skinned)) continue;
+                if (skinned && meshSkin[mi] >= 0) {
+                    const auto& remap = skinRemap[meshSkin[mi]];
+                    for (auto& vx : v)
+                        for (int k = 0; k < 4; ++k) vx.joints[k] = uint16_t(vx.joints[k] < remap.size() ? remap[vx.joints[k]] : 0);
+                }
+                // personagens: a fração do nível; o resto (armas aparecem de perto) no máximo pela metade
+                const float fracao = personagem ? renderer.simplify : std::max(renderer.simplify, 0.5f);
+                if (fracao < 1.f) simplifyMesh(v, idx, fracao);
+                id = renderer.createMesh(v.data(), uint32_t(v.size()), idx.data(), uint32_t(idx.size()), skinned);
+                if (id == kInvalidId) continue;
+                renderer.meshCache[cacheKey] = id;
             }
-            MeshId id = renderer.createMesh(v.data(), uint32_t(v.size()), idx.data(), uint32_t(idx.size()), skinned);
-            if (id == kInvalidId) continue;
             out.meshes.push_back(id);
             MaterialId mat = prim.material >= 0 && prim.material < int(out.materials.size()) ? out.materials[prim.material] : defaultMat;
             meshPrims[mi].push_back({id, mat});

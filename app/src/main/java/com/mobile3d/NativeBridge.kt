@@ -4,6 +4,7 @@ package com.mobile3d
 object NativeBridge {
     init { System.loadLibrary("mobile3d") }
 
+    @JvmStatic external fun nativeSetCrashFile(path: String)  // registro de travamento do motor (ver JogoActivity)
     @JvmStatic external fun nativeCreate(shaderDir: String): Boolean
     @JvmStatic external fun nativeDestroy()
     @JvmStatic external fun nativeResize(w: Int, h: Int)

@@ -2,12 +2,65 @@
 // Todas as chamadas chegam na thread GL (o Kotlin usa queueEvent / onDrawFrame).
 #include <EGL/egl.h>
 #include <android/log.h>
+#include <dlfcn.h>
+#include <fcntl.h>
 #include <jni.h>
+#include <signal.h>
+#include <unistd.h>
+#include <unwind.h>
+#include <cstdio>
 #include <cstring>
 #include <string>
 #include "platform/engine_c_api.h"
 
 static Engine* g_engine = nullptr;
+
+// ---------- registro de travamento ----------
+// Se o motor travar (sinal), grava o que estava fazendo e a pilha num arquivo; o app mostra na próxima abertura.
+static char g_crashFile[512] = "";
+static const char* volatile g_phase = "iniciando";
+static struct sigaction g_oldActions[NSIG];
+
+static void putStr(int fd, const char* s) { if (s) (void)!write(fd, s, std::strlen(s)); }
+static void putNum(int fd, unsigned long v, int base) {
+    char b[32]; int i = 31; b[i] = 0;
+    do { b[--i] = "0123456789abcdef"[v % base]; v /= base; } while (v && i > 0);
+    putStr(fd, b + i);
+}
+struct Frames { void* pc[24]; int n; };
+static _Unwind_Reason_Code unwindOne(struct _Unwind_Context* ctx, void* arg) {
+    Frames* f = static_cast<Frames*>(arg);
+    uintptr_t pc = _Unwind_GetIP(ctx);
+    if (pc && f->n < 24) f->pc[f->n++] = reinterpret_cast<void*>(pc);
+    return f->n < 24 ? _URC_NO_REASON : _URC_END_OF_STACK;
+}
+static void onCrash(int sig, siginfo_t* info, void* uctx) {
+    int fd = g_crashFile[0] ? open(g_crashFile, O_WRONLY | O_CREAT | O_TRUNC, 0644) : -1;
+    if (fd >= 0) {
+        putStr(fd, "Erro no motor (sinal "); putNum(fd, unsigned(sig), 10);
+        putStr(fd, sig == SIGSEGV ? " SIGSEGV" : sig == SIGABRT ? " SIGABRT" : sig == SIGBUS ? " SIGBUS" : sig == SIGFPE ? " SIGFPE" : " SIGILL");
+        putStr(fd, ") enquanto: "); putStr(fd, g_phase);
+        putStr(fd, "\nendereço: 0x"); putNum(fd, reinterpret_cast<unsigned long>(info ? info->si_addr : nullptr), 16); putStr(fd, "\n");
+        Frames f{{}, 0};
+        _Unwind_Backtrace(unwindOne, &f);
+        for (int i = 0; i < f.n; ++i) {
+            Dl_info d{};
+            putStr(fd, "  #"); putNum(fd, unsigned(i), 10); putStr(fd, " ");
+            if (dladdr(f.pc[i], &d) && d.dli_fname) {
+                const char* lib = std::strrchr(d.dli_fname, '/');
+                putStr(fd, lib ? lib + 1 : d.dli_fname);
+                putStr(fd, " +0x"); putNum(fd, reinterpret_cast<uintptr_t>(f.pc[i]) - reinterpret_cast<uintptr_t>(d.dli_fbase), 16);
+                if (d.dli_sname) { putStr(fd, " "); putStr(fd, d.dli_sname); }
+            } else { putStr(fd, "0x"); putNum(fd, reinterpret_cast<uintptr_t>(f.pc[i]), 16); }
+            putStr(fd, "\n");
+        }
+        close(fd);
+    }
+    // segue para o tratamento normal do Android (fecha o app)
+    sigaction(sig, &g_oldActions[sig], nullptr);
+    raise(sig);
+    (void)uctx;
+}
 
 #define JNI_FN(ret, name) JNIEXPORT ret JNICALL Java_com_mobile3d_NativeBridge_##name
 
@@ -36,16 +89,28 @@ static jbyteArray toBytes(JNIEnv* env, const char* s) {
 
 extern "C" {
 
+JNI_FN(void, nativeSetCrashFile)(JNIEnv* env, jclass, jstring path) {
+    std::string p = str(env, path);
+    std::snprintf(g_crashFile, sizeof(g_crashFile), "%s", p.c_str());
+    struct sigaction sa{};
+    sa.sa_sigaction = onCrash;
+    sa.sa_flags = SA_SIGINFO | SA_ONSTACK;
+    sigemptyset(&sa.sa_mask);
+    for (int sig : {SIGSEGV, SIGABRT, SIGBUS, SIGFPE, SIGILL}) sigaction(sig, &sa, &g_oldActions[sig]);
+}
+
 // onSurfaceCreated: contexto ES 3.2 ativo. Se já havia motor, o contexto antigo foi perdido: recria.
 JNI_FN(jboolean, nativeCreate)(JNIEnv* env, jclass, jstring shaderDir) {
+    g_phase = "abrindo o motor";
     if (g_engine) { engine_destroy(g_engine); g_engine = nullptr; }
     g_engine = engine_create(str(env, shaderDir).c_str());
+    g_phase = "pronto";
     if (!g_engine) __android_log_print(ANDROID_LOG_ERROR, "Mobile3D", "engine_create falhou (shaders?)");
     return g_engine != nullptr;
 }
 JNI_FN(void, nativeDestroy)(JNIEnv*, jclass) { if (g_engine) { engine_destroy(g_engine); g_engine = nullptr; } }
 JNI_FN(void, nativeResize)(JNIEnv*, jclass, jint w, jint h) { if (g_engine) engine_resize(g_engine, w, h); }
-JNI_FN(void, nativeFrame)(JNIEnv*, jclass, jfloat dt) { if (g_engine) engine_frame(g_engine, dt); }
+JNI_FN(void, nativeFrame)(JNIEnv*, jclass, jfloat dt) { if (g_engine) { g_phase = "desenhando a tela"; engine_frame(g_engine, dt); } }
 JNI_FN(void, nativeSetQuality)(JNIEnv*, jclass, jint q) { if (g_engine) engine_set_quality(g_engine, q); }
 // sons pedidos pelo jogo desde a última chamada ("nome\tvolume\tpan" por linha) e tempo (chuva, noite, hora)
 JNI_FN(jstring, nativePollSounds)(JNIEnv* env, jclass) { return env->NewStringUTF(g_engine ? engine_poll_sounds(g_engine) : ""); }
@@ -66,7 +131,7 @@ JNI_FN(void, nativeTouch)(JNIEnv* env, jclass, jint action, jintArray ids, jfloa
 }
 
 // Modo
-JNI_FN(void, nativeSetPlay)(JNIEnv*, jclass, jboolean p) { if (g_engine) engine_set_play(g_engine, p ? 1 : 0); }
+JNI_FN(void, nativeSetPlay)(JNIEnv*, jclass, jboolean p) { if (g_engine) { g_phase = p ? "começando a partida" : "saindo da partida"; engine_set_play(g_engine, p ? 1 : 0); } }
 JNI_FN(jboolean, nativeIsPlaying)(JNIEnv*, jclass) { return g_engine && engine_is_playing(g_engine); }
 
 // Cenas
@@ -183,7 +248,10 @@ JNI_FN(void, nativeGetStats)(JNIEnv* env, jclass, jfloatArray out6) {
 // Projeto
 JNI_FN(jbyteArray, nativeExportProject)(JNIEnv* env, jclass) { return toBytes(env, g_engine ? engine_export_project(g_engine) : ""); }
 JNI_FN(jboolean, nativeImportProject)(JNIEnv* env, jclass, jbyteArray json) {
-    return g_engine && engine_import_project(g_engine, bytes(env, json).c_str());
+    g_phase = "abrindo o mapa da partida";
+    bool ok = g_engine && engine_import_project(g_engine, bytes(env, json).c_str());
+    g_phase = "pronto";
+    return ok;
 }
 JNI_FN(jlong, nativeProjectRevision)(JNIEnv*, jclass) { return g_engine ? jlong(engine_project_revision(g_engine)) : 0; }
 JNI_FN(void, nativeSetProjectName)(JNIEnv* env, jclass, jbyteArray name) { if (g_engine) engine_set_project_name(g_engine, bytes(env, name).c_str()); }
@@ -247,6 +315,7 @@ JNI_FN(void, nativePlayerAim)(JNIEnv*, jclass, jboolean on) { if (g_engine) engi
 JNI_FN(void, nativeSetFirstPerson)(JNIEnv*, jclass, jboolean on) { if (g_engine) engine_set_first_person(g_engine, on ? 1 : 0); }
 JNI_FN(void, nativeTeamLoadout)(JNIEnv* env, jclass, jint team, jint skin, jstring primary, jstring secondary) {
     if (!g_engine) return;
+    g_phase = "escolhendo roupa e armas";
     const char* p = env->GetStringUTFChars(primary, nullptr);
     const char* q = env->GetStringUTFChars(secondary, nullptr);
     engine_team_loadout(g_engine, team, skin, p, q);

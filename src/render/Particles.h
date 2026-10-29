@@ -1,5 +1,10 @@
 #pragma once
+#ifdef __EMSCRIPTEN__
+#include <GLES3/gl3.h>  // navegador: WebGL 2 (OpenGL ES 3.0)
+#include <GLES2/gl2ext.h>
+#else
 #include <GLES3/gl32.h>
+#endif
 #include <cstdint>
 #include <glm/glm.hpp>
 #include "render/Camera.h"

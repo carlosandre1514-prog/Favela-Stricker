@@ -31,25 +31,39 @@ const servidor = http.createServer((req, res) => {
   if (!arq || arq.endsWith('/')) arq += 'index.html';
   const cheio = path.join(WEB, arq);
   if (!cheio.startsWith(WEB)) { res.writeHead(403); res.end(); return; }
+  // O pacote grande vai só comprimido (favela.data.gz) e, se passar do limite do GitHub, em partes (.gz.000, .gz.001…)
+  const gz = cheio + '.gz';
+  const partes = [];
+  for (let i = 0; fs.existsSync(gz + '.' + String(i).padStart(3, '0')); i++) partes.push(gz + '.' + String(i).padStart(3, '0'));
+  const comGz = fs.existsSync(gz) ? [gz] : partes;
   fs.stat(cheio, (err, st) => {
-    if (err || !st.isFile()) { res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); res.end('não encontrado'); return; }
+    const existe = !err && st.isFile();
+    if (!existe && !comGz.length) { res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); res.end('não encontrado'); return; }
     const ext = path.extname(cheio);
     const cab = {
       'Content-Type': TIPOS[ext] || 'application/octet-stream',
       // o pacote grande (modelos e texturas) fica guardado no navegador; a página sempre é buscada de novo
       'Cache-Control': ext === '.html' ? 'no-cache' : 'public, max-age=3600',
     };
-    // versão comprimida feita no build (favela.data.gz, favela.wasm.gz), se o navegador aceitar
-    const gz = cheio + '.gz';
-    if (/\bgzip\b/.test(req.headers['accept-encoding'] || '') && fs.existsSync(gz)) {
+    const aceitaGz = /\bgzip\b/.test(req.headers['accept-encoding'] || '');
+    // versão comprimida feita no build (favela.data.gz, favela.wasm.gz)
+    if (comGz.length && (aceitaGz || !existe)) {
+      if (!existe) {
+        // navegador sem gzip (raro): descomprime aqui
+        res.writeHead(200, cab);
+        const un = zlib.createGunzip();
+        un.pipe(res);
+        enviarEmSequencia(comGz, un);
+        return;
+      }
       cab['Content-Encoding'] = 'gzip';
-      cab['Content-Length'] = fs.statSync(gz).size;
+      cab['Content-Length'] = comGz.reduce((n, f) => n + fs.statSync(f).size, 0);
       res.writeHead(200, cab);
-      fs.createReadStream(gz).pipe(res);
+      enviarEmSequencia(comGz, res);
       return;
     }
     cab['Content-Length'] = st.size;
-    if (st.size < 2_000_000 && /text|javascript|json|svg/.test(cab['Content-Type']) && /\bgzip\b/.test(req.headers['accept-encoding'] || '')) {
+    if (st.size < 2_000_000 && /text|javascript|json|svg/.test(cab['Content-Type']) && aceitaGz) {
       delete cab['Content-Length'];
       cab['Content-Encoding'] = 'gzip';
       res.writeHead(200, cab);
@@ -60,6 +74,15 @@ const servidor = http.createServer((req, res) => {
     fs.createReadStream(cheio).pipe(res);
   });
 });
+
+// Manda vários arquivos um atrás do outro na mesma resposta
+function enviarEmSequencia(arquivos, destino, i = 0) {
+  if (i >= arquivos.length) { destino.end(); return; }
+  const r = fs.createReadStream(arquivos[i]);
+  r.on('error', () => destino.destroy());
+  r.on('end', () => enviarEmSequencia(arquivos, destino, i + 1));
+  r.pipe(destino, { end: false });
+}
 
 // ---------------- partidas ao vivo ----------------
 const salas = new Map();  // código -> Map(id -> {ws, time, vaga})

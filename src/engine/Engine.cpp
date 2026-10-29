@@ -167,10 +167,12 @@ void ensureBasics(Engine* e) {
         if (Mat(k) == Mat::Terrain) {
             // terreno padrão: camadas de textura reais (shaders/terrain); a ordem é a mesma do pbr.frag
             static const char* kLayers[] = {"grama", "campo", "floresta", "chao", "areia", "terra", "seixos"};
-            if (!e->lowTextures && e->renderer.loadTerrainLayers(kLayers, 7)) { m.mode = 3; m.roughness = 0.95f; }  // fraco: terreno simples
+            if (e->nivel >= 1 && e->renderer.loadTerrainLayers(kLayers, 7)) { m.mode = 3; m.roughness = 0.95f; }  // leve: terreno simples
         }
         e->mats[k] = e->renderer.createMaterial(m);
     }
+    // Leve e Padrão: a cópia das texturas na RAM sai (já estão na placa de vídeo; numa cena nova são refeitas)
+    if (e->nivel <= 1) releaseProceduralTextures();
     e->tintCache.clear();
 }
 

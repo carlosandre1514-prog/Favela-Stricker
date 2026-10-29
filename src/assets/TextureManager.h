@@ -1,5 +1,10 @@
 #pragma once
+#ifdef __EMSCRIPTEN__
+#include <GLES3/gl3.h>  // navegador: WebGL 2 (OpenGL ES 3.0)
+#include <GLES2/gl2ext.h>
+#else
 #include <GLES3/gl32.h>
+#endif
 #include <algorithm>
 #include <cstdint>
 #include <cstring>
@@ -20,11 +25,18 @@ public:
     GLuint flatNormal() { return flat_ ? flat_ : (flat_ = solid(128, 128, 255, 255, false)); }
 
     // Pixels 8 bits/canal já decodificados (ex.: do tinygltf). comp = 1..4 canais.
-    GLuint fromPixels(const uint8_t* pixels, int width, int height, int comp, bool srgb) {
+    // limite > 0: imagens maiores são reduzidas pela metade até caber (modelos no celular: modelMax)
+    GLuint fromPixels(const uint8_t* pixels, int width, int height, int comp, bool srgb, int limite = 0) {
+        if (!pixels || width <= 0 || height <= 0) return white();
+        std::vector<uint8_t> menor;
+        while (limite > 0 && std::max(width, height) > limite && width >= 2 && height >= 2) {
+            menor = halve(pixels, width, height, comp);
+            width /= 2; height /= 2;
+            pixels = menor.data();
+        }
         GLuint t = 0;
         glGenTextures(1, &t);
         glBindTexture(GL_TEXTURE_2D, t);
-        if (!pixels || width <= 0 || height <= 0) return white();
         GLenum fmt = comp == 4 ? GL_RGBA : comp == 3 ? GL_RGB : comp == 2 ? GL_RG : GL_RED;
         GLenum internal = comp == 4 ? (srgb ? GL_SRGB8_ALPHA8 : GL_RGBA8)
                         : comp == 3 ? (srgb ? GL_SRGB8 : GL_RGB8) : comp == 2 ? GL_RG8 : GL_R8;
@@ -36,8 +48,13 @@ public:
         glGenerateMipmap(GL_TEXTURE_2D);
         setParams();
         created_.push_back(t);
+        bytes += size_t(width) * height * (comp == 3 ? 4 : comp) * 4 / 3;
         return t;
     }
+
+    int modelMax = 0;    // tamanho máximo das texturas de modelos (armas, objetos); 0 = sem limite
+    int charMax = 0;     // o mesmo para personagens (vistos mais de longe: dá para usar menor)
+    size_t bytes = 0;    // memória de vídeo estimada das texturas enviadas (com mipmaps)
 
     // KTX1 com formato comprimido (ASTC 4x4..12x12 ou ETC2). Mipmaps já embutidos no arquivo.
     GLuint fromKtx(const uint8_t* data, size_t size) {
@@ -72,6 +89,7 @@ public:
         if (!created_.empty()) glDeleteTextures(GLsizei(created_.size()), created_.data());
         created_.clear();
         named_.clear();
+        bytes = 0;
     }
     // Contexto GL perdido/recriado: os ids antigos não valem mais
     void forgetAll() { created_.clear(); named_.clear(); white_ = flat_ = 0; }
@@ -86,6 +104,18 @@ public:
     }
 
 private:
+    static std::vector<uint8_t> halve(const uint8_t* px, int w, int h, int comp) {
+        const int w2 = w / 2, h2 = h / 2;
+        std::vector<uint8_t> out(size_t(w2) * h2 * comp);
+        for (int y = 0; y < h2; ++y)
+            for (int x = 0; x < w2; ++x)
+                for (int c = 0; c < comp; ++c) {
+                    const uint8_t* a = px + (size_t(2 * y) * w + 2 * x) * comp + c;
+                    const uint8_t* b = a + size_t(w) * comp;
+                    out[(size_t(y) * w2 + x) * comp + c] = uint8_t((a[0] + a[comp] + b[0] + b[comp] + 2) / 4);
+                }
+        return out;
+    }
     GLuint solid(uint8_t r, uint8_t g, uint8_t b, uint8_t a, bool srgb) {
         uint8_t px[4] = {r, g, b, a};
         GLuint t = 0;

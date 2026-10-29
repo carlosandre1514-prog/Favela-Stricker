@@ -125,6 +125,7 @@ class JogoActivity : Activity() {
         @Suppress("DEPRECATION")
         window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_FULLSCREEN or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
             View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+        installCrashLog()
         val splash = label("Preparando o jogo…", 16f, textMain).apply { gravity = Gravity.CENTER; setBackgroundColor(bg) }
         setContentView(splash)
         Thread {
@@ -165,14 +166,54 @@ class JogoActivity : Activity() {
         }
     }
 
+    // ---------------- registro de travamento ----------------
+    // Se o jogo fechar sozinho (erro no Kotlin ou no motor), o motivo fica num arquivo e aparece na próxima abertura
+    private val crashFile by lazy { File(filesDir, "ultimo_erro.txt") }
+
+    private fun installCrashLog() {
+        val previous = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { t, e ->
+            try {
+                val sw = java.io.StringWriter()
+                e.printStackTrace(java.io.PrintWriter(sw))
+                crashFile.writeText("Erro no app (${t.name}):\n$sw")
+            } catch (_: Exception) {}
+            previous?.uncaughtException(t, e)
+        }
+        try { NativeBridge.nativeSetCrashFile(crashFile.absolutePath) } catch (_: Throwable) {}
+    }
+
+    private fun showLastCrash() {
+        if (!crashFile.exists()) return
+        val text = try { crashFile.readText() } catch (_: Exception) { "" }
+        crashFile.delete()
+        if (text.isBlank()) return
+        val info = "Favela Stricker ${try { packageManager.getPackageInfo(packageName, 0).versionName } catch (_: Exception) { "" }} · " +
+            "Android ${android.os.Build.VERSION.RELEASE} · ${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL} · " +
+            "gráficos: ${levelNames[prefs.getInt("nivel", 0)]}\n\n$text"
+        AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+            .setTitle("O jogo fechou da última vez")
+            .setMessage("Copie e mande para o desenvolvedor:\n\n" + info.take(3000))
+            .setPositiveButton("Copiar") { _, _ ->
+                (getSystemService(CLIPBOARD_SERVICE) as android.content.ClipboardManager)
+                    .setPrimaryClip(android.content.ClipData.newPlainText("erro", info))
+                toast("Copiado")
+            }
+            .setNegativeButton("Fechar", null)
+            .show()
+    }
+
+    private val levelNames = arrayOf("Leve", "Padrão", "Intermediária", "Avançada")
+
     private fun setup(shaderDir: String) {
-        // 1ª vez: celular com até ~4 GB de RAM (ex.: Galaxy A14) começa no modo leve
-        if (!prefs.contains("qualidade")) {
+        // 1ª vez: o nível gráfico vem da memória do celular (ex.: Galaxy A14 com 4 GB começa no Leve)
+        if (!prefs.contains("nivel")) {
             val mi = android.app.ActivityManager.MemoryInfo()
             (getSystemService(ACTIVITY_SERVICE) as android.app.ActivityManager).getMemoryInfo(mi)
-            prefs.edit().putInt("qualidade", if (mi.totalMem < 5_000_000_000L) 0 else 1).apply()
+            val gb = mi.totalMem / 1_000_000_000.0
+            prefs.edit().putInt("nivel", if (gb < 4.5) 0 else if (gb < 6.5) 1 else 2).apply()
         }
-        try { File(shaderDir, "qualidade.txt").writeText(prefs.getInt("qualidade", 1).toString()) } catch (_: Exception) {}
+        try { File(shaderDir, "qualidade.txt").writeText(prefs.getInt("nivel", 0).toString()) } catch (_: Exception) {}
         view = EngineView(this, shaderDir)
         view.touchToEngine = false
         view.onReady = { loadMatchProject() }
@@ -192,13 +233,16 @@ class JogoActivity : Activity() {
         root.addView(screen, FrameLayout.LayoutParams(-1, -1))
         setContentView(root)
         startLogin()
+        showLastCrash()
     }
 
+    // resolução da tela e quadros por segundo de cada nível (o motor cuida de sombras, visão, texturas e modelos)
     private fun applyQuality() {
-        when (prefs.getInt("qualidade", 1)) {
-            0 -> view.applyQuality(0.5f, 30, 0)
-            1 -> view.applyQuality(0.75f, 45, 1)
-            else -> view.applyQuality(1f, 60, 2)
+        when (val n = prefs.getInt("nivel", 0)) {
+            0 -> view.applyQuality(0.5f, 30, n)
+            1 -> view.applyQuality(0.65f, 40, n)
+            2 -> view.applyQuality(0.8f, 50, n)
+            else -> view.applyQuality(1f, 60, n)
         }
     }
 
@@ -328,14 +372,20 @@ class JogoActivity : Activity() {
     }
 
     private fun qualityDialog() {
-        val items = arrayOf("Leve (celulares de 4 GB, ex.: Galaxy A14)", "Equilibrada", "Alta")
+        val items = arrayOf(
+            "Leve — celulares de 3 a 4 GB (ex.: Galaxy A14), 30 fps",
+            "Padrão — 4 a 6 GB, 40 fps",
+            "Intermediária — 6 a 8 GB, sombras, 50 fps",
+            "Avançada — celulares top, tudo no máximo, 60 fps")
         AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
-            .setTitle("Gráficos")
-            .setSingleChoiceItems(items, prefs.getInt("qualidade", 1)) { d, which ->
-                prefs.edit().putInt("qualidade", which).apply()
-                try { File(filesDir, "shaders/qualidade.txt").writeText(which.toString()) } catch (_: Exception) {}
-                applyQuality()
+            .setTitle("Qualidade gráfica")
+            .setSingleChoiceItems(items, prefs.getInt("nivel", 0)) { d, which ->
                 d.dismiss()
+                if (which == prefs.getInt("nivel", 0)) return@setSingleChoiceItems
+                prefs.edit().putInt("nivel", which).apply()
+                try { File(filesDir, "shaders/qualidade.txt").writeText(which.toString()) } catch (_: Exception) {}
+                // texturas e modelos são preparados ao abrir o motor: reabre a tela do jogo (a conta continua)
+                if (!inMatch) recreate() else { applyQuality(); toast("Vale por completo na próxima partida") }
             }.show()
     }
 

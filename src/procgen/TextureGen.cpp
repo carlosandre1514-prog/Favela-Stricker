@@ -804,9 +804,13 @@ TexData genMurals() {
                 for (int x = col - 2; x <= col + 2; ++x) if (x >= 0 && x < CW) put(x, y, M.a, 1.f);
         }
     };
+#ifdef __EMSCRIPTEN__  // navegador: sem threads
+    for (int k = 0; k < kAtlasCells; ++k) job(k);
+#else
     std::vector<std::thread> th;
     for (int k = 0; k < kAtlasCells; ++k) th.emplace_back(job, k);
     for (auto& t : th) t.join();
+#endif
     // metade da resolução (1024 x 1024): leve na memória do celular e ainda nítido na parede
     Img half(im.w / 2, im.h / 2);
     std::vector<float> ha(half.w * half.h);
@@ -912,7 +916,11 @@ static std::string cachePath(Mat m) {
 }
 static uint32_t cacheKey() {
     uint32_t h = 2166136261u;
+#ifdef MOTOR_CACHE_KEY  // site: a mesma chave no motor do PC (que gera o cache no build) e no do navegador
+    for (const char* p = MOTOR_CACHE_KEY; *p; ++p) h = (h ^ uint8_t(*p)) * 16777619u;
+#else
     for (const char* p = __DATE__ __TIME__; *p; ++p) h = (h ^ uint8_t(*p)) * 16777619u;
+#endif
     return h ^ uint32_t(int(Mat::Count) * 7919);
 }
 static bool loadCached(Mat m, TexData& t) {
@@ -954,6 +962,8 @@ const TexData& proceduralTexture(Mat m) {
     return t;
 }
 
+void releaseProceduralTextures() { for (TexData& t : gCache) t = TexData{}; }
+
 void pregenerateTextures() {
     // as que faltam (sem cache) são geradas em paralelo, uma por núcleo
     std::vector<int> todo;
@@ -965,6 +975,10 @@ void pregenerateTextures() {
         auto heavy = [](int m) { return m == int(Mat::Mural) || m == int(Mat::Graffiti) || m == int(Mat::FacadeHouse) || m == int(Mat::FacadeApt); };
         return heavy(a) && !heavy(b);
     });
+#ifdef __EMSCRIPTEN__
+    for (int k : todo) { gCache[k] = generate(Mat(k)); saveCached(Mat(k), gCache[k]); }
+    return;
+#endif
     std::atomic<size_t> next{0};
     unsigned n = std::max(2u, std::min(8u, std::thread::hardware_concurrency()));
     std::vector<std::thread> th;

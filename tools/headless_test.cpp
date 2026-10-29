@@ -22,6 +22,7 @@
 #include "json.hpp"
 #include "platform/engine_c_api.h"
 #include "procgen/TextureGen.h"
+#include "assets/TextureManager.h"
 
 static const int W = 960, H = 540;
 static GLuint g_fbo = 0;
@@ -1105,6 +1106,32 @@ int main(int argc, char** argv) {
         std::printf("  personagens com time no projeto: %d\n", chars);
     };
     // Prévia das skins de arma (loja): cada arma do kit com cada textura de skin, renderizada pelo motor
+    // Personagens de perto e a meia distância (confere a simplificação das qualidades leves)
+    if (const char* lista = std::getenv("SO_RETRATOS")) {
+        using nlohmann::json;
+        engine_new_scene(e);
+        engine_tool_call(e, "definir_ambiente", R"({"hora":13,"grade":false,"neblina":0})");
+        engine_set_grid(e, 0);
+        std::string l = lista;
+        size_t a = 0;
+        while (a < l.size()) {
+            size_t b = l.find(',', a); if (b == std::string::npos) b = l.size();
+            std::string sk = l.substr(a, b - a); a = b + 1;
+            int id = engine_add_spec(e, json{{"tipo", "modelo"}, {"arquivo", "kit:personagens/skins/" + sk}, {"personagem", true}, {"pos", {0, 0, 0}}}.dump().c_str());
+            if (id < 0) { std::printf("  [ERRO] %s: %s\n", sk.c_str(), engine_last_error(e)); ++g_fail; continue; }
+            engine_select(e, -1);
+            engine_set_camera(e, 0.f, 1.0f, 0.f, 3.14159f, 0.08f, 2.6f);
+            frames(e, 3);
+            save(out, ("retrato_" + sk + ".png").c_str());
+            engine_set_camera(e, 0.f, 1.4f, 0.f, 3.14159f, 0.05f, 1.1f);
+            frames(e, 2);
+            save(out, ("retrato_" + sk + "_rosto.png").c_str());
+            engine_tool_call(e, "remover_objetos", json{{"ids", {id}}}.dump().c_str());
+        }
+        engine_destroy(e);
+        std::printf(g_fail ? "FALHOU\n" : "OK\n");
+        return g_fail ? 1 : 0;
+    }
     if (const char* dir = std::getenv("SO_SKINS")) {
         using nlohmann::json;
         engine_new_scene(e);
@@ -1528,6 +1555,58 @@ int main(int argc, char** argv) {
         engine_set_first_person(e, 0);
         engine_net_roster(e, 0, "", "");
     };
+    // Memória do jogo do APK: abre o projeto da partida (o mesmo do app) e joga uns segundos.
+    // SO_MEMORIA = caminho do json; o nível gráfico vem de shaders/qualidade.txt (0 a 3)
+    if (const char* proj = std::getenv("SO_MEMORIA")) {
+        auto mem = [&](const char* fase) {
+            long rss = 0, pico = 0;
+            if (FILE* f = std::fopen("/proc/self/status", "r")) {
+                char l[256];
+                while (std::fgets(l, sizeof l, f)) { std::sscanf(l, "VmRSS: %ld", &rss); std::sscanf(l, "VmHWM: %ld", &pico); }
+                std::fclose(f);
+            }
+            float m[4] = {};
+            engine_memory_stats(e, m);
+            std::printf("  %-26s RAM %4ld MB (pico %4ld MB) · texturas %4.0f MB · malhas %4.0f MB (%.0f)\n", fase, rss / 1024, pico / 1024, m[0], m[1], m[2]);
+        };
+        mem("motor criado");
+        std::string txt;
+        if (FILE* f = std::fopen(proj, "rb")) { char b[65536]; size_t n; while ((n = std::fread(b, 1, sizeof b, f)) > 0) txt.append(b, n); std::fclose(f); }
+        auto j = nlohmann::json::parse(txt);
+        nlohmann::json keep = nlohmann::json::array();
+        for (auto& o : j["objetos"]) if (o.value("tipo", "") != "loja") keep.push_back(o);
+        j["objetos"] = keep;
+        engine_set_editor_overlay(e, 0);
+        auto t0 = std::chrono::steady_clock::now();
+        if (!engine_import_project(e, j.dump().c_str())) { std::printf("  projeto não abriu\n"); ++g_fail; }
+        std::printf("  projeto aberto em %.2f s\n", std::chrono::duration<float>(std::chrono::steady_clock::now() - t0).count());
+        engine_select(e, -1);
+        engine_set_camera(e, 0.f, 8.f, 20.f, 3.6f, 0.42f, 115.f);
+        frames(e, 5);
+        mem("menu (mapa ao fundo)");
+        save(out, "40_menu.png");
+        engine_team_loadout(e, 0, 0, "m4a1", "tt33");
+        engine_set_first_person(e, 1);
+        t0 = std::chrono::steady_clock::now();
+        engine_set_play(e, 1);
+        std::printf("  partida começou em %.2f s\n", std::chrono::duration<float>(std::chrono::steady_clock::now() - t0).count());
+        engine_set_camera(e, 0.f, 0.f, 0.f, 0.f, 0.05f, 3.f);
+        frames(e, 120);
+        mem("partida (10 lutadores)");
+        save(out, "40_partida.png");
+        stats(e, "partida");
+        engine_set_play(e, 0);
+        engine_set_first_person(e, 0);
+        frames(e, 5);
+        engine_team_loadout(e, 1, 3, "ak47", "tt33");
+        engine_set_first_person(e, 1);
+        engine_set_play(e, 1);
+        frames(e, 60);
+        mem("2ª partida");
+        engine_destroy(e);
+        std::printf(g_fail ? "FALHOU\n" : "OK\n");
+        return g_fail ? 1 : 0;
+    }
     if (std::getenv("SO_ONLINE")) { online(); engine_destroy(e); std::printf(g_fail ? "FALHOU\n" : "OK\n"); return g_fail ? 1 : 0; }
     if (std::getenv("SO_JOGO")) { jogo(); engine_destroy(e); std::printf(g_fail ? "FALHOU\n" : "OK\n"); return g_fail ? 1 : 0; }
     if (std::getenv("SO_TIMES")) { times(); engine_destroy(e); std::printf(g_fail ? "FALHOU\n" : "OK\n"); return g_fail ? 1 : 0; }

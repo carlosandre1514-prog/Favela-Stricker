@@ -43,6 +43,7 @@ add_library(mobile3d ${MOBILE3D_LIB_TYPE}
   src/scene/Humanoid.cpp
   ${ufbx_SOURCE_DIR}/ufbx.c
   src/procgen/TextureGen.cpp
+  src/procgen/Simplify.cpp
   src/procgen/Buildings.cpp
   src/procgen/Weapons.cpp
   src/procgen/Character.cpp
@@ -58,6 +59,11 @@ add_library(mobile3d ${MOBILE3D_LIB_TYPE}
   src/platform/engine_c_api.cpp)
 
 target_compile_definitions(mobile3d PUBLIC GLM_ENABLE_EXPERIMENTAL)
+# Site: o cache de texturas é gerado no build pelo motor do PC; os dois usam a mesma chave
+set(MOTOR_CACHE_KEY "" CACHE STRING "chave fixa do cache de texturas (vazio = muda a cada compilação)")
+if(MOTOR_CACHE_KEY)
+  target_compile_definitions(mobile3d PRIVATE MOTOR_CACHE_KEY="${MOTOR_CACHE_KEY}")
+endif()
 target_include_directories(mobile3d PUBLIC
   src
   ${glm_SOURCE_DIR}

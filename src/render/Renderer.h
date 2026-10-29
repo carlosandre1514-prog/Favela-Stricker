@@ -1,10 +1,16 @@
 #pragma once
+#ifdef __EMSCRIPTEN__
+#include <GLES3/gl3.h>  // navegador: WebGL 2 (OpenGL ES 3.0)
+#include <GLES2/gl2ext.h>
+#else
 #include <GLES3/gl32.h>
+#endif
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <glm/glm.hpp>
 #include <glm/gtc/type_precision.hpp>
+#include <map>
 #include <string>
 #include "core/Pool.h"
 #include "render/Camera.h"
@@ -81,8 +87,20 @@ public:
     void setEmissive(MaterialId id, glm::vec3 f) { if (id < materialCount_) materials_[id].emissive_factor = f; }
     uint32_t materialCount() const { return materialCount_; }
     const Mesh* mesh(MeshId id) const { return id < meshCount_ ? &meshes_[id] : nullptr; }
+    // memória das malhas na placa de vídeo (vértices + índices), para medir
+    size_t meshBytes() const {
+        size_t b = 0;
+        for (uint32_t i = 0; i < meshCount_; ++i) b += size_t(meshes_[i].vertexCount) * sizeof(Vertex) + size_t(meshes_[i].indexCount) * 4;
+        return b;
+    }
+    uint32_t meshTotal() const { return meshCount_; }
     // Libera todos os meshes/materiais (nova cena). Texturas ficam a cargo do TextureManager.
     void clearAssets();
+    // Malhas de arquivos já carregados (caminho#malha#primitiva): o mesmo modelo de novo usa as mesmas
+    // (lutador que renasce, 2ª partida, armas iguais) em vez de ocupar memória outra vez
+    std::map<std::string, MeshId> meshCache;
+    // fração dos triângulos que fica nos modelos carregados (qualidades leves < 1)
+    float simplify = 1.f;
 
     // Frame: beginFrame -> submit* -> (linhas) -> render
     void beginFrame(const Camera& cam, const DirectionalLight& sun);

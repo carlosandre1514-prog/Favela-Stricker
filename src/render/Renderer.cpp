@@ -36,7 +36,11 @@ static std::string g_common;  // shaders/common.glsl
 // Monta: linha #version + #define da variante + common.glsl + resto do arquivo
 static GLuint compile(GLenum type, const std::string& src, const char* define, const char* name) {
     size_t nl = src.find('\n');
-    std::string full = src.substr(0, nl + 1) + "#define " + define + "\n" + g_common + "\n#line 2\n" + src.substr(nl + 1);
+    std::string head = src.substr(0, nl + 1);
+#ifdef __EMSCRIPTEN__
+    head = "#version 300 es\n";  // navegador: WebGL 2 só aceita GLSL ES 3.00 (os shaders não usam nada do 3.2)
+#endif
+    std::string full = head + "#define " + define + "\n" + g_common + "\n#line 2\n" + src.substr(nl + 1);
     GLuint s = glCreateShader(type);
     const char* p = full.c_str();
     glShaderSource(s, 1, &p, nullptr);
@@ -230,6 +234,7 @@ void Renderer::clearAssets() {
         meshes_[i] = Mesh{};
     }
     meshCount_ = 0;
+    meshCache.clear();
     materialCount_ = 0;
     drawCount_ = 0;
 }

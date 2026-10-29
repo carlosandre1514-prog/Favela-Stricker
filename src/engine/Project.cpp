@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <map>
 #include <stb_image.h>
@@ -356,7 +357,11 @@ int loadModelFile(Engine* e, const char* pathIn) {
         e->lastError = "formato " + ext + " não suportado: use .glb, .gltf, .fbx ou .obj (para .dae/.blend/.3ds, exporte do Blender como .glb)";
         return -1;
     }
-    if (!(fbx ? loadFbx(path, ctx, *model) : loadGltf(path, ctx, *model))) {
+    const size_t memAntes = TextureManager::instance().bytes;
+    const bool ok = fbx ? loadFbx(path, ctx, *model) : loadGltf(path, ctx, *model);
+    if (std::getenv("MEM_DEBUG") && TextureManager::instance().bytes > memAntes)
+        std::printf("    [tex] %6.1f MB  %s\n", double(TextureManager::instance().bytes - memAntes) / 1048576.0, path);
+    if (!ok) {
         e->lastError = model->error.empty() ? std::string("não consegui abrir ") + path : model->error;
         for (auto h : model->allNodes) if (GameObject* g = e->scene.get(h)) releaseComponents(e, *g);
         for (auto h : model->roots) e->scene.destroy(h);

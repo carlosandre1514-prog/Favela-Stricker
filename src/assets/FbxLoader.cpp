@@ -54,7 +54,7 @@ GLuint loadTexture(const ufbx_texture* t, const std::string& dir, bool srgb, std
     }
     GLuint id = 0;
     if (px) {
-        id = TextureManager::instance().fromPixels(px, w, h, 4, srgb);
+        id = TextureManager::instance().fromPixels(px, w, h, 4, srgb, TextureManager::instance().modelMax);
         stbi_image_free(px);
     }
     cache[t] = id;
