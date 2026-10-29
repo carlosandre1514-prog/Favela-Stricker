@@ -48,7 +48,7 @@ const servidor = http.createServer((req, res) => {
     const aceitaGz = /\bgzip\b/.test(req.headers['accept-encoding'] || '');
     // versão comprimida feita no build (favela.data.gz, favela.wasm.gz)
     if (comGz.length && (aceitaGz || !existe)) {
-      if (!existe) {
+      if (!aceitaGz) {
         // navegador sem gzip (raro): descomprime aqui
         res.writeHead(200, cab);
         const un = zlib.createGunzip();

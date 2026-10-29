@@ -161,6 +161,9 @@ bool Renderer::init(const char* shaderDir) {
     glGenBuffers(1, &cutUbo_);
     glBindBuffer(GL_UNIFORM_BUFFER, cutUbo_);
     glBufferData(GL_UNIFORM_BUFFER, sizeof(glm::mat4) * kMaxCuts, nullptr, GL_DYNAMIC_DRAW);
+    // os três blocos ficam ligados desde o início (o WebGL recusa desenhar com bloco usado e sem buffer)
+    glBindBufferBase(GL_UNIFORM_BUFFER, 0, sceneUbo_);
+    glBindBufferBase(GL_UNIFORM_BUFFER, 1, jointUbo_);
     glBindBufferBase(GL_UNIFORM_BUFFER, 2, cutUbo_);
     glGenBuffers(1, &instanceVbo_);
     glBindBuffer(GL_ARRAY_BUFFER, instanceVbo_);

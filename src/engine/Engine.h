@@ -36,6 +36,7 @@ struct Attachment {
 
 struct CharacterInfo {
     Scene::Handle root;        // GameObject raiz (origem nos pés)
+    Scene::Handle holster;     // a arma guardada no corpo (fuzil nas costas, pistola na coxa)
     Animator* anim = nullptr;
     float height = 1.75f;
     int clipMap[CC_Count];     // animação do motor (CharClip) -> índice no Animator
@@ -172,6 +173,7 @@ struct Fighter {
     float netAge = 0.f;
     int netShots = 0;
     std::string netWeapon;
+    std::map<std::string, std::string> gunSkins;  // online: skins das armas de outra pessoa (arma -> skin)
     glm::vec3 lastPos{0.f}, goal{0.f};
 };
 struct ShopRT { Scene::Handle obj; int kind = 0; int team = 0; };  // kind 0 armas, 1 roupas
@@ -436,6 +438,7 @@ struct WeaponLook {
     uint32_t accessories = 0;
 };
 int createWeapon(Engine* e, int kind, int character, const WeaponLook& look = {});
+int holsterWeapon(Engine* e, int ch, int kind, const WeaponLook& look);  // guarda a arma no corpo (-1 tira)
 std::string accessoriesList(uint32_t accessories);  // ["mira","coronha",...] em JSON   // character < 0: solto no chão
 int characterOfSelection(Engine* e);
 // Modelo importado (glb/fbx) selecionado vira personagem: física, animações por nome ou retarget humanoide

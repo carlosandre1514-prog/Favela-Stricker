@@ -6,7 +6,7 @@
 // x, y: centro da peça em fração da tela (0 a 1). Padrão = o modelo das telas.
 const PECAS = {
   analogico: { nome: 'Analógico', x: 0.107, y: 0.805 },
-  tiro2: { nome: 'Atirar (esquerda)', x: 0.090, y: 0.456 },
+  tiro2: { nome: 'Atirar (esquerda)', x: 0.090, y: 0.555 },  // abaixo do minimapa
   tiro: { nome: 'Atirar', x: 0.925, y: 0.777 },
   mira: { nome: 'Mirar', x: 0.828, y: 0.803 },
   pular: { nome: 'Pular', x: 0.949, y: 0.562 },
@@ -53,6 +53,11 @@ function pecaHtml(id) {
   return '';
 }
 
+// computador: o mouse some e vira a câmera (o navegador pode recusar sem um clique; tenta de novo no próximo)
+function travarMouse() {
+  try { const r = document.getElementById('tela').requestPointerLock(); if (r && r.catch) r.catch(() => {}); } catch (_) {}
+}
+
 // prende o dedo no elemento (alguns navegadores recusam quando o toque já acabou)
 function capturar(el, id) { try { el.setPointerCapture(id); } catch (_) {} }
 
@@ -85,7 +90,7 @@ function iniciarPartida(time, roupa, sala, armaPrincipal) {
   // polícia olha para o morro; bandidos, para a rua de baixo
   motor.camera(0, 0, 0, time === 0 ? 0 : 3.14159, 0.05, 3);
   if (sala) ligarAoVivo(sala, time);
-  if (!TOQUE) document.getElementById('tela').requestPointerLock?.();
+  if (!TOQUE) travarMouse();
   clearInterval(lacoHud);
   lacoHud = setInterval(() => {
     if (!partida) return;
@@ -418,7 +423,7 @@ addEventListener('blur', () => { teclas.clear(); if (partida) { motor.atirar(fal
     if (!partida || TOQUE || partida.loja || $('.camada')) return;
     if (e.target.closest('button, input, .slot')) return;
     ctxAudio();
-    if (!travado()) { tela.requestPointerLock?.(); return; }
+    if (!travado()) { travarMouse(); return; }
     if (e.button === 0) motor.atirar(true);
     if (e.button === 2) motor.mirar(true);
   });
@@ -443,7 +448,7 @@ function pausar() {
   </div></div>`);
   palco.appendChild(c);
   ligarAjustes(c);
-  $('#p-voltar', c).onclick = () => { c.remove(); if (!TOQUE) document.getElementById('tela').requestPointerLock?.(); };
+  $('#p-voltar', c).onclick = () => { c.remove(); if (!TOQUE) travarMouse(); };
   $('#p-sair', c).onclick = async () => {
     c.remove();
     if (await confirmar('Sair da partida?', partida.sala ? 'Você sai da sala também.' : 'O progresso desta partida não conta.', 'Sair')) {
@@ -497,7 +502,7 @@ function fecharLojaPartida() {
   partida.loja.remove();
   partida.loja = null;
   motor.lojaFechar();
-  if (!TOQUE) document.getElementById('tela').requestPointerLock?.();
+  if (!TOQUE) travarMouse();
 }
 function atualizarLojaPartida(redesenhar) {
   const el = partida && partida.loja;

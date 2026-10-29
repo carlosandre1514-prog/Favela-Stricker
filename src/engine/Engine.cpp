@@ -580,27 +580,17 @@ static void addAccessories(Engine* e, GameObject& weapon, uint32_t acc, const AA
               glm::vec3(0.f, procedural ? 0.024f : wb.min.y + (wb.max.y - wb.min.y) * 0.57f, wb.max.z * 0.55f));  // embaixo do guarda-mão
 }
 
-int createWeapon(Engine* e, int kind, int ch, const WeaponLook& look) {
-    kind = std::clamp(kind, 0, WK_Count - 1);
-    // armas feitas de formas geométricas foram retiradas: sem arquivo, vira o modelo realista (pistola: TT-33;
-    // as outras: M4A1); faca e taco saem
-    if (look.file.empty()) {
-        if (kind == WK_Knife || kind == WK_Bat) { e->lastError = "faca e taco foram retirados (só armas realistas)"; return -1; }
-        WeaponLook real = look;
-        real.file = kind == WK_Pistol ? "kit:armas/tt33" : "kit:armas/m4a1";
-        return createWeapon(e, kind == WK_Pistol ? WK_Pistol : WK_Rifle, ch, real);
-    }
+// Modelo da arma (cano em +Z, origem no cabo, no tamanho do tipo); muzzle e wb saem no espaço da arma
+static Scene::Handle spawnWeaponModel(Engine* e, int kind, const WeaponLook& look, glm::vec3& muzzle, AABB& wb) {
     glm::vec3 pos = e->editorCam.target + glm::vec3(0, 0.6f, 0);
-    glm::vec3 muzzle;
     Scene::Handle h;
-    AABB wb;
     if (!look.file.empty()) {
         // modelo do usuário: deita com o cano em +Z, tamanho do tipo, mão no cabo
         std::vector<ProtoPart> parts;
         AABB b;
         if (!modelParts(e, look.file, nullptr, parts, b)) {
             if (e->lastError.empty()) e->lastError = "o arquivo não tem malha para virar arma";
-            return -1;
+            return {};
         }
         glm::vec3 ext = b.max - b.min;
         glm::mat4 R(1.f);
@@ -629,9 +619,27 @@ int createWeapon(Engine* e, int kind, int ch, const WeaponLook& look) {
         else wb = AABB{glm::vec3(-0.03f, -0.1f, -0.4f), glm::vec3(0.03f, 0.1f, 0.7f)};
     }
     GameObject* w = e->scene.get(h);
-    if (!w) return -1;
+    if (!w) return {};
     addAccessories(e, *w, look.accessories, wb, look.file.empty());
     Scene::forEachInSubtree(*w, [](GameObject& o) { o.noCut = true; });  // passa pela porta sem ser cortada
+    return h;
+}
+
+int createWeapon(Engine* e, int kind, int ch, const WeaponLook& look) {
+    kind = std::clamp(kind, 0, WK_Count - 1);
+    // armas feitas de formas geométricas foram retiradas: sem arquivo, vira o modelo realista (pistola: TT-33;
+    // as outras: M4A1); faca e taco saem
+    if (look.file.empty()) {
+        if (kind == WK_Knife || kind == WK_Bat) { e->lastError = "faca e taco foram retirados (só armas realistas)"; return -1; }
+        WeaponLook real = look;
+        real.file = kind == WK_Pistol ? "kit:armas/tt33" : "kit:armas/m4a1";
+        return createWeapon(e, kind == WK_Pistol ? WK_Pistol : WK_Rifle, ch, real);
+    }
+    glm::vec3 muzzle;
+    AABB wb;
+    Scene::Handle h = spawnWeaponModel(e, kind, look, muzzle, wb);
+    GameObject* w = e->scene.get(h);
+    if (!w) return -1;
     if (ch >= 0 && ch < int(e->characters.size())) {
         CharacterInfo& c = e->characters[ch];
         if (e->scene.get(c.weapon)) {  // troca a arma antiga
@@ -679,6 +687,63 @@ int createWeapon(Engine* e, int kind, int ch, const WeaponLook& look) {
         if (c.anim && base >= 0 && c.clipMap[base + AP_Idle] >= 0) c.anim->setClip(c.clipMap[base + AP_Idle]);
         updateAttachments(e);
     }
+    return w->id;
+}
+
+// Arma guardada no corpo (a que não está na mão), como no Free Fire: fuzil nas costas, na diagonal com o cano
+// subindo pelo ombro direito; pistola na coxa direita. Presa ao osso do peito/quadril, acompanha a animação.
+// kind < 0: só tira a que estava guardada.
+int holsterWeapon(Engine* e, int ch, int kind, const WeaponLook& look) {
+    if (ch < 0 || ch >= int(e->characters.size())) return -1;
+    CharacterInfo& c = e->characters[ch];
+    if (GameObject* old = e->scene.get(c.holster)) {
+        Scene::Handle oh = c.holster;
+        e->attachments.erase(std::remove_if(e->attachments.begin(), e->attachments.end(),
+                                            [&](const Attachment& a) { return a.obj.index == oh.index && a.obj.gen == oh.gen; }),
+                             e->attachments.end());
+        c.gear.erase(std::remove_if(c.gear.begin(), c.gear.end(), [&](Scene::Handle g) { return g.index == oh.index && g.gen == oh.gen; }), c.gear.end());
+        (void)old;
+        destroyObject(e, oh);
+    }
+    c.holster = {};
+    Animator* a = c.anim;
+    if (kind < 0 || look.file.empty() || !a || !a->skeleton) return -1;
+    const bool pistol = kind == WK_Pistol;
+    const int cj = pistol ? CJ_Hips : CJ_Chest;
+    const int joint = a->retarget ? a->retarget->targetOf[cj] : (a->skeleton->jointCount == CJ_Total ? cj : -1);
+    GameObject* body = e->scene.get(c.root);
+    if (joint < 0 || !body) return -1;
+    glm::vec3 muzzle;
+    AABB wb;
+    Scene::Handle h = spawnWeaponModel(e, kind, look, muzzle, wb);
+    GameObject* w = e->scene.get(h);
+    if (!w) return -1;
+    // posição desejada no mundo, a partir do corpo de agora; o deslocamento até o osso fica guardado
+    e->scene.updateTransforms();
+    const glm::mat4 space = a->space ? a->space->world() : glm::mat4(1.f);
+    const glm::mat4 boneW = space * a->global[joint];
+    const glm::vec3 fwd = glm::normalize(body->transform.rotation * glm::vec3(0, 0, 1));
+    const glm::vec3 up(0.f, 1.f, 0.f);
+    const glm::vec3 rt = glm::normalize(glm::cross(fwd, up));  // lado direito do personagem
+    const float sc = c.height / 1.75f;
+    glm::vec3 z, x, pos = glm::vec3(boneW[3]);
+    if (pistol) {  // cano para baixo, encostada na lateral da coxa
+        z = -up;
+        x = rt;
+        pos += (rt * 0.17f - up * 0.05f + fwd * 0.02f) * sc;
+    } else {       // deitada nas costas: a lateral da arma encosta no corpo
+        z = glm::normalize(up * 0.86f + rt * 0.5f);
+        x = -fwd;
+        pos += (-fwd * 0.17f + up * 0.02f - rt * 0.1f) * sc;
+    }
+    const glm::vec3 y = glm::normalize(glm::cross(z, x));
+    x = glm::normalize(glm::cross(y, z));
+    glm::mat4 want(1.f);
+    want[0] = glm::vec4(x, 0.f); want[1] = glm::vec4(y, 0.f); want[2] = glm::vec4(z, 0.f); want[3] = glm::vec4(pos, 1.f);
+    e->attachments.push_back({h, a, joint, glm::inverse(boneW) * want});
+    c.holster = h;
+    c.gear.push_back(h);  // apagar o personagem apaga a arma guardada junto
+    updateAttachments(e);
     return w->id;
 }
 
@@ -998,6 +1063,12 @@ void applyFirstPerson(Engine* e) {
             if (w->active != on) Scene::forEachInSubtree(*w, [&](GameObject& o) { o.active = on; });
     };
     CharacterInfo* pc = e->player >= 0 && e->player < int(e->characters.size()) ? &e->characters[e->player] : nullptr;
+    // a arma guardada nas costas/coxa do próprio jogador não aparece na primeira pessoa (os outros veem)
+    if (pc)
+        if (GameObject* hw = e->scene.get(pc->holster)) {
+            const bool show = !(e->firstPerson && e->playing && e->fpEyeValid);
+            if (hw->active != show) Scene::forEachInSubtree(*hw, [&](GameObject& o) { o.active = show; });
+        }
     if (!e->firstPerson || !e->playing || !e->fpEyeValid || !pc) {
         e->camera.fovYDeg = e->baseFov;
         if (e->fpScoped) { showWeapon(pc, true); e->fpScoped = false; }

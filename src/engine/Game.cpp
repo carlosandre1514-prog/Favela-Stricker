@@ -283,9 +283,9 @@ int enemyTarget(Engine* e) {
 // Roupas da partida: as skins de personagem do jogo (kit:personagens/skins), cada uma já com farda, colete,
 // capacete, boné e acessórios no próprio modelo
 struct SkinDef { const char* name; int price; const char* file; };
-const SkinDef kSkins[2][5] = {
-    {{"PM", 0, "pm"}, {"Polícia Civil", 500, "civil"}, {"Exército", 700, "exercito"}, {"Choque", 1000, "choque"}, {"Especial", 1500, "especial"}},
-    {{"Rubro", 0, "rubro"}, {"Alvinegro", 300, "alvinegro"}, {"Tricolor", 500, "tricolor"}, {"Canarinho", 800, "canarinho"}, {"Faixa", 1200, "faixa"}}};
+const SkinDef kSkins[2][5] = {  // as 10 são gratuitas (skins pagas novas entram no mercado do jogo)
+    {{"PM", 0, "pm"}, {"Polícia Civil", 0, "civil"}, {"Exército", 0, "exercito"}, {"Choque", 0, "choque"}, {"Especial", 0, "especial"}},
+    {{"Rubro", 0, "rubro"}, {"Alvinegro", 0, "alvinegro"}, {"Tricolor", 0, "tricolor"}, {"Canarinho", 0, "canarinho"}, {"Faixa", 0, "faixa"}}};
 // Armas da partida (tabela de dano aprovada): dano no corpo (cabeça = 2,5x), intervalo entre tiros, dispersão do
 // robô, rajada do robô, bagos, pente, reserva e a partir de quantos metros o dano cai (até 30% bem de longe)
 struct GunDef { const char* key; const char* name; int price; int team; float dmg, interval, spread; int burst, pellets, mag, reserve; float falloff; };
@@ -337,14 +337,29 @@ void equipGun(Engine* e, Fighter& f) {
     WeaponLook look;
     look.file = std::string("kit:armas/") + gunOf(k).key;
     int w = createWeapon(e, kind, ci, look);
+    // skin de arma: a minha (jogador deste aparelho) ou a de outra pessoa da sala; robô não tem
+    const std::map<std::string, std::string>* skins = f.remote ? &f.gunSkins : !f.bot ? &e->match.gunSkins : nullptr;
+    auto pintar = [&](GameObject& wg, const std::string& gun) {
+        if (!skins) return;
+        auto it = skins->find(gun);
+        if (it == skins->end() || it->second.empty()) return;
+        float metal = -1.f, rough = -1.f;
+        gunSkinFinish(gun, it->second, metal, rough);
+        applyKitTexture(e, wg, std::string("armas/skins/") + gun + "_" + it->second + ".jpg", metal, rough);
+    };
     if (GameObject* wg = objectById(e, w)) {
         e->game.spawned.push_back(Scene::handleOf(*wg));
-        auto it = e->match.gunSkins.find(gunOf(k).key);
-        if (!f.bot && it != e->match.gunSkins.end() && !it->second.empty()) {
-            float metal = -1.f, rough = -1.f;
-            gunSkinFinish(gunOf(k).key, it->second, metal, rough);
-            applyKitTexture(e, *wg, std::string("armas/skins/") + gunOf(k).key + "_" + it->second + ".jpg", metal, rough);
-        }
+        pintar(*wg, gunOf(k).key);
+    }
+    // a outra arma fica guardada no corpo: fuzil nas costas, pistola na coxa
+    const std::string outra = k == f.primary ? f.secondary : f.primary;
+    if (!outra.empty() && outra != k && knownGun(outra)) {
+        WeaponLook guardada;
+        guardada.file = std::string("kit:armas/") + gunOf(outra).key;
+        int hw = holsterWeapon(e, ci, outra == "tt33" ? WK_Pistol : WK_Rifle, guardada);
+        if (GameObject* hg = objectById(e, hw)) pintar(*hg, gunOf(outra).key);
+    } else {
+        holsterWeapon(e, ci, -1, {});
     }
     e->lastError.clear();
     CharacterInfo& c = e->characters[ci];
@@ -752,6 +767,8 @@ void teamStart(Engine* e) {
         static const char* botGuns[2][5] = {{"m4a1", "m4colt", "m4a1", "m4colt", "m4a1"}, {"ak47", "ak74", "ak74_tatica", "ak47", "ak74"}};
         std::string arma = r.value("arma", "");
         f.weapon = knownGun(arma) ? gunForTeam(arma, f.team) : botGuns[f.team][M.f.size() % 5];
+        f.primary = f.weapon;
+        f.secondary = "tt33";  // robôs também levam a pistola na coxa
         if (!f.bot) {  // escolhas do jogo: roupa, arma principal e a segunda (troca rápida; "" = só uma)
             if (M.playerSkin >= 0) f.skin = std::clamp(M.playerSkin, 0, 4);
             if (!M.playerPrimary.empty()) f.weapon = gunForTeam(M.playerPrimary, f.team);
@@ -770,6 +787,11 @@ void teamStart(Engine* e) {
                 f.name = h.value("nome", "Jogador");
                 f.skin = std::clamp(h.value("skin", 0), 0, 4);
                 f.weapon = gunForTeam(h.value("arma", ""), f.team);
+                f.primary = f.weapon;
+                f.secondary = knownGun(h.value("arma2", "")) ? gunForTeam(h.value("arma2", ""), f.team) : "";
+                if (auto sk = h.find("skins"); sk != h.end() && sk->is_object())
+                    for (auto it = sk->begin(); it != sk->end(); ++it)
+                        if (it->is_string() && knownGun(it.key())) f.gunSkins[it.key()] = it->get<std::string>();
             } else {
                 f.netId = "b" + std::to_string(f.team) + "_" + std::to_string(slotBot[k]);
                 f.remote = !M.host;  // os robôs são de quem criou a sala
@@ -849,12 +871,17 @@ void remoteUpdate(Engine* e, Fighter& f, float dt) {
     c.crouch = f.netCrouch;
     c.aimHold = f.netAim;
     c.viewPitch = f.netPitch;
-    if (f.netWeapon != f.weapon && knownGun(f.netWeapon)) { f.weapon = f.netWeapon; equipGun(e, f); }
+    if (f.netWeapon != f.weapon && knownGun(f.netWeapon)) {
+        f.weapon = f.netWeapon;
+        if (f.weapon != f.primary && f.weapon != f.secondary) (f.weapon == "tt33" ? f.secondary : f.primary) = f.weapon;  // comprou outra
+        equipGun(e, f);
+    }
     if (f.netReload) c.reloadTimer = std::max(c.reloadTimer, 0.2f);
     else c.reloadTimer = std::max(0.f, c.reloadTimer - dt);
     c.airborne = f.netAir;
     animateCharacter(c, g->transform.rotation, v, !f.netAir, f.netAir);
     if (f.netShots > c.shots) {
+        f.shotAgo = 0.f;  // atirou: aparece no minimapa dos adversários
         int n = std::min(3, f.netShots - c.shots);
         c.shots = f.netShots;
         for (int k = 0; k < n; ++k) remoteShotFx(e, f, c, *g);
@@ -1464,7 +1491,7 @@ std::string hudJson(Engine* e) {
             glm::vec3 rt(-fw.z, 0.f, fw.x);
             for (size_t i = 0; i < M.f.size(); ++i) {
                 const Fighter& f = M.f[i];
-                if (int(i) == pf || f.dead || (f.team != M.f[pf].team && f.shotAgo > 2.f)) continue;
+                if (int(i) == pf || f.dead || (f.team != M.f[pf].team && f.shotAgo > 2.75f)) continue;  // inimigo: só ~2,75 s depois de atirar
                 GameObject* g = e->scene.get(f.root);
                 if (!g) continue;
                 glm::vec3 d = g->transform.position - pg->transform.position;

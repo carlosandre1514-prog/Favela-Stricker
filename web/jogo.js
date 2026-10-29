@@ -151,7 +151,7 @@ function telaLado() {
         <span class="texto" style="color:#DBEAFE">Nasce fora da favela, na rua dos prédios. Sobe as escadarias para tomar o morro.</span>
         <span class="cresce"></span>
         <div class="linha" style="gap:6px;flex-wrap:wrap"><span class="tag" style="background:rgba(59,130,246,.22);color:#DBEAFE">M4A1 · M4 Colt com luneta</span>
-          <span class="tag" style="background:rgba(59,130,246,.22);color:#DBEAFE">Fardas: PM, Civil, Exército, Choque, Especial</span></div>
+          <span class="tag" style="background:rgba(59,130,246,.22);color:#DBEAFE">5 fardas grátis: PM, Civil, Exército, Choque, Especial</span></div>
         <div class="linha" style="justify-content:space-between"><span style="font-size:12px;color:#BFDBFE">4 robôs + você</span><span class="entrar" style="background:#3B82F6">ENTRAR</span></div>
       </button>
       <button class="lado ban" data-time="1">
@@ -159,7 +159,7 @@ function telaLado() {
         <span class="texto" style="color:#FEF3C7">Nasce na quadra, dentro da favela. Com polícia na quadra, nasce num canto do morro sem policial.</span>
         <span class="cresce"></span>
         <div class="linha" style="gap:6px;flex-wrap:wrap"><span class="tag" style="background:rgba(245,158,11,.22);color:#FEF3C7">AK-47 · AK-74 · AK-74 tática</span>
-          <span class="tag" style="background:rgba(245,158,11,.22);color:#FEF3C7">Roupas: Rubro, Alvinegro, Tricolor, Canarinho, Faixa</span></div>
+          <span class="tag" style="background:rgba(245,158,11,.22);color:#FEF3C7">5 roupas grátis: Rubro, Alvinegro, Tricolor, Canarinho, Faixa</span></div>
         <div class="linha" style="justify-content:space-between"><span style="font-size:12px;color:#FDE68A">4 robôs + você</span><span class="entrar" style="background:#F59E0B;color:#111827">ENTRAR</span></div>
       </button>
     </div></div>`), 'lado');
@@ -186,8 +186,7 @@ function telaRoupa(time, pronto) {
       return `<button class="item ${r === sel ? 'sel' : ''} ${tem ? '' : 'travado'}" data-k="${r.key}" style="justify-content:flex-end">
         <img src="retratos/${r.key}.png" alt="" style="flex:1 1 0;min-height:0;height:0">
         <span class="n" style="font-size:13px">${esc(r.nome)}</span>
-        <span class="r raridade-${r.raridade}">${RARIDADES[r.raridade]}</span>
-        <span class="p ${tem ? 'verde' : 'amarelo'}">${tem ? (r.preco ? 'sua' : 'grátis') : `${ICONE.moeda(12)} ${fmt(r.preco)}`}</span></button>`;
+        <span class="p ${tem ? 'verde' : 'amarelo'}">${tem ? (r === sel ? 'equipada' : 'grátis') : `${ICONE.moeda(12)} ${fmt(r.preco)}`}</span></button>`;
     }).join('');
     for (const d of $$('.item', t)) d.onclick = async () => {
       const r = minhas.find((x) => x.key === d.dataset.k);
@@ -260,7 +259,7 @@ function telaMercado(aba = 'todas', selId = null) {
     det.innerHTML = `<div class="linha" style="gap:8px"><span class="etiqueta fundo-${sel.raridade}">${RARIDADES[sel.raridade].toUpperCase()}</span><span class="dica">${esc(sel.desc)}</span></div>
       <span class="bebas" style="font-size:30px">${esc(sel.nome.toUpperCase())}</span>
       <div class="previa"><img src="${sel.img}" alt="${esc(sel.nome)}"></div>
-      <span class="dica" style="font-size:11px">${sel.arma ? 'Prévia renderizada pelo motor do jogo · só visual, não muda o dano' : 'Roupa só do seu lado · quantos quiserem podem usar a mesma'}</span>${botao}`;
+      <span class="dica" style="font-size:11px">${sel.arma ? 'Só visual, não muda o dano · a skin é da sua arma: no online os outros veem ela na sua mão e nas suas costas' : 'Roupa só do seu lado · quantos quiserem podem usar a mesma'}</span>${botao}`;
     const acao = $('#m-acao', det);
     if (!acao) return;
     acao.onclick = async () => {

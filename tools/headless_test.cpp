@@ -1107,6 +1107,46 @@ int main(int argc, char** argv) {
         std::printf("  personagens com time no projeto: %d\n", chars);
     };
     // Prévia das skins de arma (loja): cada arma do kit com cada textura de skin, renderizada pelo motor
+    // Armas guardadas no corpo (fuzil nas costas, pistola na coxa) e as mãos da skin na primeira pessoa
+    if (const char* proj = std::getenv("SO_COSTAS")) {
+        using nlohmann::json;
+        std::string txt;
+        if (FILE* f = std::fopen(proj, "rb")) { char b[65536]; size_t n; while ((n = std::fread(b, 1, sizeof b, f)) > 0) txt.append(b, n); std::fclose(f); }
+        engine_set_editor_overlay(e, 0);
+        engine_import_project(e, txt.c_str());
+        engine_select(e, -1);
+        const int time = std::getenv("TIME") ? std::atoi(std::getenv("TIME")) : 0;
+        const int roupa = std::getenv("ROUPA") ? std::atoi(std::getenv("ROUPA")) : 0;
+        engine_team_gun_skin(e, time ? "ak47" : "m4a1", time ? "dragao" : "neon");
+        engine_team_loadout(e, time, roupa, time ? "ak47" : "m4a1", "tt33");
+        engine_set_first_person(e, 0);
+        engine_set_play(e, 1);
+        frames(e, 30);
+        engine_set_camera(e, 0.f, 0.f, 0.f, time ? 0.f : 3.14159f, 0.15f, 2.4f);  // atrás do jogador
+        frames(e, 20);
+        save(out, ("50_costas_" + std::to_string(time) + ".png").c_str());
+        engine_look(e, 500.f, 0.f);  // de lado
+        frames(e, 20);
+        save(out, ("50_lado_" + std::to_string(time) + ".png").c_str());
+        engine_player_swap(e);  // pistola na mão, fuzil vai para as costas
+        frames(e, 20);
+        save(out, ("50_trocou_" + std::to_string(time) + ".png").c_str());
+        float pp[3] = {}, pr[3], ps[3];
+        engine_get_transform(e, engine_player_id(e), pp, pr, ps);
+        for (int k = 0; k < 4; ++k) {  // volta em torno do personagem, de perto
+            engine_set_camera(e, pp[0], pp[1] + 1.1f, pp[2], 3.14159f * 0.5f * k, 0.12f, 2.0f);
+            frames(e, 12);
+            save(out, ("50_volta_" + std::to_string(time) + "_" + std::to_string(k) + ".png").c_str());
+        }
+        engine_set_first_person(e, 1);
+        engine_set_play(e, 1);
+        engine_set_camera(e, 0.f, 0.f, 0.f, time ? 3.14159f : 0.f, 0.05f, 3.f);
+        frames(e, 40);
+        save(out, ("50_fps_" + std::to_string(time) + ".png").c_str());
+        engine_destroy(e);
+        std::printf(g_fail ? "FALHOU\n" : "OK\n");
+        return g_fail ? 1 : 0;
+    }
     // Personagens de perto e a meia distância (confere a simplificação das qualidades leves)
     if (const char* lista = std::getenv("SO_RETRATOS")) {
         using nlohmann::json;
@@ -1532,7 +1572,8 @@ int main(int argc, char** argv) {
         std::printf("[34] online (rede simulada)\n");
         teamProject();
         json roster = json::array({{{"id", "eu"}, {"nome", "Eu"}, {"time", 0}, {"skin", 1}, {"arma", "m4a1"}},
-                                   {{"id", "amigo"}, {"nome", "Amigo"}, {"time", 1}, {"skin", 2}, {"arma", "ak74"}},
+                                   {{"id", "amigo"}, {"nome", "Amigo"}, {"time", 1}, {"skin", 2}, {"arma", "ak74"}, {"arma2", "tt33"},
+                                    {"skins", {{"ak74", "favela"}, {"tt33", "gold_relic"}}}},
                                    {{"id", "aliado"}, {"nome", "Aliado"}, {"time", 0}, {"skin", 3}, {"arma", "m4colt"}}});
         engine_net_roster(e, 1, "eu", roster.dump().c_str());
         engine_team_loadout(e, 0, 1, "m4a1", "tt33");

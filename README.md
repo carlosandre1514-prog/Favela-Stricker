@@ -6,6 +6,7 @@ Jogo de tiro em primeira pessoa **Polícia x Bandidos** no mapa da favela.
 - **Online:** jogadores contra jogadores, em salas com código (até 10 pessoas). A partida é ao vivo: os outros
   veem você andar, pular, agachar, mirar, atirar, recarregar e trocar de arma na hora. Tem chat de voz com o seu time.
 - **Login:** conta com e-mail e senha (ou convidado). Moedas e itens comprados ficam na conta.
+- **Roupas:** o personagem é sempre o mesmo e sempre usa uma das 10 skins (5 de cada lado), todas grátis.
 - **Lojas:** armas se compram **na partida**, na base do time, com o $ dos abates. Skins de arma e roupas se compram
   no **mercado**, com moedas. Cada lado tem as suas roupas (polícia só farda, bandido só roupa de bandido);
   quantos quiserem podem usar a mesma.

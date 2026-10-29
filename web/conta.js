@@ -11,13 +11,14 @@ const guardado = {
 // ---------------- catálogo (preços provisórios) ----------------
 const RARIDADES = { comum: 'Comum', rara: 'Rara', epica: 'Épica', lendaria: 'Lendária' };
 
-// Roupas: a ordem de cada lado é a do motor (Game.cpp kSkins). Polícia só usa farda; bandido só roupa de bandido.
+// Roupas (skins de personagem): o personagem é sempre o mesmo e sempre usa uma delas. As 10 são gratuitas.
+// A ordem de cada lado é a do motor (Game.cpp kSkins). Polícia só usa farda; bandido só roupa de bandido.
 const ROUPAS = [
   { key: 'pm', nome: 'PM', time: 0, i: 0, preco: 0, raridade: 'comum' },
-  { key: 'civil', nome: 'Polícia Civil', time: 0, i: 1, preco: 499, raridade: 'rara' },
-  { key: 'exercito', nome: 'Exército', time: 0, i: 2, preco: 699, raridade: 'rara' },
-  { key: 'choque', nome: 'Choque', time: 0, i: 3, preco: 999, raridade: 'epica' },
-  { key: 'especial', nome: 'Especial', time: 0, i: 4, preco: 1499, raridade: 'lendaria' },
+  { key: 'civil', nome: 'Polícia Civil', time: 0, i: 1, preco: 0, raridade: 'comum' },
+  { key: 'exercito', nome: 'Exército', time: 0, i: 2, preco: 0, raridade: 'comum' },
+  { key: 'choque', nome: 'Choque', time: 0, i: 3, preco: 0, raridade: 'comum' },
+  { key: 'especial', nome: 'Especial', time: 0, i: 4, preco: 0, raridade: 'comum' },
   { key: 'rubro', nome: 'Rubro', time: 1, i: 0, preco: 0, raridade: 'comum' },
   { key: 'alvinegro', nome: 'Alvinegro', time: 1, i: 1, preco: 0, raridade: 'comum' },
   { key: 'tricolor', nome: 'Tricolor', time: 1, i: 2, preco: 0, raridade: 'comum' },
@@ -252,7 +253,11 @@ class Sala {
     }));
   }
   lista() { return Object.entries(this.jogadores).map(([id, p]) => ({ id, ...p })); }
-  roster() { return JSON.stringify(this.lista().map((p) => ({ id: p.id, nome: p.nome || 'Jogador', time: p.time | 0, skin: p.skin | 0, arma: p.arma || '' }))); }
+  // o que o motor precisa de cada pessoa: lado, roupa, as duas armas e as skins das armas dela (os outros veem)
+  roster() {
+    return JSON.stringify(this.lista().map((p) => ({ id: p.id, nome: p.nome || 'Jogador', time: p.time | 0, skin: p.skin | 0,
+      arma: p.arma || '', arma2: p.arma2 || 'tt33', skins: p.skins || {} })));
+  }
   atualizar(eu) { return fb.patch(`salas/${this.codigo}/jogadores/${fb.uid}`, eu); }
   async comecar() {
     await fb.del(`salas/${this.codigo}/est`);
@@ -274,8 +279,10 @@ class Sala {
   parar() { for (const o of this.ouvintes) o.fechar(); this.ouvintes = []; }
 }
 
-// O que vai para a sala sobre mim: lado, roupa e armas iniciais
+// O que vai para a sala sobre mim: lado, roupa, armas iniciais e as skins das minhas armas
 function minhaEntrada(time) {
   const r = conta.roupa(time);
-  return { nome: conta.nome(), time, skin: r.i, arma: armaInicial(time), arma2: 'tt33' };
+  const skins = {};
+  for (const a of ARMAS) { const sk = conta.skinArma(a.key); if (sk) skins[a.key] = sk; }
+  return { nome: conta.nome(), time, skin: r.i, arma: armaInicial(time), arma2: 'tt33', skins };
 }
