@@ -37,6 +37,8 @@ class PonteJogo(private val jogo: JogoActivity) {
     private fun texto(b: ByteArray) = String(b, Charsets.UTF_8)
 
     @JavascriptInterface fun config(): String = jogo.configJogo()
+    @JavascriptInterface fun versao(): String = jogo.versao()
+    @JavascriptInterface fun fase(texto: String) { jogo.diag.fase = texto }
     @JavascriptInterface fun pronto(): Boolean = pronto
     @JavascriptInterface fun girarMenu(on: Boolean) { girando = on }
     @JavascriptInterface fun visaoGeral() = gl { NativeBridge.nativeSetCamera(0f, 8f, 20f, 3.6f, 0.42f, 115f) }

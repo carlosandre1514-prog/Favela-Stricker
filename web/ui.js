@@ -30,7 +30,9 @@ addEventListener('resize', ajustarPalco);
 ajustarPalco();
 
 // ---------------- telas ----------------
+const VERSAO = ANDROID ? 'v' + (() => { try { return Nativo.versao(); } catch (_) { return ''; } })() : 'site';
 function mostrar(no, tag) {
+  if (ANDROID) { try { Nativo.fase('tela ' + tag); } catch (_) {} }  // vai para o rastro do diagnóstico
   for (const c of [...palco.children]) if (!c.classList.contains('fixo')) c.remove();
   no.dataset.tela = tag;
   palco.prepend(no);

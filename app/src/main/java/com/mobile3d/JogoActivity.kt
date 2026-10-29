@@ -45,6 +45,9 @@ class JogoActivity : Activity() {
     private var ultimoHud = 0L
     private var ultimaRede = 0L
     private var pedidoMicrofone: PermissionRequest? = null
+    val diag by lazy { Diagnostico(this) }
+    private var morteAnterior: String? = null   // rastro de quando o Android fechou o jogo da última vez
+    private var baixouQualidade = ""
 
     // ---------------- ciclo de vida ----------------
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -52,6 +55,15 @@ class JogoActivity : Activity() {
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         telaCheia()
         instalarRegistroDeErros()
+        // morreu na tela da última vez (falta de memória não deixa erro): guarda o rastro e baixa a qualidade
+        morteAnterior = diag.morteAnterior()
+        if (morteAnterior != null && nivelGrafico() > 0) {
+            val antes = nivelGrafico()
+            prefs.edit().putInt("nivel", antes - 1).apply()
+            baixouQualidade = "A qualidade gráfica baixou de ${NOMES_NIVEL[antes]} para ${NOMES_NIVEL[antes - 1]}."
+        }
+        diag.fase = "preparando os arquivos"
+        diag.iniciar()
         val abertura = TextView(this).apply {
             text = "Preparando o jogo…"
             setTextColor(0xFFF3F4F6.toInt())
@@ -81,6 +93,7 @@ class JogoActivity : Activity() {
 
     override fun onPause() {
         super.onPause()
+        diag.emUso(false)
         if (::motorView.isInitialized) motorView.onPause()
         if (::web.isInitialized) web.onPause()
         sons.pause()
@@ -89,12 +102,19 @@ class JogoActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
+        diag.emUso(true)
         if (::motorView.isInitialized) motorView.onResume()
         if (::web.isInitialized) web.onResume()
         sons.resume()
     }
 
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        diag.registrar("o Android pediu memória (nível $level) · ${try { diag.memoria() } catch (_: Exception) { "" }}")
+    }
+
     override fun onDestroy() {
+        diag.parar()
         if (::web.isInitialized) web.destroy()
         sons.release()
         super.onDestroy()
@@ -120,6 +140,7 @@ class JogoActivity : Activity() {
             prefs.edit().putInt("nivel", if (gb < 4.5) 0 else if (gb < 6.5) 1 else 2).apply()
         }
         try { File(dirMotor, "qualidade.txt").writeText(nivelGrafico().toString()) } catch (_: Exception) {}
+        diag.fase = "abrindo o motor (gráficos ${NOMES_NIVEL[nivelGrafico()]})"
 
         motorView = EngineView(this, dirMotor, if (nivelGrafico() >= 3) 4 else 0)  // Ultra: antisserrilhado 4x
         motorView.touchToEngine = false
@@ -145,6 +166,12 @@ class JogoActivity : Activity() {
         web.webViewClient = object : WebViewClient() {
             override fun shouldInterceptRequest(view: WebView, req: WebResourceRequest): WebResourceResponse? =
                 if (req.url.host == "jogo.local") arquivoDaInterface(req.url.path ?: "/") else null
+            // o processo das telas morreu (o Android tirou memória dele): reabre em vez de fechar o jogo
+            override fun onRenderProcessGone(view: WebView, detail: android.webkit.RenderProcessGoneDetail): Boolean {
+                diag.registrar("as telas (WebView) caíram · ${if (detail.didCrash()) "erro" else "falta de memória"}")
+                runOnUiThread { recreate() }
+                return true
+            }
         }
         web.webChromeClient = object : WebChromeClient() {
             // chat de voz: o microfone só abre com a permissão do Android
@@ -175,6 +202,7 @@ class JogoActivity : Activity() {
 
     // Projeto da partida (o mesmo do editor); as barracas de roupa ficam de fora: roupa se compra no mercado
     private fun abrirMapaDaPartida() {
+        diag.fase = "abrindo o mapa"
         ponte.pronto = false
         try {
             val json = JSONObject(assets.open("exemplos/5_policia_x_bandidos.json").bufferedReader().readText())
@@ -194,6 +222,7 @@ class JogoActivity : Activity() {
         }
         NativeBridge.nativeSetCamera(0f, 8f, 20f, 3.6f, 0.42f, 115f)
         ponte.pronto = true
+        diag.fase = "mapa aberto"
     }
 
     // Na thread GL, depois de cada quadro: sons, tiro, olhar e as cópias que a página lê
@@ -246,6 +275,8 @@ class JogoActivity : Activity() {
     }
 
     // ---------------- usados pela PonteJogo ----------------
+    fun versao(): String = try { packageManager.getPackageInfo(packageName, 0).versionName ?: "" } catch (_: Exception) { "" }
+
     fun configJogo(): String = try { assets.open("config_jogo.json").bufferedReader().readText() } catch (_: Exception) { "{}" }
 
     fun nivelGrafico() = prefs.getInt("nivel", 0).coerceIn(0, 3)
@@ -292,23 +323,29 @@ class JogoActivity : Activity() {
         try { NativeBridge.nativeSetCrashFile(arquivoErro.absolutePath) } catch (_: Throwable) {}
     }
 
+    // Aviso na abertura: o jogo deu erro (motor ou app) ou o Android fechou ele na tela (memória)
     private fun mostrarUltimoErro() {
-        if (!arquivoErro.exists()) return
-        val texto = try { arquivoErro.readText() } catch (_: Exception) { "" }
-        arquivoErro.delete()
-        if (texto.isBlank()) return
-        val versao = try { packageManager.getPackageInfo(packageName, 0).versionName } catch (_: Exception) { "" }
-        val niveis = arrayOf("Leve", "Padrão", "Intermediária", "Ultra")
-        val info = "Favela Stricker $versao · Android ${Build.VERSION.RELEASE} · ${Build.MANUFACTURER} ${Build.MODEL} · " +
-            "gráficos: ${niveis[nivelGrafico()]}\n\n$texto"
+        val erro = if (arquivoErro.exists()) (try { arquivoErro.readText() } catch (_: Exception) { "" }).also { arquivoErro.delete() } else ""
+        val morte = morteAnterior
+        morteAnterior = null
+        if (erro.isBlank() && morte == null) return
+        val titulo = if (erro.isNotBlank()) "O jogo fechou da última vez" else "O Android fechou o jogo da última vez"
+        val explica = if (erro.isNotBlank()) "Deu um erro." else "Quase sempre é falta de memória no celular."
+        val info = "Favela Stricker ${versao()} · Android ${Build.VERSION.RELEASE} · ${Build.MANUFACTURER} ${Build.MODEL} · " +
+            "gráficos agora: ${NOMES_NIVEL[nivelGrafico()]}\n" + (if (erro.isNotBlank()) "\n$erro\n" else "") +
+            (if (morte != null) "\nO que o jogo fazia (rastro):\n$morte" else "")
         AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
-            .setTitle("O jogo fechou da última vez")
-            .setMessage("Copie e mande para o desenvolvedor:\n\n" + info.take(3000))
+            .setTitle(titulo)
+            .setMessage("$explica ${baixouQualidade}\nCopie e mande para o desenvolvedor:\n\n" + info.takeLast(3000))
             .setPositiveButton("Copiar") { _, _ ->
                 (getSystemService(CLIPBOARD_SERVICE) as android.content.ClipboardManager)
                     .setPrimaryClip(android.content.ClipData.newPlainText("erro", info))
             }
             .setNegativeButton("Fechar", null)
             .show()
+    }
+
+    companion object {
+        val NOMES_NIVEL = arrayOf("Leve", "Padrão", "Intermediária", "Ultra")
     }
 }

@@ -45,7 +45,7 @@ function telaLogin() {
         <button class="dica" id="l-esqueci">Esqueci a senha</button></div>
       <button class="btn btn-fraco" id="l-convidado">Jogar como convidado</button>
       <div class="status" id="l-status"></div>
-    </div></div>`), 'login');
+    </div><span class="versao">Favela Stricker ${esc(VERSAO)}</span></div>`), 'login');
   $('#l-nome', t).value = guardado.get('nome', '');
   $('#l-email', t).value = guardado.get('email', '');
   const st = $('#l-status', t);
@@ -128,6 +128,7 @@ function telaInicio() {
       <button class="chip" data-ir="config" aria-label="Configurações">${ICONE.engrenagem}</button>
       <button class="chip" id="i-conta">${ICONE.pessoa}<span>${esc(conta.nome())}</span></button>
     </div>
+    <span class="versao">Favela Stricker ${esc(VERSAO)} · gráficos ${esc(nomeNivel())}</span>
     <button class="destaque" data-ir="mercado">
       <div class="linha" style="gap:8px"><span class="etiqueta fundo-${d.raridade}">${RARIDADES[d.raridade].toUpperCase()}</span><span class="dica" style="color:#D1D5DB">Destaque do mercado</span></div>
       <img src="armas/${d.arma}_${d.key}.png" alt="${esc(d.nome)}">
