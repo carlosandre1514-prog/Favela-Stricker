@@ -1,82 +1,245 @@
-/* Favela Stricker (site): as mesmas cores e telas do app */
+/* Favela Stricker: a interface do jogo (a mesma no site e no APK).
+   Desenhada sobre um palco de 844x390 (celular deitado) que é ampliado/reduzido para a tela. */
+@font-face { font-family: 'Bebas Neue'; font-weight: 400; font-display: swap; src: url(fontes/bebas-neue-latin.woff2) format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: 'Bebas Neue'; font-weight: 400; font-display: swap; src: url(fontes/bebas-neue-latin-ext.woff2) format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+@font-face { font-family: 'Inter'; font-weight: 100 900; font-display: swap; src: url(fontes/inter-latin.woff2) format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: 'Inter'; font-weight: 100 900; font-display: swap; src: url(fontes/inter-latin-ext.woff2) format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+
 :root {
-  --fundo: #0B0F17; --painel: #121826; --ouro: #FBBF24; --azul: #3B82F6; --azul-claro: #93C5FD; --laranja: #F59E0B;
-  --amarelo: #FCD34D; --verde: #86EFAC; --texto: #F3F4F6; --apagado: #C3C8D2; --escuro: rgba(11, 15, 23, 0.72);
+  --fundo: #0B0F17; --painel: #121826; --painel2: #1B2232; --ouro: #FBBF24; --ouro-claro: #FCD34D; --azul: #3B82F6; --azul-claro: #93C5FD;
+  --azul-medio: #60A5FA; --laranja: #F59E0B; --verde: #86EFAC; --verde-forte: #4ADE80; --vermelho: #F87171; --texto: #F3F4F6;
+  --apagado: #C3C8D2; --cinza: #9CA3AF; --escuro: rgba(11, 15, 23, 0.72); --borda: rgba(255, 255, 255, 0.18);
+  --pol-fundo: #0F1D36; --ban-fundo: #2A1C08;
+  --raro-comum: #9CA3AF; --raro-rara: #60A5FA; --raro-epica: #C084FC; --raro-lendaria: #FBBF24;
 }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body { margin: 0; height: 100%; overflow: hidden; background: var(--fundo); color: var(--texto);
-  font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; user-select: none; -webkit-user-select: none; touch-action: none; }
+  font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; user-select: none; -webkit-user-select: none;
+  touch-action: none; overscroll-behavior: none; }
+body.android, body.android html { background: transparent; }
+body.android { background: transparent; }
 canvas#tela { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; outline: none; }
-#ui { position: fixed; inset: 0; pointer-events: none; }
-#ui > * { pointer-events: auto; }
-.tela { position: absolute; inset: 0; display: flex; flex-direction: column; padding: 14px 22px; background: var(--fundo); overflow: auto; }
-.tela.transparente { background: rgba(8, 11, 18, 0.72); }
-.titulo { font-family: "Bebas Neue", "Oswald", Impact, "Arial Narrow", sans-serif; font-weight: 700; letter-spacing: .04em; line-height: 0.95; }
-.ouro { color: var(--ouro); } .azul { color: #60A5FA; } .apagado { color: var(--apagado); } .verde { color: var(--verde); } .amarelo { color: var(--amarelo); }
-button { font: inherit; color: inherit; border: none; cursor: pointer; border-radius: 12px; padding: 10px 16px; min-height: 44px; font-weight: 700; }
+body.android canvas#tela { display: none; }
+#ui { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
+#palco { position: absolute; left: 0; top: 0; transform-origin: 0 0; pointer-events: none; }
+#palco > * { pointer-events: auto; }
+a, button { font: inherit; color: inherit; text-decoration: none; }
+button { border: none; background: none; padding: 0; cursor: pointer; }
 button:disabled { opacity: .5; cursor: default; }
-.b-ouro { background: var(--ouro); color: #111827; } .b-azul { background: var(--azul); } .b-laranja { background: var(--laranja); color: #111827; }
-.b-fraco { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.18); }
-.b-link { background: none; color: var(--azul-claro); min-height: 36px; padding: 6px 4px; font-weight: 600; }
-input { font: inherit; color: var(--texto); background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.18); border-radius: 10px; padding: 10px 12px; width: 100%; outline: none; }
-input:focus { border-color: var(--ouro); }
+svg { flex: none; }
+
+.bebas { font-family: 'Bebas Neue', Impact, 'Arial Narrow', sans-serif; font-weight: 400; letter-spacing: 1px; line-height: 1; }
+.cresce { flex: 1 1 0; min-width: 0; min-height: 0; }
 .linha { display: flex; align-items: center; gap: 10px; }
 .coluna { display: flex; flex-direction: column; gap: 8px; }
-.cresce { flex: 1 1 0; min-width: 0; min-height: 0; }
-.cartao { background: var(--painel); border-radius: 16px; padding: 14px 16px; border: 1px solid rgba(255,255,255,0.08); }
-.chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 18px; background: rgba(11,15,23,0.85); border: 1px solid rgba(252,211,77,0.55); color: var(--amarelo); font-weight: 800; font-size: 14px; }
-.cabecalho { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
-.cabecalho .titulo { font-size: 34px; }
-.status { color: var(--amarelo); font-weight: 700; font-size: 13px; min-height: 18px; }
-.grade-skins { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; flex: 1 1 0; min-height: 0; }
-.skin { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; border-radius: 16px; background: var(--painel); border: 2px solid rgba(255,255,255,0.13); padding: 6px; cursor: pointer; min-height: 0; }
-.skin img { flex: 1 1 0; min-height: 0; max-width: 100%; object-fit: contain; }
-.skin.sel { border-color: var(--ouro); background: #16233D; }
-.skin.travada img { opacity: .45; }
-.chips { display: flex; gap: 6px; flex-wrap: wrap; }
-.chips button { min-height: 38px; padding: 6px 12px; background: var(--painel); border: 2px solid rgba(255,255,255,0.13); font-size: 13px; }
-.chips button.sel { border-color: var(--ouro); background: #16233D; }
-.lista-loja { display: flex; flex-direction: column; gap: 5px; overflow: auto; width: 300px; }
-.item-loja { display: flex; align-items: center; gap: 8px; height: 48px; padding: 0 10px; border-radius: 12px; background: var(--painel); border: 1px solid rgba(255,255,255,0.08); cursor: pointer; font-weight: 700; font-size: 14px; }
-.item-loja img { width: 64px; height: 40px; object-fit: contain; }
-.item-loja.sel { border-color: #60A5FA; background: #16233D; }
-#carregando { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; background: var(--fundo); z-index: 10; text-align: center; padding: 20px; }
-#carregando .logo { font-family: "Bebas Neue", Impact, sans-serif; font-size: 56px; display: flex; gap: 14px; }
-#carregando .barra { width: min(420px, 80vw); height: 10px; border-radius: 6px; background: rgba(255,255,255,0.1); overflow: hidden; }
-#progresso { height: 100%; width: 0; background: var(--ouro); transition: width .2s; }
-#carregando .dica { color: var(--apagado); font-size: 12px; max-width: 460px; }
+
+/* telas */
+.tela { position: absolute; inset: 0; display: flex; flex-direction: column; gap: 12px; padding: 18px 24px 18px; background: var(--fundo); overflow: hidden; }
+.tela.sobre-mapa { background: rgba(8, 11, 18, 0.72); }
+.topo { display: flex; align-items: center; gap: 14px; min-height: 44px; }
+.topo .titulo { font-family: 'Bebas Neue', sans-serif; font-size: 38px; letter-spacing: 1px; line-height: 1; white-space: nowrap; }
+.voltar { display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 12px;
+  background: rgba(255, 255, 255, 0.08); border: 1px solid var(--borda); flex: none; }
+.dica { font-size: 12px; color: var(--apagado); }
+
+/* botões */
+.btn { display: flex; align-items: center; justify-content: center; gap: 6px; height: 44px; padding: 0 16px; border-radius: 12px;
+  font-size: 13px; font-weight: 600; white-space: nowrap; }
+.btn-fraco { background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.22); }
+.btn-ouro { background: var(--ouro); color: #111827; font-weight: 800; }
+.btn-azul { background: var(--azul); font-weight: 800; }
+.btn-laranja { background: var(--laranja); color: #111827; font-weight: 800; }
+.btn-escuro { background: #1F2937; border: 1px solid rgba(255, 255, 255, 0.2); }
+.btn-grande { height: 58px; border-radius: 14px; font-family: 'Bebas Neue', sans-serif; font-size: 32px; letter-spacing: 2px; font-weight: 400; }
+.chip-moedas { display: flex; align-items: center; gap: 6px; height: 36px; padding: 0 6px 0 12px; border-radius: 18px; background: rgba(11, 15, 23, 0.85);
+  border: 1px solid rgba(252, 211, 77, 0.55); font-size: 14px; font-weight: 800; color: var(--ouro-claro); }
+.chip-moedas .mais { display: flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 13px; background: var(--ouro); color: #111827; font-size: 18px; line-height: 1; }
+.chip-moedas.sem-mais { padding-right: 14px; }
+.chip { display: flex; align-items: center; gap: 6px; height: 36px; padding: 0 12px; border-radius: 18px; background: rgba(11, 15, 23, 0.85);
+  border: 1px solid var(--borda); font-size: 12px; color: #E5E7EB; white-space: nowrap; }
+.etiqueta { font-size: 11px; font-weight: 800; letter-spacing: 1px; padding: 3px 8px; border-radius: 6px; }
+.raridade-comum { color: var(--raro-comum); } .raridade-rara { color: var(--raro-rara); } .raridade-epica { color: var(--raro-epica); } .raridade-lendaria { color: var(--raro-lendaria); }
+.fundo-comum { background: var(--raro-comum); color: #111827; } .fundo-rara { background: var(--raro-rara); color: #0B1220; }
+.fundo-epica { background: var(--raro-epica); color: #1A0B26; } .fundo-lendaria { background: var(--ouro); color: #111827; }
+.moeda { display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: var(--ouro-claro); flex: none; }
+
+/* entradas */
+input[type=text], input[type=email], input[type=password] { font: inherit; font-size: 14px; color: var(--texto); background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--borda); border-radius: 10px; padding: 10px 12px; width: 100%; outline: none; user-select: text; -webkit-user-select: text; }
+input:focus { border-color: var(--ouro); }
+.status { color: var(--ouro-claro); font-weight: 700; font-size: 12px; min-height: 16px; }
+.cartao { background: var(--painel); border-radius: 18px; padding: 14px 16px; border: 1px solid rgba(255, 255, 255, 0.08); }
+
+/* tela inicial */
+#inicio .esquerda { position: absolute; left: 30px; top: 22px; bottom: 20px; width: 300px; display: flex; flex-direction: column; gap: 10px; }
+#inicio .grade { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; width: 260px; }
+#inicio .direita-topo { position: absolute; right: 20px; top: 18px; display: flex; gap: 8px; align-items: center; }
+#inicio .destaque { position: absolute; right: 24px; bottom: 30px; width: 420px; display: flex; flex-direction: column; gap: 6px; padding: 14px 16px;
+  border-radius: 18px; background: rgba(11, 15, 23, 0.78); border: 1px solid rgba(252, 211, 77, 0.45); }
+#inicio .destaque img { width: 388px; height: 170px; object-fit: contain; }
+
+/* escolha do lado */
+.lados { flex: 1 1 0; min-height: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.lado { display: flex; flex-direction: column; gap: 10px; padding: 18px 20px; border-radius: 18px; cursor: pointer; text-align: left; }
+.lado.pol { background: var(--pol-fundo); border: 2px solid var(--azul); }
+.lado.ban { background: var(--ban-fundo); border: 2px solid var(--laranja); }
+.lado .icone { display: flex; align-items: center; justify-content: center; width: 52px; height: 52px; border-radius: 14px; }
+.lado .nome { font-family: 'Bebas Neue', sans-serif; font-size: 44px; line-height: 1; }
+.lado .texto { font-size: 13px; line-height: 1.45; }
+.lado .tag { font-size: 11px; padding: 4px 9px; border-radius: 8px; }
+.lado .entrar { display: flex; align-items: center; height: 40px; padding: 0 18px; border-radius: 12px; font-weight: 800; font-size: 14px; letter-spacing: 1px; }
+
+/* grades de itens (roupas, mercado) */
+.grade-itens { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; align-content: start; overflow-y: auto; padding-right: 2px; }
+.item { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 6px 8px; border-radius: 14px; background: var(--painel);
+  border: 2px solid rgba(255, 255, 255, 0.12); cursor: pointer; min-width: 0; }
+.item.sel { border-color: var(--ouro); background: #16233D; }
+.item img { width: 100%; height: 64px; object-fit: contain; }
+.item .n { font-size: 11px; font-weight: 800; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.item .r { font-size: 10px; font-weight: 800; letter-spacing: .5px; }
+.item .p { display: flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 800; }
+.item.travado img { opacity: .5; }
+.detalhe { display: flex; flex-direction: column; gap: 8px; padding: 14px 16px; border-radius: 18px; background: var(--painel); border: 1px solid rgba(255, 255, 255, 0.1); min-height: 0; }
+.detalhe .previa { flex: 1 1 0; min-height: 0; border-radius: 12px; background: var(--painel2); display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.detalhe .previa img { max-width: 92%; max-height: 92%; object-fit: contain; }
+.abas { display: flex; gap: 6px; }
+.aba { height: 34px; padding: 0 12px; border-radius: 10px; background: rgba(255, 255, 255, 0.06); border: 1px solid var(--borda); font-size: 13px; font-weight: 700; }
+.aba.sel { background: rgba(251, 191, 36, 0.18); border-color: var(--ouro); color: var(--ouro-claro); }
+
+/* loja de moedas */
+.pacotes { flex: 1 1 0; min-height: 0; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; }
+.pacote { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 4px; padding: 12px 10px;
+  border-radius: 16px; background: var(--painel); border: 2px solid rgba(255, 255, 255, 0.1); }
+.pacote.popular { border-color: var(--azul-medio); } .pacote.melhor { border-color: var(--verde-forte); }
+.pacote .selo { position: absolute; top: -10px; left: 50%; transform: translateX(-50%); font-size: 10px; font-weight: 800; letter-spacing: 1px;
+  padding: 3px 8px; border-radius: 6px; white-space: nowrap; }
+.pacote .qtd { font-family: 'Bebas Neue', sans-serif; font-size: 34px; color: var(--ouro-claro); }
+.pacote .bonus { font-size: 11px; color: var(--apagado); min-height: 14px; }
+.pacote .preco { width: 100%; height: 38px; border-radius: 10px; background: var(--ouro); color: #111827; font-weight: 800; font-size: 14px; margin-top: 6px; }
+.moedas-desenho { flex: 1 1 0; display: flex; align-items: center; justify-content: center; }
+
+/* tabela de armas */
+.tabela { width: 100%; border-collapse: collapse; font-size: 13px; }
+.tabela th { font-size: 10px; letter-spacing: 1px; color: var(--cinza); font-weight: 800; text-align: right; padding: 6px 8px; }
+.tabela th:first-child, .tabela td:first-child { text-align: left; }
+.tabela td { padding: 7px 8px; text-align: right; }
+.tabela tr:nth-child(even) td { background: rgba(255, 255, 255, 0.035); }
+.tabela .cab { color: #FCA5A5; }
+
+/* configurações */
+.config { flex: 1 1 0; min-height: 0; display: flex; gap: 14px; }
+.config .menu { width: 170px; display: flex; flex-direction: column; gap: 6px; }
+.config .menu .aba { height: 40px; text-align: left; }
+.config .corpo { flex: 1 1 0; min-width: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding-right: 4px; }
+.ajuste { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 12px; background: var(--painel); }
+.ajuste .nome { width: 190px; font-size: 13px; font-weight: 700; }
+.ajuste .nome small { display: block; font-weight: 400; color: var(--cinza); font-size: 11px; }
+.ajuste .valor { width: 44px; text-align: right; font-weight: 800; font-size: 13px; color: var(--ouro-claro); }
+input[type=range] { -webkit-appearance: none; appearance: none; flex: 1 1 0; height: 6px; border-radius: 3px; background: rgba(255, 255, 255, 0.15); outline: none; }
+input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; border-radius: 50%; background: var(--ouro); border: 3px solid #111827; }
+input[type=range]::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%; background: var(--ouro); border: 3px solid #111827; }
+.niveis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.nivel { display: flex; flex-direction: column; gap: 4px; padding: 12px; border-radius: 14px; background: var(--painel); border: 2px solid rgba(255, 255, 255, 0.1); text-align: left; }
+.nivel.sel { border-color: var(--ouro); background: #16233D; }
+.nivel .n { font-family: 'Bebas Neue', sans-serif; font-size: 24px; }
+.nivel small { font-size: 11px; color: var(--apagado); line-height: 1.35; }
+.chave { width: 46px; height: 26px; border-radius: 13px; background: rgba(255, 255, 255, 0.18); position: relative; flex: none; }
+.chave::after { content: ''; position: absolute; left: 3px; top: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; transition: left .15s; }
+.chave.ligada { background: var(--ouro); } .chave.ligada::after { left: 23px; }
+
+/* editor do HUD */
+#editor-hud { position: absolute; inset: 0; background: rgba(8, 11, 18, 0.45); }
+#editor-hud .barra { position: absolute; left: 50%; top: 10px; transform: translateX(-50%); display: flex; align-items: center; gap: 8px; padding: 8px 10px;
+  border-radius: 14px; background: rgba(11, 15, 23, 0.92); border: 1px solid var(--borda); z-index: 3; }
+#editor-hud .barra input[type=range] { width: 120px; flex: none; }
+#editor-hud .peca { outline: 2px dashed rgba(255, 255, 255, 0.45); outline-offset: 3px; cursor: grab; }
+#editor-hud .peca.sel { outline-color: var(--ouro); }
 
 /* ---------- HUD ---------- */
-#hud { position: absolute; inset: 0; pointer-events: none; font-size: 13px; }
-#hud .toque { pointer-events: auto; }
-.hud-caixa { background: var(--escuro); border-radius: 10px; padding: 5px 10px; }
-#vida { position: absolute; left: 14px; top: 10px; display: flex; align-items: center; gap: 8px; width: 200px; }
-#vida .trilho { flex: 1; height: 9px; border-radius: 5px; background: rgba(255,255,255,0.18); overflow: hidden; }
-#vida .barra { height: 100%; background: #4ADE80; border-radius: 5px; width: 100%; }
-#kd { position: absolute; left: 14px; top: 46px; }
-#minimapa { position: absolute; left: 14px; top: 78px; width: 84px; height: 84px; }
+#hud { position: absolute; inset: 0; pointer-events: none; }
+#hud .toque, #hud button, #hud .peca { pointer-events: auto; }
+.caixa { background: var(--escuro); border-radius: 10px; }
+#vida { position: absolute; left: 14px; top: 10px; display: flex; align-items: center; gap: 8px; padding: 6px 10px; width: 196px; }
+#vida .trilho { flex-grow: 1; height: 9px; border-radius: 5px; background: rgba(255, 255, 255, 0.18); overflow: hidden; }
+#vida .barra { width: 100%; height: 9px; border-radius: 5px; background: var(--verde-forte); transition: width .15s; }
+#vida b { font-size: 13px; font-weight: 800; width: 24px; text-align: right; }
+#info { position: absolute; left: 14px; top: 46px; display: flex; gap: 6px; }
+#info span { padding: 4px 9px; border-radius: 9px; background: var(--escuro); font-size: 12px; }
+#dinheiro { font-weight: 800; color: var(--verde); }
 #placar { position: absolute; left: 50%; top: 8px; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 3px; }
-#placar .faixa { display: flex; border-radius: 12px; overflow: hidden; background: rgba(11,15,23,0.8); font-weight: 800; }
-#placar .pol { background: #1D4ED8; padding: 2px 12px; display: flex; gap: 8px; align-items: center; }
-#placar .ban { background: #B45309; padding: 2px 12px; display: flex; gap: 8px; align-items: center; }
-#placar .num { font-family: "Bebas Neue", Impact, sans-serif; font-size: 26px; }
-#placar .relogio { padding: 0 12px; display: flex; align-items: center; font-size: 15px; }
-#abates { position: absolute; right: 66px; top: 10px; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; font-size: 12px; }
-#pausa { position: absolute; right: 14px; top: 10px; width: 44px; height: 44px; padding: 0; background: var(--escuro); }
-#mira { position: absolute; left: 50%; top: 50%; width: 80px; height: 80px; transform: translate(-50%, -50%); }
-#luneta { position: absolute; inset: 0; display: none; }
-#dano { position: absolute; inset: 0; background: rgba(220,38,38,0.33); display: none; }
-#centro { position: absolute; left: 50%; top: 50%; transform: translate(-50%, 60px); text-align: center; font-size: 18px; font-weight: 800; padding: 10px 16px; border-radius: 12px; display: none; background: rgba(11,15,23,0.7); }
-#armas { position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); display: flex; gap: 6px; align-items: flex-end; }
-.slot { width: 112px; height: 58px; border-radius: 12px; background: var(--escuro); border: 2px solid rgba(255,255,255,0.25); display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; }
-.slot img { width: 92px; height: 32px; object-fit: contain; }
-.slot.ativa { border-color: var(--ouro); }
-.redondo { position: absolute; border-radius: 50%; background: rgba(11,15,23,0.65); border: 2px solid rgba(255,255,255,0.55); display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 10px; font-weight: 800; padding: 0; min-height: 0; }
-.redondo.ligado { background: rgba(251,191,36,0.35); border-color: var(--ouro); }
-.tiro { background: rgba(220,38,38,0.85); border: 3px solid rgba(255,255,255,0.75); font-size: 30px; }
-#rede { position: absolute; left: 50%; top: 66px; transform: translateX(-50%); font-size: 11px; font-weight: 800; }
-#teclas { position: absolute; left: 14px; bottom: 12px; font-size: 11px; color: var(--apagado); line-height: 1.5; }
-.so-toque { display: none; }
-body.toque .so-toque { display: flex; }
-body.toque #teclas { display: none; }
-@media (max-height: 420px) { .tela { padding: 10px 16px; } .cabecalho .titulo { font-size: 28px; } }
+#placar .faixa { display: flex; align-items: stretch; border-radius: 12px; overflow: hidden; background: rgba(11, 15, 23, 0.8); }
+#placar .pol { display: flex; align-items: center; gap: 8px; padding: 3px 12px; background: #1D4ED8; }
+#placar .ban { display: flex; align-items: center; gap: 8px; padding: 3px 12px; background: #B45309; }
+#placar .rot { font-size: 11px; font-weight: 800; letter-spacing: 1px; }
+#placar .num { font-family: 'Bebas Neue', sans-serif; font-size: 28px; line-height: 1; }
+#placar .relogio { display: flex; align-items: center; padding: 0 12px; font-size: 15px; font-weight: 800; }
+#placar .meta { font-size: 11px; padding: 1px 8px; border-radius: 6px; background: rgba(11, 15, 23, 0.6); }
+#abates { position: absolute; right: 66px; top: 10px; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+#abates span { font-size: 12px; padding: 3px 9px; border-radius: 7px; background: var(--escuro); }
+#pausar { position: absolute; right: 14px; top: 10px; width: 44px; height: 44px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.25);
+  background: var(--escuro); display: flex; align-items: center; justify-content: center; }
+#rede { position: absolute; left: 50%; top: 66px; transform: translateX(-50%); font-size: 11px; font-weight: 800; padding: 2px 8px; border-radius: 6px; background: rgba(11, 15, 23, 0.6); }
+#mira { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); }
+#luneta { position: absolute; inset: 0; width: 100%; height: 100%; display: none; }
+#dano { position: absolute; inset: 0; background: radial-gradient(ellipse at center, rgba(220, 38, 38, 0) 45%, rgba(220, 38, 38, 0.45) 100%); display: none; }
+#centro { position: absolute; left: 50%; top: 50%; transform: translate(-50%, 46px); text-align: center; font-size: 18px; font-weight: 800; padding: 10px 16px;
+  border-radius: 12px; background: rgba(11, 15, 23, 0.72); display: none; }
+#botao-loja { position: absolute; left: 50%; top: 226px; transform: translateX(-50%); display: none; align-items: center; gap: 8px; height: 40px; padding: 0 16px;
+  border-radius: 12px; background: var(--ouro); color: #111827; font-size: 13px; font-weight: 800; }
+#botao-loja.outro { background: rgba(11, 15, 23, 0.85); color: var(--texto); border: 1px solid var(--borda); }
+.peca { position: absolute; transform: translate(-50%, -50%); }
+.redondo { border-radius: 50%; border: 2px solid rgba(255, 255, 255, 0.55); background: rgba(11, 15, 23, 0.65); display: flex; flex-direction: column;
+  align-items: center; justify-content: center; color: var(--texto); font-weight: 800; }
+.redondo .r { font-size: 9px; font-weight: 800; }
+.redondo.ligado { border-color: var(--ouro); background: rgba(251, 191, 36, 0.35); }
+.tiro { border: 3px solid rgba(255, 255, 255, 0.75); background: rgba(220, 38, 38, 0.85); }
+.tiro.esq { border-width: 2px; border-color: rgba(255, 255, 255, 0.6); background: rgba(220, 38, 38, 0.7); }
+.contador { position: absolute; right: -4px; top: -4px; min-width: 20px; height: 20px; border-radius: 10px; background: var(--ouro); color: #111827;
+  font-size: 11px; font-weight: 800; display: flex; align-items: center; justify-content: center; }
+#armas { display: flex; gap: 6px; align-items: flex-end; }
+.slot { width: 110px; height: 58px; border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  background: var(--escuro); border: 2px solid rgba(255, 255, 255, 0.25); opacity: 0.75; }
+.slot.ativa { border-color: var(--ouro); opacity: 1; }
+.slot img { width: 92px; height: 34px; object-fit: contain; }
+.slot span { font-size: 11px; font-weight: 800; }
+.troca { width: 46px; height: 46px; border-radius: 12px; border: 2px solid rgba(255, 255, 255, 0.5); background: rgba(11, 15, 23, 0.7); display: flex; align-items: center; justify-content: center; }
+#minimapa { border-radius: 50%; }
+#analogico { border-radius: 50%; background: rgba(255, 255, 255, 0.12); border: 2px solid rgba(255, 255, 255, 0.35); display: flex; align-items: center; justify-content: center; }
+#analogico .bola { width: 43%; height: 43%; border-radius: 50%; background: rgba(255, 255, 255, 0.45); }
+#zona-andar, #zona-olhar { position: absolute; top: 0; height: 100%; }
+#zona-andar { left: 0; width: 50%; } #zona-olhar { right: 0; width: 50%; }
+#teclas { position: absolute; left: 14px; bottom: 10px; font-size: 11px; color: var(--apagado); line-height: 1.5; max-width: 220px; }
+.so-toque { display: none !important; }
+body.toque .so-toque { display: flex !important; }
+body.toque .so-teclado { display: none !important; }
+
+/* loja de armas da partida */
+#loja-partida { position: absolute; inset: 0; background: var(--fundo); display: flex; flex-direction: column; gap: 12px; padding: 16px 20px 16px; }
+.lista-armas { width: 300px; display: flex; flex-direction: column; gap: 6px; overflow-y: auto; }
+.linha-arma { display: flex; align-items: center; gap: 10px; height: 44px; padding: 0 12px 0 10px; border-radius: 12px; background: var(--painel);
+  border: 2px solid rgba(255, 255, 255, 0.08); font-size: 13px; font-weight: 800; cursor: pointer; flex: none; }
+.linha-arma.sel { border-color: var(--azul-medio); background: #16233D; }
+.linha-arma img { width: 68px; height: 32px; object-fit: contain; }
+.barras { display: grid; grid-template-columns: 80px 1fr; gap: 6px 10px; align-items: center; font-size: 12px; color: var(--apagado); }
+.barras .t { height: 8px; border-radius: 4px; background: rgba(255, 255, 255, 0.12); overflow: hidden; }
+.barras .t i { display: block; height: 100%; border-radius: 4px; }
+
+/* pausa, avisos */
+.camada { position: absolute; inset: 0; background: rgba(0, 0, 0, 0.6); display: flex; align-items: center; justify-content: center; z-index: 5; }
+.janela { width: 340px; display: flex; flex-direction: column; gap: 10px; padding: 18px; border-radius: 18px; background: var(--painel); border: 1px solid var(--borda); }
+.janela .t { font-family: 'Bebas Neue', sans-serif; font-size: 30px; }
+.janela .m { font-size: 13px; color: var(--apagado); line-height: 1.45; white-space: pre-line; }
+#aviso { position: absolute; left: 50%; bottom: 22px; transform: translateX(-50%); padding: 10px 16px; border-radius: 12px; background: rgba(17, 24, 39, 0.95);
+  border: 1px solid var(--borda); font-weight: 700; font-size: 13px; z-index: 20; pointer-events: none; max-width: 80%; text-align: center; }
+
+/* tela de carregamento (só no site) */
+#carregando { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; background: var(--fundo); z-index: 10; text-align: center; padding: 20px; }
+#carregando .logo { font-family: 'Bebas Neue', Impact, sans-serif; font-size: 56px; display: flex; gap: 14px; }
+#carregando .barra { width: min(420px, 80vw); height: 10px; border-radius: 6px; background: rgba(255, 255, 255, 0.1); overflow: hidden; }
+#progresso { height: 100%; width: 0; background: var(--ouro); transition: width .2s; }
+#carregando .dica { color: var(--apagado); font-size: 12px; max-width: 460px; }
+.ouro { color: var(--ouro); } .azul { color: var(--azul-medio); } .verde { color: var(--verde); } .amarelo { color: var(--ouro-claro); } .vermelho { color: var(--vermelho); } .apagado { color: var(--apagado); }

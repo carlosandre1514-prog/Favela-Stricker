@@ -339,9 +339,12 @@ void equipGun(Engine* e, Fighter& f) {
     int w = createWeapon(e, kind, ci, look);
     if (GameObject* wg = objectById(e, w)) {
         e->game.spawned.push_back(Scene::handleOf(*wg));
-        if (!f.bot)
-            if (auto it = e->match.gunSkins.find(gunOf(k).key); it != e->match.gunSkins.end() && !it->second.empty())
-                applyKitTexture(e, *wg, std::string("armas/skins/") + gunOf(k).key + "_" + it->second + ".jpg");
+        auto it = e->match.gunSkins.find(gunOf(k).key);
+        if (!f.bot && it != e->match.gunSkins.end() && !it->second.empty()) {
+            float metal = -1.f, rough = -1.f;
+            gunSkinFinish(gunOf(k).key, it->second, metal, rough);
+            applyKitTexture(e, *wg, std::string("armas/skins/") + gunOf(k).key + "_" + it->second + ".jpg", metal, rough);
+        }
     }
     e->lastError.clear();
     CharacterInfo& c = e->characters[ci];
@@ -991,6 +994,14 @@ void teamStop(Engine* e) {
 }
 }  // namespace
 
+// Acabamento das skins de fuzil: Dourada = metal polido; as outras = pintura (pouco metal).
+// As da TT-33 foram pintadas no molde da arma e mantêm o metal/brilho de cada peça (-1).
+void gunSkinFinish(const std::string& gun, const std::string& skin, float& metal, float& rough) {
+    if (gun == "tt33") { metal = rough = -1.f; return; }
+    if (skin == "dourada") { metal = 1.f; rough = 0.28f; return; }
+    metal = 0.15f; rough = 0.55f;
+}
+
 int behaviorTypeFromName(const std::string& raw) {
     std::string n;
     for (char ch : raw) n += ch == ' ' || ch == '-' ? '_' : char(std::tolower((unsigned char)ch));
@@ -1227,6 +1238,14 @@ int nearShop(Engine* e) {
         glm::vec3 d = front - pg->transform.position;
         if (glm::length(glm::vec2(d.x, d.z)) < 2.6f && std::abs(d.y) < 2.5f) return int(i);
     }
+    // na base do próprio time (onde nasce) a loja de armas do time também abre, sem ir até a barraca
+    const int team = e->match.f[pf].team;
+    for (const glm::vec3& sp : e->match.spawns[team]) {
+        glm::vec3 d = sp - pg->transform.position;
+        if (glm::length(glm::vec2(d.x, d.z)) > 12.f || std::abs(d.y) > 4.f) continue;
+        for (size_t i = 0; i < e->match.shops.size(); ++i)
+            if (e->match.shops[i].team == team && e->match.shops[i].kind == 0) return int(i);
+    }
     return -1;
 }
 }  // namespace
@@ -1260,10 +1279,18 @@ std::string shopJson(Engine* e) {
     auto owned = [&](int id) { return std::find(f.owned.begin(), f.owned.end(), id) != f.owned.end(); };
     if (sh.kind == 0) {
         for (int g = 0; g < kGunCount; ++g) {
-            if (kGuns[g].team >= 0 && kGuns[g].team != sh.team) continue;
-            items.push_back({{"id", g}, {"nome", kGuns[g].name}, {"preco", kGuns[g].price}, {"tem", kGuns[g].price == 0 || owned(g)},
-                             {"usando", f.weapon == kGuns[g].key}});
+            const GunDef& d = kGuns[g];
+            if (d.team >= 0 && d.team != sh.team) continue;
+            const bool tem = d.price == 0 || owned(g) || f.primary == d.key || f.secondary == d.key;
+            // ficha da arma para a loja: dano, cadência e precisão (0 a 1) e tiros para abater (vida 100)
+            items.push_back({{"id", g}, {"arma", d.key}, {"nome", d.name}, {"preco", d.price}, {"tem", tem}, {"usando", f.weapon == d.key},
+                             {"dano", int(d.dmg)}, {"cabeca", int(std::round(d.dmg * 2.5f))}, {"pente", d.mag},
+                             {"tiros", int(std::ceil(100.f / d.dmg))}, {"cadencia_s", std::round(10.f / d.interval) / 10.f},
+                             {"barra_dano", std::min(1.f, d.dmg / 40.f)}, {"barra_cadencia", std::min(1.f, (1.f / d.interval) / 10.f)},
+                             {"barra_precisao", std::clamp(1.f - d.spread / 0.05f, 0.1f, 1.f)}});
         }
+        items.push_back({{"id", 200}, {"arma", "granada"}, {"nome", "Granada"}, {"preco", 300}, {"tem", false}, {"usando", false},
+                         {"qtd", f.grenades}, {"max", 2}});
     } else {
         for (int k = 0; k < 5; ++k)
             items.push_back({{"id", 100 + k}, {"nome", kSkins[sh.team][k].name}, {"preco", kSkins[sh.team][k].price},
@@ -1279,6 +1306,14 @@ std::string shopBuy(Engine* e, int item) {
     if (pf < 0 || M.openShop < 0) return "Loja fechada";
     Fighter& f = M.f[pf];
     const ShopRT& sh = M.shops[M.openShop];
+    if (item == 200) {  // granada: $300, até 2
+        if (sh.kind != 0) return "Item inválido";
+        if (f.grenades >= 2) return "Você já tem 2 granadas";
+        if (f.money < 300) return "Dinheiro insuficiente: faltam $" + std::to_string(300 - f.money);
+        f.money -= 300;
+        ++f.grenades;
+        return "Comprou: Granada  (💰 $" + std::to_string(f.money) + ")";
+    }
     bool isSkin = item >= 100;
     int price;
     std::string name;
@@ -1303,7 +1338,13 @@ std::string shopBuy(Engine* e, int item) {
         glm::vec3 fw = g ? g->transform.rotation * glm::vec3(0, 0, 1) : glm::vec3(0, 0, 1);
         spawnFighterBody(e, f, p + glm::vec3(0, 0.05f, 0), std::atan2(fw.x, fw.z));
     } else {
-        f.weapon = kGuns[item].key;
+        // fuzil vai para a arma principal, pistola para a segunda; já vem com pente e reserva cheios
+        const GunDef& g = kGuns[item];
+        const int slot = std::string(g.key) == "tt33" && !f.primary.empty() && f.primary != g.key ? 1 : 0;
+        (slot ? f.secondary : f.primary) = g.key;
+        f.slot = slot;
+        f.weapon = g.key;
+        f.mag[slot] = g.mag; f.reserve[slot] = g.reserve;
         equipGun(e, f);
     }
     return (has ? "Usando: " : "Comprou: ") + name + "  (💰 $" + std::to_string(f.money) + ")";
@@ -1390,6 +1431,7 @@ std::string hudJson(Engine* e) {
         j["morto"] = f.dead;
         j["renasce"] = f.dead ? std::max(0, int(std::ceil(5.f - f.deadTime))) : 0;
         j["granadas"] = f.grenades;
+        j["dinheiro"] = f.money;
         j["slot"] = f.slot;
         json slots = json::array();
         int ci = charIndexOfRoot(e, f.root);

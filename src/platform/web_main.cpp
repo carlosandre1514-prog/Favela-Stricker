@@ -71,6 +71,10 @@ EMSCRIPTEN_KEEPALIVE int web_trocar_arma() { return g ? engine_player_swap(g) : 
 EMSCRIPTEN_KEEPALIVE int web_granada() { return g ? engine_player_grenade(g) : 0; }
 EMSCRIPTEN_KEEPALIVE void web_recarregar() { if (g) engine_player_reload(g); }
 EMSCRIPTEN_KEEPALIVE int web_interagir() { return g ? engine_interact(g) : 0; }
+// loja de armas da partida (aberta com web_interagir perto da barraca do time)
+EMSCRIPTEN_KEEPALIVE const char* web_loja() { return g ? engine_shop_json(g) : ""; }
+EMSCRIPTEN_KEEPALIVE const char* web_loja_comprar(int item) { return g ? engine_shop_buy(g, item) : ""; }
+EMSCRIPTEN_KEEPALIVE void web_loja_fechar() { if (g) engine_shop_close(g); }
 // online (a página leva e traz os dados da sala)
 EMSCRIPTEN_KEEPALIVE void web_rede_sala(int host, const char* id, const char* roster) { if (g) engine_net_roster(g, host, id, roster); }
 EMSCRIPTEN_KEEPALIVE const char* web_rede_coletar() { return g ? engine_net_collect(g) : "{}"; }

@@ -1,4 +1,7 @@
 #include "render/Renderer.h"
+#if defined(__EMSCRIPTEN__) || defined(MOTOR_GLSL300)
+#include <regex>
+#endif
 #include "render/Particles.h"
 #include <stb_image.h>
 #include <algorithm>
@@ -37,10 +40,14 @@ static std::string g_common;  // shaders/common.glsl
 static GLuint compile(GLenum type, const std::string& src, const char* define, const char* name) {
     size_t nl = src.find('\n');
     std::string head = src.substr(0, nl + 1);
-#ifdef __EMSCRIPTEN__
-    head = "#version 300 es\n";  // navegador: WebGL 2 só aceita GLSL ES 3.00 (os shaders não usam nada do 3.2)
+#if defined(__EMSCRIPTEN__) || defined(MOTOR_GLSL300)
+    head = "#version 300 es\n";  // navegador: WebGL 2 só aceita GLSL ES 3.00 (MOTOR_GLSL300: testa isso no PC)
 #endif
     std::string full = head + "#define " + define + "\n" + g_common + "\n#line 2\n" + src.substr(nl + 1);
+#if defined(__EMSCRIPTEN__) || defined(MOTOR_GLSL300)
+    // GLSL ES 3.00 não tem layout(binding = N): os blocos são ligados pelo C++ (bindBlocks)
+    full = std::regex_replace(full, std::regex(R"(,\s*binding\s*=\s*\d+)"), "");
+#endif
     GLuint s = glCreateShader(type);
     const char* p = full.c_str();
     glShaderSource(s, 1, &p, nullptr);
@@ -53,6 +60,15 @@ static GLuint compile(GLenum type, const std::string& src, const char* define, c
         ENG_LOG("erro no shader %s (%s): %s\n", name, define, log);
     }
     return s;
+}
+
+// Blocos de uniformes nos mesmos pontos do layout(binding) dos shaders: 0 cena, 1 ossos, 2 cortes
+static void bindBlocks(GLuint p) {
+    const char* names[] = {"SceneBlock", "JointBlock", "CutBlock"};
+    for (GLuint i = 0; i < 3; ++i) {
+        GLuint bi = glGetUniformBlockIndex(p, names[i]);
+        if (bi != GL_INVALID_INDEX) glUniformBlockBinding(p, bi, i);
+    }
 }
 
 static GLuint link(const std::string& vs, const std::string& fs, const char* define, const char* name) {
@@ -70,17 +86,14 @@ static GLuint link(const std::string& vs, const std::string& fs, const char* def
         glDeleteProgram(p);
         return 0;
     }
+    bindBlocks(p);
     return p;
 }
 
 GLuint Renderer::loadProgram(const char* vsFile, const char* fsFile) {
     std::string vs = readFile(shaderDir_ + "/" + vsFile), fs = readFile(shaderDir_ + "/" + fsFile);
     if (vs.empty() || fs.empty()) return 0;
-    GLuint p = link(vs, fs, "EXTRA", vsFile);
-    if (!p) return 0;
-    GLuint bi = glGetUniformBlockIndex(p, "SceneBlock");
-    if (bi != GL_INVALID_INDEX) glUniformBlockBinding(p, bi, 0);
-    return p;
+    return link(vs, fs, "EXTRA", vsFile);
 }
 
 bool Renderer::init(const char* shaderDir) {
@@ -117,14 +130,6 @@ bool Renderer::init(const char* shaderDir) {
         p->uOccStrength = glGetUniformLocation(p->id, "uOcclusionStrength");
         p->uMode = glGetUniformLocation(p->id, "uMode");
         p->uTime = glGetUniformLocation(p->id, "uTime");
-        GLuint bi = glGetUniformBlockIndex(p->id, "SceneBlock");
-        if (bi != GL_INVALID_INDEX) glUniformBlockBinding(p->id, bi, 0);
-        bi = glGetUniformBlockIndex(p->id, "JointBlock");
-        if (bi != GL_INVALID_INDEX) glUniformBlockBinding(p->id, bi, 1);
-    }
-    for (GLuint id : {skyProg_, lineProg_}) {
-        GLuint bi = glGetUniformBlockIndex(id, "SceneBlock");
-        if (bi != GL_INVALID_INDEX) glUniformBlockBinding(id, bi, 0);
     }
     skyInvVP_ = glGetUniformLocation(skyProg_, "uInvViewProj");
     skyZenith_ = glGetUniformLocation(skyProg_, "uZenith");

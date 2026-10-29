@@ -59,3 +59,13 @@ boné, corrente, relógio, brincos) saem de tools/gerar_roupas.py e tools/gerar_
 Skins de personagem (kit/personagens/skins: pm, civil, exercito, choque, especial, rubro, alvinegro, tricolor,
 canarinho, faixa): criadas e enviadas pelo dono do projeto. Convertidas por tools/converter_skin.py (esqueleto
 Mixamo único, pose de descanso, texturas 1024) sem reduzir triângulos, para não deformar corpo nem rosto.
+No jogo, as qualidades Leve, Padrão e Intermediária simplificam as malhas ao carregar (src/procgen/Simplify.cpp).
+
+Fontes da interface (web/fontes: telas do APK e do site)
+  Bebas Neue — Dharma Type — SIL Open Font License 1.1
+  Inter — The Inter Project Authors (Rasmus Andersson) — SIL Open Font License 1.1
+  (textos das licenças em web/fontes/LICENCAS.txt)
+
+Skins de fuzil do mercado (shaders/kit/armas/skins: Dourada, Dragão, Neon, Favela, Selva, Urbana, Deserto)
+  Padrões gerados por tools/gerar_skins_armas.py; prévias das lojas (app/src/main/assets/armas) renderizadas
+  pelo próprio motor (headless SO_PREVIAS) e recortadas por tools/recortar_previas.py.

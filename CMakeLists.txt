@@ -5,6 +5,12 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 # Obs.: exceções/RTTI ficam ligados por enquanto (tinygltf/Bullet). Desligar depois, com tudo funcionando.
 
+# Navegador: o motor usa exceções (leitura de JSON e glTF), que o Emscripten desliga por padrão
+if(EMSCRIPTEN)
+  string(APPEND CMAKE_CXX_FLAGS " -fexceptions")
+  string(APPEND CMAKE_C_FLAGS " -fexceptions")
+endif()
+
 include(FetchContent)
 FetchContent_Declare(glm GIT_REPOSITORY https://github.com/g-truc/glm.git GIT_TAG 1.0.1)
 FetchContent_Declare(tinygltf GIT_REPOSITORY https://github.com/syoyo/tinygltf.git GIT_TAG v2.9.3)
@@ -85,7 +91,7 @@ elseif(EMSCRIPTEN)
     -sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=268435456 -sSTACK_SIZE=1048576
     -sEXPORTED_RUNTIME_METHODS=ccall,cwrap,UTF8ToString,stringToUTF8,lengthBytesUTF8
     -sEXPORTED_FUNCTIONS=@${CMAKE_SOURCE_DIR}/web/exportadas.txt
-    -sMODULARIZE=1 -sEXPORT_NAME=FavelaMotor -sENVIRONMENT=web
+    -sMODULARIZE=1 -sEXPORT_NAME=FavelaMotor -sENVIRONMENT=web -fexceptions -sMAXIMUM_MEMORY=4GB
     --preload-file ${CMAKE_BINARY_DIR}/pacote@/jogo
     -O2)
 else()

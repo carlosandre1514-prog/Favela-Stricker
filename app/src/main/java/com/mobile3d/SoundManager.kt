@@ -18,6 +18,7 @@ class SoundManager(context: Context) {
     private var rainStream = 0
     private var rainVolume = 0f
     var enabled = true
+    var volume = 1f  // configurações do jogo (efeitos)
 
     init {
         pool.setOnLoadCompleteListener { _, id, status -> if (status == 0) synchronized(ready) { ready.add(id) } }
@@ -39,7 +40,7 @@ class SoundManager(context: Context) {
             val name = if (ids.containsKey(p[0])) p[0] else p[0].removeSuffix("_longe")
             val id = ids[name] ?: continue
             if (!isReady(id)) continue
-            val vol = p[1].toFloatOrNull() ?: continue
+            val vol = (p[1].toFloatOrNull() ?: continue) * volume
             val pan = (p[2].toFloatOrNull() ?: 0f).coerceIn(-1f, 1f)
             val l = vol * (if (pan > 0) 1f - pan * 0.7f else 1f)
             val r = vol * (if (pan < 0) 1f + pan * 0.7f else 1f)
@@ -51,7 +52,7 @@ class SoundManager(context: Context) {
 
     // Chuva em loop: volume acompanha a intensidade (0..1)
     fun setRain(level: Float) {
-        val v = if (enabled) (level * 0.85f).coerceIn(0f, 1f) else 0f
+        val v = if (enabled) (level * 0.85f * volume).coerceIn(0f, 1f) else 0f
         if (v < 0.01f) {
             if (rainStream != 0) { pool.stop(rainStream); rainStream = 0 }
             rainVolume = 0f

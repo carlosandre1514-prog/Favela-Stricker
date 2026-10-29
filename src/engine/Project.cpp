@@ -210,10 +210,18 @@ void applyMaterialTo(Engine* e, GameObject& g, bool subtree, const json& spec) {
         int w, h, comp;
         std::string file = it->get<std::string>();
         if (file.rfind("kit:", 0) == 0) file = kitPath(e, file.substr(4));  // textura do kit (ex.: skin de arma)
-        unsigned char* px = stbi_load(file.c_str(), &w, &h, &comp, 4);
+        // a mesma imagem já enviada (skin de arma a cada renascer) não ocupa memória de novo
+        TextureManager& tm = TextureManager::instance();
+        GLuint tex = tm.named(file + "#s");
+        unsigned char* px = tex ? nullptr : stbi_load(file.c_str(), &w, &h, &comp, 4);
         if (px) {
-            GLuint tex = TextureManager::instance().fromPixels(px, w, h, 4, true);
+            tex = tm.fromPixels(px, w, h, 4, true, tm.modelMax);
+            tm.setNamed(file + "#s", tex);
             stbi_image_free(px);
+        }
+        if (tex) {
+            const bool metal = spec.contains("metal") && spec["metal"].is_number();
+            const bool rough = spec.contains("rugosidade") && spec["rugosidade"].is_number();
             std::vector<std::pair<MaterialId, MaterialId>> remap;
             each([&](MeshRenderer& mr) {
                 for (auto& [from, to] : remap) if (from == mr.material) { mr.material = to; return; }
@@ -223,6 +231,9 @@ void applyMaterialTo(Engine* e, GameObject& g, bool subtree, const json& spec) {
                 copy.albedo = tex;
                 copy.albedoFactor = glm::vec4(1.f);
                 copy.mode = 0;
+                if (metal || rough) copy.orm = TextureManager::instance().white();  // metal/brilho iguais na arma toda
+                if (metal) copy.metallic = spec["metal"].get<float>();
+                if (rough) copy.roughness = spec["rugosidade"].get<float>();
                 MaterialId id = e->renderer.createMaterial(copy);
                 remap.push_back({mr.material, id});
                 mr.material = id;
@@ -1462,8 +1473,11 @@ std::string toolCall(Engine* e, const std::string& name, const std::string& inpu
 }
 
 // Skin de arma: troca só a textura de cor (o resto do material e o UV continuam os do modelo)
-void applyKitTexture(Engine* e, GameObject& g, const std::string& kitName) {
-    applyMaterialTo(e, g, true, json{{"textura", kitPath(e, kitName)}});
+void applyKitTexture(Engine* e, GameObject& g, const std::string& kitName, float metal, float rough) {
+    json spec{{"textura", kitPath(e, kitName)}};
+    if (metal >= 0.f) spec["metal"] = metal;
+    if (rough >= 0.f) spec["rugosidade"] = rough;
+    applyMaterialTo(e, g, true, spec);
 }
 
 }  // namespace eng

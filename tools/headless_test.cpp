@@ -23,6 +23,7 @@
 #include "platform/engine_c_api.h"
 #include "procgen/TextureGen.h"
 #include "assets/TextureManager.h"
+#include "engine/Engine.h"
 
 static const int W = 960, H = 540;
 static GLuint g_fbo = 0;
@@ -1132,6 +1133,45 @@ int main(int argc, char** argv) {
         std::printf(g_fail ? "FALHOU\n" : "OK\n");
         return g_fail ? 1 : 0;
     }
+    // Prévias das armas com as skins do mercado (fundo puro: o recorte é feito depois por tools/recortar_previas.py)
+    // SO_PREVIAS = "arma:skin,arma:skin,..." (skin vazia = padrão)
+    if (const char* lista = std::getenv("SO_PREVIAS")) {
+        using nlohmann::json;
+        engine_new_scene(e);
+        engine_tool_call(e, "definir_ambiente", R"({"hora":13,"grade":false,"neblina":0})");
+        engine_set_grid(e, 0);
+        engine_select(e, -1);
+        engine_set_camera(e, 0.f, 1.02f, 0.f, 1.5708f + 0.18f, 0.12f, 1.05f);
+        engine_set_quality(e, 0);
+        frames(e, 3);
+        save(out, "previa_fundo.png");
+        engine_set_quality(e, 3);
+        std::string l = lista;
+        size_t a = 0;
+        while (a < l.size()) {
+            size_t b = l.find(',', a); if (b == std::string::npos) b = l.size();
+            std::string item = l.substr(a, b - a); a = b + 1;
+            size_t c = item.find(':');
+            std::string g = item.substr(0, c), sk = c == std::string::npos ? "" : item.substr(c + 1);
+            json spec = {{"tipo", "arma"}, {"arma", g}, {"pos", {0, 1.0, 0}}};
+            if (!sk.empty()) spec["textura"] = "kit:armas/skins/" + g + "_" + sk + ".jpg";
+            float metal = -1.f, rough = -1.f;
+            eng::gunSkinFinish(g, sk, metal, rough);
+            if (!sk.empty() && metal >= 0.f) { spec["metal"] = metal; spec["rugosidade"] = rough; }
+            int id = engine_add_spec(e, spec.dump().c_str());
+            if (id < 0) { std::printf("  [ERRO] %s: %s\n", item.c_str(), engine_last_error(e)); ++g_fail; continue; }
+            engine_select(e, -1);
+            engine_set_camera(e, 0.f, 1.02f, 0.f, 1.5708f + 0.18f, 0.12f, g == "tt33" ? 0.6f : 1.05f);
+            engine_set_quality(e, 0);  // sem sombra na foto (a arma já foi carregada no nível do arquivo)
+            frames(e, 3);
+            save(out, ("previa_" + g + (sk.empty() ? "" : "_" + sk) + ".png").c_str());
+            engine_set_quality(e, 3);
+            engine_tool_call(e, "remover_objetos", json{{"ids", {id}}}.dump().c_str());
+        }
+        engine_destroy(e);
+        std::printf(g_fail ? "FALHOU\n" : "OK\n");
+        return g_fail ? 1 : 0;
+    }
     if (const char* dir = std::getenv("SO_SKINS")) {
         using nlohmann::json;
         engine_new_scene(e);
@@ -1574,7 +1614,7 @@ int main(int argc, char** argv) {
         if (FILE* f = std::fopen(proj, "rb")) { char b[65536]; size_t n; while ((n = std::fread(b, 1, sizeof b, f)) > 0) txt.append(b, n); std::fclose(f); }
         auto j = nlohmann::json::parse(txt);
         nlohmann::json keep = nlohmann::json::array();
-        for (auto& o : j["objetos"]) if (o.value("tipo", "") != "loja") keep.push_back(o);
+        for (auto& o : j["objetos"]) if (!(o.value("tipo", "") == "loja" && o.value("loja", "") == "roupas")) keep.push_back(o);  // como o app
         j["objetos"] = keep;
         engine_set_editor_overlay(e, 0);
         auto t0 = std::chrono::steady_clock::now();
@@ -1593,6 +1633,19 @@ int main(int argc, char** argv) {
         engine_set_camera(e, 0.f, 0.f, 0.f, 0.f, 0.05f, 3.f);
         frames(e, 120);
         mem("partida (10 lutadores)");
+        {   // loja de armas na base: botão no HUD, abre, granada sem dinheiro é recusada
+            auto hud = nlohmann::json::parse(std::string(engine_hud_json(e)));
+            std::string label = hud.value("interagir", "");
+            std::printf("  na base: botão \"%s\", $%d\n", label.c_str(), hud.value("dinheiro", -1));
+            if (label.find("Loja de armas") == std::string::npos) { std::printf("  [ERRO] sem loja na base\n"); ++g_fail; }
+            engine_interact(e);
+            std::string loja = engine_shop_json(e);
+            auto lj = nlohmann::json::parse(loja.empty() ? "{}" : loja);
+            std::printf("  loja: %s, %zu itens\n", lj.value("loja", "?").c_str(), lj.contains("itens") ? lj["itens"].size() : 0);
+            if (!lj.contains("itens") || lj["itens"].size() < 3) { std::printf("  [ERRO] loja vazia\n"); ++g_fail; }
+            std::printf("  granada: %s\n", engine_shop_buy(e, 200));
+            engine_shop_close(e);
+        }
         save(out, "40_partida.png");
         stats(e, "partida");
         engine_set_play(e, 0);

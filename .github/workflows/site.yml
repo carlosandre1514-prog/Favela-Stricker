@@ -1,0 +1,88 @@
+name: Site do jogo
+
+# Monta a versão para navegador (o motor em WebAssembly + as telas da pasta web/) e publica no ramo "site",
+# que o Render coloca no ar (render.yaml). O APK continua no workflow "APK do jogo".
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: site
+  cancel-in-progress: true
+
+jobs:
+  site:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Dependências (Mesa EGL/GLES para gerar o cache de texturas)
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq libegl-dev libgles-dev libegl-mesa0 > /dev/null
+
+      # As pichações e grafites são gerados pelo motor (demora). O motor do PC gera e grava em shaders/cache
+      # com a mesma chave que o motor do navegador vai procurar: no site o mapa abre bem mais rápido.
+      - name: Cache das texturas (motor no Linux)
+        run: |
+          cmake -S . -B build-pc -DCMAKE_BUILD_TYPE=Release -DMOTOR_CACHE_KEY=${{ github.sha }}
+          cmake --build build-pc -j4 --target mobile3d_headless
+          mkdir -p saida
+          SO_ONLINE=1 ./build-pc/mobile3d_headless shaders saida
+          ls -la shaders/cache
+
+      - uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: 3.1.64
+
+      - name: Motor para o navegador (WebAssembly)
+        run: |
+          mkdir -p build-web/pacote
+          cp -r shaders/. build-web/pacote/
+          emcmake cmake -S . -B build-web -DCMAKE_BUILD_TYPE=Release -DMOTOR_CACHE_KEY=${{ github.sha }}
+          cmake --build build-web -j4 --target favela
+          ls -la build-web/favela.*
+
+      - name: Montar o site
+        run: |
+          mkdir -p dist/web
+          cp -r web/. dist/web/
+          rm -f dist/web/exportadas.txt
+          cp build-web/favela.js build-web/favela.wasm build-web/favela.data dist/web/
+          cp -r app/src/main/assets/armas app/src/main/assets/retratos app/src/main/assets/sons app/src/main/assets/exemplos dist/web/
+          cp -r servidor dist/servidor
+          rm -rf dist/servidor/node_modules
+          cp render.yaml dist/
+          cd dist/web
+          gzip -9 -k favela.wasm favela.js
+          gzip -9 favela.data
+          # o GitHub não aceita arquivo acima de 100 MB: o pacote vai em partes que o servidor junta
+          if [ "$(stat -c%s favela.data.gz)" -gt 45000000 ]; then
+            split -b 45m -d -a 3 favela.data.gz favela.data.gz.
+            rm favela.data.gz
+          fi
+          ls -la
+
+      - name: Testar o servidor com o site montado
+        run: |
+          cd dist/servidor && npm install --omit=dev --silent && cd ..
+          node servidor/server.js &
+          sleep 2
+          curl -sf http://localhost:10000/saude
+          curl -sf -o /dev/null -w "index %{http_code}\n" http://localhost:10000/
+          curl -sf -H 'Accept-Encoding: gzip' -o /dev/null -w "data %{http_code} %{size_download} bytes\n" http://localhost:10000/favela.data
+          curl -sf -H 'Accept-Encoding: gzip' -o /dev/null -w "wasm %{http_code} %{content_type}\n" http://localhost:10000/favela.wasm
+          kill %1
+          rm -rf servidor/node_modules
+
+      - name: Publicar no ramo site (o Render atualiza sozinho)
+        run: |
+          cd dist
+          git init -q -b site
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Site do jogo (${GITHUB_SHA::7})"
+          git push -q -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" site

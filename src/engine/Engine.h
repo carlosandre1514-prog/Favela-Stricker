@@ -539,7 +539,8 @@ void teamChoose(Engine* e, int team);
 void teamLoadout(Engine* e, int team, int skin, const std::string& primary, const std::string& secondary = "");
 bool teamSwapWeapon(Engine* e);     // troca rápida principal <-> segunda arma
 void teamGunSkin(Engine* e, const std::string& gun, const std::string& skin);  // skin da arma do jogador ("" = padrão)
-void applyKitTexture(Engine* e, GameObject& g, const std::string& kitName);    // textura de cor do kit no objeto
+void applyKitTexture(Engine* e, GameObject& g, const std::string& kitName, float metal = -1.f, float rough = -1.f);  // textura de cor do kit no objeto
+void gunSkinFinish(const std::string& gun, const std::string& skin, float& metal, float& rough);  // acabamento da skin de arma
 bool teamThrowGrenade(Engine* e);   // joga granada para onde a câmera olha
 std::string hudJson(Engine* e);     // estado da partida para o HUD do jogo (JSON)
 // Online (antes do Play): sala com jogadores [{"id","nome","time","skin","arma"}]; "" sai do modo online
