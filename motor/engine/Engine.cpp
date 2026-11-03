@@ -1343,7 +1343,7 @@ bool driveCharacter(Engine* e, CharacterInfo& c, glm::vec3 move, float speed, bo
     glm::vec3 hit; GameObject* obj = nullptr; float frac;
     bool grounded = e->physics.raycastIgnoring(center, center - glm::vec3(0, c.height * 0.5f + 0.25f, 0), b, hit, obj, frac);
     btVector3 nv(move.x * speed * mag, vel.y(), move.z * speed * mag);
-    if (jump && grounded) nv.setY(5.2f);
+    if (jump && grounded) nv.setY(5.6f);  // ~80 cm de altura, ~0,57 s no ar (com a gravidade dobrada abaixo)
     // Degrau, batente ou quina no caminho: quando o boneco trava, olha o chão um pouco à frente dos pés; se estiver até
     // 45 cm mais alto (e não for parede na altura do joelho), sobe junto. Assim anda liso nas escadarias e becos.
     const float hvAgora = std::sqrt(float(vel.x() * vel.x() + vel.z() * vel.z()));
@@ -1366,7 +1366,8 @@ bool driveCharacter(Engine* e, CharacterInfo& c, glm::vec3 move, float speed, bo
     b->setFriction(mag > 0.05f ? 0.f : 0.4f);
     // parado no chão (rampa, escada): sem gravidade, senão escorrega para baixo
     const bool anchor = grounded && !jump && mag < 0.05f && vel.y() < 0.5f && frac * (c.height * 0.5f + 0.25f) < c.height * 0.5f + 0.08f;
-    b->setGravity(anchor ? btVector3(0, 0, 0) : btVector3(0, -9.81f, 0));
+    // no ar, gravidade dobrada: pulo e queda rápidos como de verdade (com a normal o boneco parecia flutuar)
+    b->setGravity(anchor ? btVector3(0, 0, 0) : btVector3(0, grounded ? -9.81f : -19.6f, 0));
     if (anchor) nv.setY(0.f);
     b->setLinearVelocity(nv);
     b->activate(true);

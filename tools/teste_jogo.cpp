@@ -446,6 +446,45 @@ int main(int argc, char** argv) {
         std::printf(g_fail ? "FALHOU\n" : "OK\n");
         return g_fail ? 1 : 0;
     }
+    // Movimento no chão plano: a mesma velocidade para frente, para o lado e para trás; pulo rápido (sobe e desce)
+    if (std::getenv("SO_PULO")) {
+        engine_new_scene(e);
+        const int ch = engine_create_random_character(e, 7, 1);
+        engine_set_play(e, 1);
+        frames(e, 30);
+        float p[3], r[3], sc[3];
+        auto vel = [&](float x, float y, int corre) {
+            engine_set_camera(e, 0.f, 1.f, 0.f, 0.f, 0.2f, 4.f);
+            engine_player_input(e, x, y, corre);
+            frames(e, 30);
+            engine_get_transform(e, ch, p, r, sc);
+            glm::vec2 a(p[0], p[2]);
+            frames(e, 30);
+            engine_get_transform(e, ch, p, r, sc);
+            engine_player_input(e, 0.f, 0.f, 0);
+            frames(e, 20);
+            return glm::length(glm::vec2(p[0], p[2]) - a) * 2.f;  // m/s (30 quadros = 0,5 s)
+        };
+        const float vf = vel(0.f, 1.f, 1), vl = vel(1.f, 0.f, 1), vt = vel(0.f, -1.f, 1), vd = vel(0.7071f, 0.7071f, 1);
+        std::printf("  correndo: frente %.2f · lado %.2f · trás %.2f · diagonal %.2f m/s\n", vf, vl, vt, vd);
+        for (float v : {vl, vt, vd}) if (std::abs(v - vf) > 0.15f * vf) { std::printf("  [ERRO] velocidade diferente conforme a direção\n"); ++g_fail; break; }
+        engine_get_transform(e, ch, p, r, sc);
+        const float y0 = p[1];
+        engine_player_jump(e);
+        float topo = y0; int noAr = 0;
+        for (int k = 0; k < 120; ++k) {
+            frames(e, 1);
+            engine_get_transform(e, ch, p, r, sc);
+            topo = std::max(topo, p[1]);
+            if (p[1] > y0 + 0.06f) noAr = k + 1;  // (parado, o boneco assenta uns 3 cm acima de onde estava)
+            if (std::getenv("DEPURAR") && k % 6 == 0) std::printf("    %3d y=%.3f\n", k, p[1] - y0);
+        }
+        std::printf("  pulo: altura %.2f m · no ar %.2f s\n", topo - y0, noAr / 60.f);
+        if (topo - y0 < 0.5f || topo - y0 > 1.f || noAr / 60.f > 0.75f) { std::printf("  [ERRO] pulo fora do esperado (0,5 a 1 m, até 0,75 s)\n"); ++g_fail; }
+        engine_destroy(e);
+        std::printf(g_fail ? "FALHOU\n" : "OK\n");
+        return g_fail ? 1 : 0;
+    }
     // Caminhada pelas escadarias principais: o boneco anda (e corre) por cada rota e o teste anota onde ele trava
     // (velocidade bem abaixo da pedida por vários quadros seguidos). SO_CAMINHADA=1
     if (std::getenv("SO_CAMINHADA")) {

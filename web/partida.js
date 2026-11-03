@@ -360,7 +360,7 @@ function ligarControlesToque(t) {
     // bolinha fica na borda, apontando para o lado do dedo
     if (len > 1) { dx /= len; dy /= len; }
     bola.style.transform = `translate(${dx * R * 0.55 / layout.analogico.s}px, ${dy * R * 0.55 / layout.analogico.s}px)`;
-    motor.andar(dx, -dy, -dy > 0.93);  // empurrando até o fim para frente: corre
+    motor.andar(dx, -dy, Math.hypot(dx, dy) > 0.93);  // empurrando até a borda (para qualquer lado): corre
   };
   const fimAndar = (e) => { if (e.pointerId === dedoAndar) soltarAnalogico(); };
   for (const alvo of [zonaA, analog]) {
@@ -414,7 +414,7 @@ function enviarAndar() {
   const x = (teclas.has('KeyD') ? 1 : 0) - (teclas.has('KeyA') ? 1 : 0);
   const y = (teclas.has('KeyW') ? 1 : 0) - (teclas.has('KeyS') ? 1 : 0);
   const n = Math.hypot(x, y) || 1;
-  motor.andar(x / n, y / n, (teclas.has('ShiftLeft') || teclas.has('ShiftRight')) && y > 0);
+  motor.andar(x / n, y / n, teclas.has('ShiftLeft') || teclas.has('ShiftRight'));  // Shift corre para qualquer lado
 }
 addEventListener('keydown', (e) => {
   if (!partida || e.target.tagName === 'INPUT') return;
