@@ -70,7 +70,6 @@ const motor = ANDROID ? {
   prepararPartida: () => {
     if (mapaCarregado || !M || !projetoPartida) return;
     M.ccall('web_abrir_projeto', 'number', ['string'], [JSON.stringify(projetoPartida)]);
-    M.ccall('web_selecionar', null, ['number'], [-1]);
     mapaCarregado = true;
   },
   mapaPronto: () => mapaCarregado,
@@ -192,6 +191,5 @@ async function iniciarMotor(aoProgresso) {
   // o mapa fica guardado e só abre na primeira partida (barracas de roupa fora: roupa é no mercado)
   projetoPartida = await (await fetch('exemplos/5_policia_x_bandidos.json')).json();
   projetoPartida.objetos = (projetoPartida.objetos || []).filter((o) => !(o.tipo === 'loja' && o.loja === 'roupas'));
-  M.ccall('web_sem_editor', null, [], []);
   return true;
 }

@@ -62,11 +62,9 @@ add_library(mobile3d ${MOBILE3D_LIB_TYPE}
   src/engine/Project.cpp
   src/engine/Game.cpp
   src/jogo/Partida.cpp
+  src/jogo/MapaFavela.cpp
   src/jogo/jogo_api.cpp
   src/engine/Weather.cpp
-  src/engine/Export.cpp
-  src/engine/AnimEdit.cpp
-  src/engine/Planet.cpp
   src/platform/engine_c_api.cpp)
 
 target_compile_definitions(mobile3d PUBLIC GLM_ENABLE_EXPERIMENTAL)
@@ -82,6 +80,10 @@ target_include_directories(mobile3d PUBLIC
   ${ufbx_SOURCE_DIR}
   ${bullet_SOURCE_DIR}/src)
 target_link_libraries(mobile3d PUBLIC BulletDynamics BulletCollision LinearMath)
+# nada pode ficar sem dono (função chamada que não existe): o erro aparece na hora de compilar, não no celular
+if(NOT EMSCRIPTEN AND NOT APPLE)
+  target_link_options(mobile3d PRIVATE -Wl,--no-undefined)
+endif()
 
 if(ANDROID)
   target_sources(mobile3d PRIVATE src/platform/android_jni.cpp)
@@ -102,6 +104,6 @@ elseif(EMSCRIPTEN)
 else()
   # Build de desenvolvimento no PC/CI (Linux + Mesa): teste headless que renderiza as cenas em PNG
   target_link_libraries(mobile3d PUBLIC GLESv2 EGL)
-  add_executable(mobile3d_headless tools/headless_test.cpp)
-  target_link_libraries(mobile3d_headless PRIVATE mobile3d)
+  add_executable(favela_testes tools/teste_jogo.cpp)
+  target_link_libraries(favela_testes PRIVATE mobile3d)
 endif()

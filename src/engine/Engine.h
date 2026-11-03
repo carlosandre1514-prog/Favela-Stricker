@@ -7,7 +7,6 @@
 #include <vector>
 #include "assets/GltfLoader.h"
 #include "editor/EditorCamera.h"
-#include "editor/Gizmo.h"
 #include "physics/Physics.h"
 #include "procgen/Buildings.h"
 #include "procgen/Character.h"
@@ -158,24 +157,6 @@ struct GameModule {
     virtual std::string interactLabel(Engine*) { return ""; }  // botão de interagir do jogo ("" = nenhum)
 };
 
-// Animações criadas no editor (ou carregadas do projeto) acrescentadas à lista de um Animator
-struct ClipStore {
-    Animator* anim = nullptr;
-    std::vector<AnimationClip> own;               // clips do modelo + personalizados (a lista que o Animator usa)
-    std::deque<std::vector<Channel>> channels;
-    std::deque<std::vector<float>> data;
-};
-// Estado do editor de animação (pose osso a osso + quadros-chave)
-struct AnimEditState {
-    bool active = false;
-    Scene::Handle root;
-    Animator* anim = nullptr;
-    int bone = -1;
-    std::vector<std::pair<float, std::vector<glm::quat>>> keys;  // tempo -> rotação local de cada osso
-    AnimationClip previewClip;
-    std::vector<Channel> previewChannels;
-    std::vector<float> previewData;
-};
 // Porta em jogo: abre sozinha quando alguém chega perto
 struct DoorRT { Scene::Handle h; glm::quat base{1, 0, 0, 0}; float angle = 0.f, w = 1.f; };
 // Abertura cortada numa parede/muro (porta, janela, vão): caixa local (centro e tamanho) em relação à raiz
@@ -184,12 +165,8 @@ struct Opening { Scene::Handle root; glm::vec3 center, size; };
 struct TeleRT { Scene::Handle root; glm::vec3 a, b; std::string la, lb; };
 struct LightObject { Scene::Handle obj; glm::vec3 color{1.f}; float intensity = 8.f, radius = 10.f; };
 
-enum MapKind { MAP_None = -1, MAP_Infinite = 0, MAP_City, MAP_Favela, MAP_School, MAP_Suburb, MAP_Planet, MAP_Count };
+enum MapKind { MAP_None = -1 };  // mapKind >= 0: índice do mapa no cadastro (engine/MapKit.h)
 
-// Mundo-planeta: continentes, oceano, cidades com nomes inventados e estradas entre elas (Planet.cpp)
-struct PlanetCity { std::string name; glm::vec2 pos; float radius, h; int kind; };  // kind 0 capital, 1 cidade, 2 vila
-struct PlanetRoad { glm::vec2 a, b; int ca, cb; };
-struct PlanetData { float half = 3000.f; std::vector<PlanetCity> cities; std::vector<PlanetRoad> roads; };
 
 struct Tracer { glm::vec3 a, b; float life = 0.f; };
 
@@ -212,7 +189,6 @@ struct Engine {
     Physics physics;
     Camera camera;
     EditorCamera editorCam;
-    Gizmo gizmo;
     DirectionalLight sun;
     Environment env;
     PointLight points[kMaxPointLights];
@@ -256,24 +232,10 @@ struct Engine {
     glm::vec2 boundsMin{0.f}, boundsMax{0.f};
     std::vector<StaticCollision> statics;
     std::vector<TerrainChunk> chunks;
-    PlanetData planet;
-    bool globeMode = false;              // planeta visto de longe (globo); zoom perto desce para o terreno
-    Scene::Handle globe;
-    float globeSavedFog = 0.f;
-    Environment globeSavedEnv;
-    glm::vec3 globeSavedSun{0.55f, -1.f, 0.25f};
     std::vector<MeshId> freeGeoMeshes;   // malhas de cidade de chunks descarregados (reaproveitadas)
     std::vector<MeshId> freeChunkMeshes;
-    Prototype treeProto[3], rockProto, houseProto[3];
     std::map<std::string, Prototype> veg;  // plantas do kit carregadas nesta cena (vegPrototype)
-    Prototype kitBuilding[3];          // prédios prontos do kit da cidade (planeta); vazio = não carregou
     Scene::Handle water;
-    // Mapa editável: cada construção/árvore/poste vira objeto ("peça"); o projeto guarda só as mudanças
-    struct MapPiece { Scene::Handle h; glm::vec3 p, s; glm::quat r; std::string name; };
-    bool mapEditable = false;
-    std::vector<MapPiece> mapPieces;
-    // Trocas do mapa: modelo (arquivo 3D) no lugar de árvores/pedras/casas e textura no lugar de um material
-    std::map<std::string, std::string> protoSwaps, texSwaps;
 
     // Jogador
     int player = -1;                 // índice em characters
@@ -314,19 +276,15 @@ struct Engine {
     float nearOverride = 0.f;  // > 0: plano de corte próximo fixo (primeira pessoa: não desenha a própria cabeça)
     // Primeira pessoa (jogo): câmera no olho do jogador, cabeça escondida, arma e braços à vista
     bool firstPerson = false;
-    bool editorOverlay = true;  // jogo: sem borda do mapa, caixa de seleção e ícones do editor fora do Play
     glm::vec3 fpEye{0.f};
     bool fpEyeValid = false;
     bool fpScoped = false;      // olhando pela luneta (arma e braços escondidos)
     float baseFov = 60.f;
     float hitMarker = 0.f;      // > 0: acertou alguém agora (marcador no centro da tela)
     bool hitHead = false;
-    std::string toolResult;             // resposta da última chamada de ferramenta (IA)
-    std::vector<std::unique_ptr<ClipStore>> clipStores;
-    AnimEditState animEdit;
+    std::string toolResult;             // texto devolvido pela API C (fica vivo até a próxima chamada)
 
     bool playing = false;
-    bool showGrid = true;
     bool previewAnim = true;          // animações rodando também no editor
     int width = 1, height = 1;
     Scene::Handle selected;
@@ -394,9 +352,6 @@ struct WeaponLook {
 int createWeapon(Engine* e, int kind, int character, const WeaponLook& look = {});
 int holsterWeapon(Engine* e, int ch, int kind, const WeaponLook& look);  // guarda a arma no corpo (-1 tira)
 std::string accessoriesList(uint32_t accessories);  // ["mira","coronha",...] em JSON   // character < 0: solto no chão
-int characterOfSelection(Engine* e);
-// Modelo importado (glb/fbx) selecionado vira personagem: física, animações por nome ou retarget humanoide
-int makeCharacterFromModel(Engine* e, bool controllable);
 void setPlayer(Engine* e, int character);
 void updatePlayer(Engine* e, float dt);
 void updateAttachments(Engine* e);
@@ -417,17 +372,12 @@ void addFlash(Engine* e, const FxLight& l, float life);
 void updateEffects(Engine* e, float dt);
 int gatherLights(Engine* e, PointLight* out, int max);           // luzes da cena + luzes dos efeitos
 void drawEffectsOverlay(Engine* e, const glm::mat4& vp, bool editor);
-bool pickEmitter(Engine* e, glm::vec3 o, glm::vec3 d, float& t, GameObject*& hit);
 
 // ---- personagens: movimento compartilhado por jogador e inimigos (Engine.cpp)
 bool driveCharacter(Engine* e, CharacterInfo& c, glm::vec3 move, float speed, bool jump, float dt, glm::vec3 face = glm::vec3(0.f));
 void animateCharacter(CharacterInfo& c, const glm::quat& rot, glm::vec3 vel, bool grounded, bool airborne);  // animação pela velocidade
 void deleteObject(Engine* e, Scene::Handle h);
 
-// ---- animações (AnimEdit.cpp)
-// Modelo humanoide importado: liga as animações do motor (retarget) sem precisar virar personagem.
-bool setupHumanoid(Engine* e, GameObject& root, Animator* anim);
-Animator* animatorOf(GameObject& root);
 // Atualiza as caixas das aberturas no renderizador e na física (antes de desenhar)
 void updateCuts(Engine* e);
 // Lâmpadas dos postes: brilho conforme a noite
@@ -437,24 +387,6 @@ void weatherStart(Engine* e);
 void weatherUpdate(Engine* e, float dt);
 void weatherLook(const Engine* e, Environment& env, DirectionalLight& sun, float& fog);
 void playSound(Engine* e, const char* name, glm::vec3 pos, float gain = 1.f, bool positional = true);
-void applyCustomAnims(Engine* e, GameObject& root, const std::string& arrJson);  // "animacoes" da receita
-void forgetClipStores(Engine* e, const std::vector<Animator*>& gone);
-int animEditBegin(Engine* e);                       // ossos ou -1 (lastError)
-std::string animEditBones(Engine* e);
-void animEditSelect(Engine* e, int bone);
-int animEditSelected(Engine* e);
-bool animEditPick(Engine* e, glm::vec2 px);
-void animEditGet(Engine* e, int bone, float* euler3);
-void animEditSet(Engine* e, int bone, const float* euler3);
-int animEditKey(Engine* e, float t);                // grava a pose no tempo t; retorna nº de quadros
-void animEditDeleteKey(Engine* e, float t);
-void animEditGoto(Engine* e, float t);               // volta para a pose gravada em t (para ajustar)
-std::string animEditKeys(Engine* e);
-void animEditResetPose(Engine* e);
-bool animEditPreview(Engine* e, bool on);
-int animEditSave(Engine* e, const std::string& name);  // índice da animação nova ou -1
-void animEditEnd(Engine* e);
-void drawAnimEditOverlay(Engine* e, const glm::mat4& vp);
 
 // ---- jogo (Game.cpp)
 // ajudas de jogabilidade (o jogo também usa)
@@ -470,11 +402,9 @@ void damageAt(Engine* e, GameObject* hit, float dmg, glm::vec3 from);
 void damageRadius(Engine* e, glm::vec3 c, float radius, float dmg, bool hurtPlayer = false);
 int behaviorTypeFromName(const std::string& n);
 
-// ---- projeto (Project.cpp): formato JSON único para salvar, abrir e comandos da IA
+// ---- projeto (Project.cpp): abre o projeto (cena) em JSON e cria objetos a partir de receitas
 int createFromSpecJson(Engine* e, const std::string& specJson, std::string* err);
-std::string exportProject(Engine* e, bool withIds);
 bool importProject(Engine* e, const std::string& json, std::string* err);
-std::string toolCall(Engine* e, const std::string& name, const std::string& inputJson);
 void setTimeOfDay(Engine* e, float hour);
 int recordRecipe(Engine* e, GameObject& root, const std::string& specJson);
 // Muda um campo da receita do objeto raiz (ex.: cor/material editados no inspetor). valueJson: JSON do valor.
@@ -497,39 +427,16 @@ int loadModelFile(Engine* e, const char* path); // .glb/.gltf/.fbx -> id da raiz
 bool attachGear(Engine* e, int character, const std::string& name);
 std::string gameStatusText(Engine* e);
 void applyKitTexture(Engine* e, GameObject& g, const std::string& kitName, float metal = -1.f, float rough = -1.f);  // textura de cor do kit no objeto
-// Caminhos da favela para os robôs (escadarias, patamares, rua em volta)
-void favelaNavGraph(Engine* e, std::vector<glm::vec3>& nodes, std::vector<std::vector<int>>& adj, const std::vector<glm::vec3>& extra);
-// Exporta para .glb: rootId >= 0 = só esse objeto (na origem), -1 = cena inteira (Export.cpp)
-bool exportGlb(Engine* e, int rootId, const std::string& path, std::string* err);         // texto do objetivo para o HUD
 
 // ---- mundo (World.cpp)
-void loadMap(Engine* e, int kind, uint32_t seed, bool withPlayer = true, bool editable = false);
+void loadMap(Engine* e, int kind, uint32_t seed);   // kind: índice no cadastro de mapas (engine/MapKit.h)
 void addBoxCollider(Engine* e, Scene::Handle root, glm::vec3 centerLocal, glm::vec3 half);  // collider estático do objeto
-// Aplica as trocas (protoSwaps/texSwaps) nos protótipos e materiais do mapa atual
-void applyMapSwaps(Engine* e, bool textures = true, bool models = true);
-bool setMapEditable(Engine* e, bool on);                                     // refaz o mapa com peças editáveis
-bool setMapSwap(Engine* e, bool texture, const std::string& key, const std::string& path);  // path vazio = desfaz
 int matIndexByName(const std::string& name);
 void clearWorld(Engine* e);
-void updateWorld(Engine* e);           // streaming do mundo infinito
 float mapHeight(Engine* e, float x, float z);
 Scene::Handle createBuilding(Engine* e, int kind, uint32_t seed, glm::vec3 pos, int floors = 0);  // floors 0 = sorteado
-void drawMapOverlay(Engine* e, const glm::mat4& vp);
 void mapOverview(Engine* e);           // câmera do alto enquadrando o mapa
-// ---- planeta (Planet.cpp)
-void planetGenerate(Engine* e);
-float planetHeight(const Engine* e, float x, float z);
-bool planetNoTrees(const Engine* e, float x, float z);
-float planetForest(const Engine* e, float x, float z);              // 0..1: mata fechada
-glm::vec3 planetGroundHint(const Engine* e, float x, float z);     // chão: (estrada/cidade, floresta, roça)
-void planetDecorateChunk(Engine* e, TerrainChunk& c, float x0, float z0, float size, std::vector<BoxCollider>& boxes);
-glm::vec3 planetSpawn(Engine* e, int city, float* yaw);
-std::string planetRegion(Engine* e, glm::vec3 p);
-void planetMapImage(Engine* e, int size, uint8_t* rgba);
-void planetGlobeUpdate(Engine* e);       // editor: troca globo <-> terreno conforme o zoom
-void planetGlobeExit(Engine* e, glm::vec3 at, float distance);  // desce do globo para o terreno em `at`
-void planetGlobeEnter(Engine* e);        // sobe para o globo (sobre o ponto que a câmera olha)
-// Cria portas e elevadores do Geo como filhos de `root` (usado por spawnGeo e pelos chunks do planeta)
+// Cria portas e elevadores do Geo como filhos de `root` (usado por spawnGeo)
 void spawnGeoExtras(Engine* e, Geo& g, Scene::Handle root, bool local, float detailFar);
 
 }  // namespace eng

@@ -53,35 +53,33 @@ EMSCRIPTEN_KEEPALIVE int web_iniciar(int quality) {
 
 EMSCRIPTEN_KEEPALIVE void web_qualidade(int q) { if (g) engine_set_quality(g, q); }
 EMSCRIPTEN_KEEPALIVE int web_abrir_projeto(const char* json) { return g ? engine_import_project(g, json) : 0; }
-EMSCRIPTEN_KEEPALIVE void web_selecionar(int id) { if (g) engine_select(g, id); }
-EMSCRIPTEN_KEEPALIVE void web_sem_editor() { if (g) engine_set_editor_overlay(g, 0); }
 EMSCRIPTEN_KEEPALIVE void web_play(int on) { if (g) engine_set_play(g, on); }
 EMSCRIPTEN_KEEPALIVE void web_camera(float tx, float ty, float tz, float yaw, float pitch, float dist) { if (g) engine_set_camera(g, tx, ty, tz, yaw, pitch, dist); }
 EMSCRIPTEN_KEEPALIVE void web_olhar(float dx, float dy) { if (g) engine_look(g, dx, dy); }
 EMSCRIPTEN_KEEPALIVE void web_primeira_pessoa(int on) { if (g) engine_set_first_person(g, on); }
-EMSCRIPTEN_KEEPALIVE void web_escolhas(int team, int skin, const char* primary, const char* secondary) { if (g) engine_team_loadout(g, team, skin, primary, secondary); }
-EMSCRIPTEN_KEEPALIVE void web_skin_arma(const char* gun, const char* skin) { if (g) engine_team_gun_skin(g, gun, skin); }
-EMSCRIPTEN_KEEPALIVE const char* web_hud() { return g ? engine_hud_json(g) : "{}"; }
+EMSCRIPTEN_KEEPALIVE void web_escolhas(int team, int skin, const char* primary, const char* secondary) { if (g) jogo_escolhas(g, team, skin, primary, secondary); }
+EMSCRIPTEN_KEEPALIVE void web_skin_arma(const char* gun, const char* skin) { if (g) jogo_skin_arma(g, gun, skin); }
+EMSCRIPTEN_KEEPALIVE const char* web_hud() { return g ? jogo_hud(g) : "{}"; }
 EMSCRIPTEN_KEEPALIVE const char* web_sons() { return g ? engine_poll_sounds(g) : ""; }
 EMSCRIPTEN_KEEPALIVE void web_andar(float x, float y, int run) { if (g) engine_player_input(g, x, y, run); }
 EMSCRIPTEN_KEEPALIVE void web_pular() { if (g) engine_player_jump(g); }
 EMSCRIPTEN_KEEPALIVE void web_agachar(int on) { if (g) engine_player_crouch(g, on); }
 EMSCRIPTEN_KEEPALIVE void web_atirar() { if (g) engine_player_fire(g); }
 EMSCRIPTEN_KEEPALIVE void web_mirar(int on) { if (g) engine_player_aim(g, on); }
-EMSCRIPTEN_KEEPALIVE int web_trocar_arma() { return g ? engine_player_swap(g) : 0; }
-EMSCRIPTEN_KEEPALIVE int web_granada() { return g ? engine_player_grenade(g) : 0; }
+EMSCRIPTEN_KEEPALIVE int web_trocar_arma() { return g ? jogo_trocar_arma(g) : 0; }
+EMSCRIPTEN_KEEPALIVE int web_granada() { return g ? jogo_granada(g) : 0; }
 EMSCRIPTEN_KEEPALIVE void web_recarregar() { if (g) engine_player_reload(g); }
 EMSCRIPTEN_KEEPALIVE int web_interagir() { return g ? engine_interact(g) : 0; }
 // loja de armas da partida (aberta com web_interagir perto da barraca do time)
-EMSCRIPTEN_KEEPALIVE const char* web_loja() { return g ? engine_shop_json(g) : ""; }
-EMSCRIPTEN_KEEPALIVE const char* web_loja_comprar(int item) { return g ? engine_shop_buy(g, item) : ""; }
-EMSCRIPTEN_KEEPALIVE void web_loja_fechar() { if (g) engine_shop_close(g); }
+EMSCRIPTEN_KEEPALIVE const char* web_loja() { return g ? jogo_loja(g) : ""; }
+EMSCRIPTEN_KEEPALIVE const char* web_loja_comprar(int item) { return g ? jogo_loja_comprar(g, item) : ""; }
+EMSCRIPTEN_KEEPALIVE void web_loja_fechar() { if (g) jogo_loja_fechar(g); }
 // online (a página leva e traz os dados da sala)
-EMSCRIPTEN_KEEPALIVE void web_rede_sala(int host, const char* id, const char* roster) { if (g) engine_net_roster(g, host, id, roster); }
-EMSCRIPTEN_KEEPALIVE const char* web_rede_coletar() { return g ? engine_net_collect(g) : "{}"; }
-EMSCRIPTEN_KEEPALIVE void web_rede_aplicar(const char* s) { if (g) engine_net_apply(g, s); }
-EMSCRIPTEN_KEEPALIVE const char* web_rede_eventos() { return g ? engine_net_events(g) : "[]"; }
-EMSCRIPTEN_KEEPALIVE void web_rede_evento(const char* s) { if (g) engine_net_event(g, s); }
+EMSCRIPTEN_KEEPALIVE void web_rede_sala(int host, const char* id, const char* roster) { if (g) jogo_rede_sala(g, host, id, roster); }
+EMSCRIPTEN_KEEPALIVE const char* web_rede_coletar() { return g ? jogo_rede_coletar(g) : "{}"; }
+EMSCRIPTEN_KEEPALIVE void web_rede_aplicar(const char* s) { if (g) jogo_rede_aplicar(g, s); }
+EMSCRIPTEN_KEEPALIVE const char* web_rede_eventos() { return g ? jogo_rede_eventos(g) : "[]"; }
+EMSCRIPTEN_KEEPALIVE void web_rede_evento(const char* s) { if (g) jogo_rede_evento(g, s); }
 
 }  // extern "C"
 

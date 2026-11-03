@@ -7,6 +7,8 @@
 #include <cstdio>
 #include <functional>
 #include "engine/Engine.h"
+#include "engine/MapKit.h"
+#include "jogo/MapaFavela.h"
 #include "jogo/Partida.h"
 #include "json.hpp"
 
@@ -575,7 +577,7 @@ void teamStart(Engine* e) {
             if (GameObject* rg = e->scene.get(M.f.back().root); rg && rg->rigidBody) e->physics.setKinematic(*rg->rigidBody, true);
         ++pc;
     }
-    if (e->mapKind == MAP_Favela) {
+    if (mapIs(e, "favela")) {
         std::vector<glm::vec3> bases;
         for (int t = 0; t < 2; ++t) { bases.push_back(M.base[t]); for (const glm::vec3& sp : M.spawns[t]) bases.push_back(sp); }
         favelaNavGraph(e, M.nav, M.navAdj, bases);
@@ -1231,6 +1233,7 @@ TeamMatch& matchOf(Engine* e) {
     return p ? p->M : vazio;
 }
 void jogoInstalar(Engine* e) {
+    registrarMapaFavela();  // o mapa do jogo entra no cadastro de mapas do motor
     if (e && !dynamic_cast<Partida*>(e->module.get())) e->module = std::make_unique<Partida>();
 }
 
@@ -1259,7 +1262,7 @@ bool Partida::onInteract(Engine* e) { return M.active && shopInteract(e); }
 std::string Partida::interactLabel(Engine* e) { return M.active ? shopLabel(e) : std::string(); }
 void Partida::onProjectLoaded(Engine* e) {
     // mapa da partida: as armas já carregam aqui (atrás da tela de carregamento), não no começo da partida
-    if (e->mapKind == MAP_Favela) preloadMatchWeapons(e);
+    if (mapIs(e, "favela")) preloadMatchWeapons(e);
 }
 std::string Partida::statusText(Engine* e) {
     if (e->rules.objetivo != "times" || !M.active) return "";

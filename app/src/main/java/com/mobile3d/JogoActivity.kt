@@ -144,7 +144,6 @@ class JogoActivity : Activity() {
         diag.fase = "abrindo o motor (gráficos ${NOMES_NIVEL[nivelGrafico()]})"
 
         motorView = EngineView(this, dirMotor, if (nivelGrafico() >= 3) 4 else 0)  // Ultra: antisserrilhado 4x
-        motorView.touchToEngine = false
         // tela inicial leve: o motor abre vazio e parado; o mapa só carrega quando a partida vai começar
         motorView.onReady = {
             ponte.mapaPronto = false
@@ -221,9 +220,7 @@ class JogoActivity : Activity() {
                 manter.put(o)
             }
             json.put("objetos", manter)
-            NativeBridge.nativeSetEditorOverlay(false)
             NativeBridge.importProject(json.toString())
-            NativeBridge.nativeSelect(-1)
         } catch (e: Exception) {
             Log.e("FavelaStricker", "mapa da partida", e)
         }
