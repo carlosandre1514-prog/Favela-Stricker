@@ -496,10 +496,14 @@ int main(int argc, char** argv) {
         int travadas = 0, quadros = 0;
         double perda = 0.0;
         const size_t nRotas = std::getenv("ROTAS") ? size_t(std::atoi(std::getenv("ROTAS"))) : eng::favelaRotas().size();
+        const int soCorre = std::getenv("CORRE") ? std::atoi(std::getenv("CORRE")) : -1;    // 0 andando, 1 correndo
+        const int soSentido = std::getenv("SENTIDO") ? std::atoi(std::getenv("SENTIDO")) : -1;  // 0 subindo, 1 descendo
         for (int corre = 0; corre < 2; ++corre)
         for (size_t ri = 0; ri < std::min(nRotas, eng::favelaRotas().size()); ++ri) {
             const auto& rt = eng::favelaRotas()[ri];
+            if (soCorre >= 0 && corre != soCorre) continue;
             for (int sentido = 0; sentido < 2; ++sentido) {
+                if (soSentido >= 0 && sentido != soSentido) continue;
                 std::vector<glm::vec2> pts(rt.begin(), rt.end());
                 if (sentido) std::reverse(pts.begin(), pts.end());
                 float p[3], r[3], sc[3];
@@ -528,6 +532,11 @@ int main(int argc, char** argv) {
                     if (v < pedida * 0.4f) {
                         if (++lento == 6) {
                             ++travadas;
+                            if (travadas <= 3) {  // foto de onde travou (de trás do boneco e de cima)
+                                engine_set_camera(e, agora.x, agora.y + 1.f, agora.z, std::atan2(-d.x, -d.y), 0.35f, 4.f);
+                                engine_set_first_person(e, 0); frames(e, 2);
+                                char fn[64]; std::snprintf(fn, sizeof fn, "trava_%d.png", travadas); save(out, fn);
+                            }
                             if (travadas <= 25) std::printf("  trava: rota %zu %s %s em (%.1f, %.1f, %.1f) v=%.2f\n", ri, sentido ? "descendo" : "subindo",
                                                             corre ? "correndo" : "andando", agora.x, agora.y, agora.z, v);
                         }
