@@ -18,6 +18,9 @@ struct MeshBuilder {
     glm::vec4 color{1.f};        // cor por vértice
     glm::vec2 uvTile{0.f};       // > 0: UV em metros / tile (fachadas, tijolo); 0: UV 0..1 por face
     int joint = -1;              // >= 0: peça presa 100% a este osso (personagem)
+    // Molde de textura (skin do boneco): retângulo da imagem (u0, v0, u1, v1; v0 em cima) para cada face da
+    // próxima caixa, na ordem +Z (frente), -Z (costas), +X, -X, +Y (topo), -Y (baixo). nullptr = UV normal
+    const glm::vec4* faceRects = nullptr;
 
     bool empty() const { return idx.empty(); }
     void clear() { v.clear(); idx.clear(); }
@@ -60,9 +63,12 @@ struct MeshBuilder {
         glm::vec3 mx = mn + size;
         glm::vec3 c[8];
         for (int k = 0; k < 8; ++k) c[k] = {k & 1 ? mx.x : mn.x, k & 2 ? mx.y : mn.y, k & 4 ? mx.z : mn.z};
-        auto face = [&](int a, int b, int cc, int d, float w, float h, float u0, float v0) {
+        auto face = [&](int fi, int a, int b, int cc, int d, float w, float h, float u0, float v0) {
             glm::vec2 uv[4];
-            if (uvTile.x > 0.f) {
+            if (faceRects) {  // cada face olhada de fora: esquerda->direita = u0->u1, de cima para baixo = v0->v1
+                const glm::vec4 r = faceRects[fi];
+                uv[0] = {r.x, r.w}; uv[1] = {r.z, r.w}; uv[2] = {r.z, r.y}; uv[3] = {r.x, r.y};
+            } else if (uvTile.x > 0.f) {
                 // UV em metros: u ao longo da largura, v para cima (texturas de fachada alinhadas por andar)
                 uv[0] = {u0 / uvTile.x, -v0 / uvTile.y};
                 uv[1] = {(u0 + w) / uvTile.x, -v0 / uvTile.y};
@@ -74,12 +80,12 @@ struct MeshBuilder {
             quad(c[a], c[b], c[cc], c[d], uv);
         };
         float sx = size.x, sy = size.y, sz = size.z;
-        if (!(skipFaces & 32)) face(4, 5, 7, 6, sx, sy, mn.x, mn.y);           // +Z
-        if (!(skipFaces & 16)) face(1, 0, 2, 3, sx, sy, -mx.x, mn.y);          // -Z
-        if (!(skipFaces & 2))  face(5, 1, 3, 7, sz, sy, -mx.z, mn.y);          // +X
-        if (!(skipFaces & 1))  face(0, 4, 6, 2, sz, sy, mn.z, mn.y);           // -X
-        if (!(skipFaces & 8))  face(6, 7, 3, 2, sx, sz, mn.x, -mx.z);          // +Y
-        if (!(skipFaces & 4))  face(0, 1, 5, 4, sx, sz, mn.x, mn.z);           // -Y
+        if (!(skipFaces & 32)) face(0, 4, 5, 7, 6, sx, sy, mn.x, mn.y);           // +Z
+        if (!(skipFaces & 16)) face(1, 1, 0, 2, 3, sx, sy, -mx.x, mn.y);          // -Z
+        if (!(skipFaces & 2))  face(2, 5, 1, 3, 7, sz, sy, -mx.z, mn.y);          // +X
+        if (!(skipFaces & 1))  face(3, 0, 4, 6, 2, sz, sy, mn.z, mn.y);           // -X
+        if (!(skipFaces & 8))  face(4, 6, 7, 3, 2, sx, sz, mn.x, -mx.z);          // +Y
+        if (!(skipFaces & 4))  face(5, 0, 1, 5, 4, sx, sz, mn.x, mn.z);           // -Y
     }
     // Caixa pelo centro
     void boxC(glm::vec3 center, glm::vec3 size, unsigned skip = 0) { box(center - size * 0.5f, size, skip); }

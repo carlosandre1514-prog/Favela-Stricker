@@ -306,6 +306,45 @@ CharacterParams characterParams(const json& spec, uint32_t seed) {
     return p;
 }
 
+// Skin pintada do boneco em blocos: aparencia.textura = imagem no molde (shaders/kit/personagens/molde.json).
+// Lê o molde, liga p.texturizado e devolve o caminho da imagem ("" = sem skin pintada ou faltando arquivo).
+std::string skinTextureOf(Engine* e, const json& spec, CharacterParams& p) {
+    auto a = spec.find("aparencia");
+    if (!p.bloco || a == spec.end() || !a->is_object()) return "";
+    auto t = a->find("textura");
+    if (t == a->end() || !t->is_string() || t->get<std::string>().empty()) return "";
+    std::string file = t->get<std::string>();
+    if (file.rfind("kit:", 0) == 0) file = kitPath(e, file.substr(4));
+    if (FILE* f = std::fopen(file.c_str(), "rb")) std::fclose(f); else return "";
+    static json molde;  // o mesmo para todos
+    if (molde.is_null()) {
+        if (FILE* f = std::fopen(kitPath(e, "personagens/molde.json").c_str(), "rb")) {
+            std::string txt;
+            char buf[4096];
+            size_t n;
+            while ((n = std::fread(buf, 1, sizeof(buf), f)) > 0) txt.append(buf, n);
+            std::fclose(f);
+            molde = json::parse(txt, nullptr, false);
+        }
+        if (!molde.is_object()) { molde = json::object(); }
+    }
+    auto partes = molde.find("partes");
+    if (partes == molde.end() || !partes->is_object()) return "";
+    static const char* nomes[8] = {"tronco", "cabeca", "braco_esq", "braco_dir", "perna_esq", "perna_dir", "pe_esq", "pe_dir"};
+    static const char* faces[6] = {"frente", "costas", "lado_esq", "lado_dir", "topo", "base"};
+    for (int i = 0; i < 8; ++i) {
+        auto pt = partes->find(nomes[i]);
+        if (pt == partes->end() || !pt->is_object()) return "";
+        for (int k = 0; k < 6; ++k) {
+            auto r = pt->find(faces[k]);
+            if (r == pt->end() || !r->is_array() || r->size() != 4) return "";
+            p.molde[i][k] = {(*r)[0].get<float>(), (*r)[1].get<float>(), (*r)[2].get<float>(), (*r)[3].get<float>()};
+        }
+    }
+    p.texturizado = true;
+    return file;
+}
+
 int finish(Engine* e, Scene::Handle h, json& spec, bool isChar) {
     GameObject* g = e->scene.get(h);
     if (!g) return -1;
@@ -934,6 +973,7 @@ int createFromSpecJson(Engine* e, const std::string& specJson, std::string* err)
         uint32_t seed = uint32_t(inum(spec, "semente", 0));
         if (!seed) { seed = uint32_t(e->fxRng.next() & 0x7fffffff) | 1u; spec["semente"] = seed; }
         CharacterParams p = characterParams(spec, seed);
+        std::string skinFile = skinTextureOf(e, spec, p);
         if (enemy && spec.find("aparencia") == spec.end()) {  // inimigo padrão: roupa escura/vermelha
             p.shirt = srgb(120, 20, 25);
             p.pants = srgb(30, 30, 35);
@@ -944,6 +984,9 @@ int createFromSpecJson(Engine* e, const std::string& specJson, std::string* err)
         int id = createCharacter(e, p, pos, yaw, controllable);
         if (id < 0) return fail(e->lastError.empty() ? "não consegui criar o personagem" : e->lastError);
         int ci = int(e->characters.size()) - 1;
+        if (!skinFile.empty())  // skin pintada: a imagem por cima dos blocos (cada imagem vai uma vez só para a memória)
+            if (GameObject* g = e->scene.get(e->objects[id]))
+                applyMaterialTo(e, *g, true, json{{"textura", skinFile}, {"metal", 0.f}, {"rugosidade", 0.85f}});
         if (!controllable && e->player == ci) e->player = prevPlayer;  // só vira jogador se pedido (ou se não há outro)
         if (!controllable && prevPlayer < 0 && !enemy) e->player = ci;
         if (auto it = spec.find("arma"); it != spec.end() && it->is_string() && !it->get<std::string>().empty()) {

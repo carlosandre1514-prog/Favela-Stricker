@@ -314,6 +314,67 @@ void wave(ClipWriter& w, const Joints& J) {
 }  // namespace
 
 
+// Corpo em blocos com skin pintada: cada parte do molde é uma caixa; partes com mais de um bloco (tronco, braço,
+// perna) dividem as laterais da imagem pela altura de cada bloco. Topo e base só nos blocos das pontas; entre
+// dois blocos a tampa usa a linha da divisão (fica da cor da roupa ali quando a junta dobra).
+static void buildTexturedBlockBody(const CharacterParams& p, MeshBuilder& b, float H, float sx, float tx, float shoulderY,
+                                   float elbowY, float wristY, float thighY, float kneeY, float ankleY) {
+    b.color = glm::vec4(1.f);
+    // seg: parte do molde, osso, centro x/z, largura, profundidade, de yTop a yBot (metros), fração da parte [fa, fb]
+    auto seg = [&](int part, int joint, float x, float z, float w, float d, float yTop, float yBot, float fa, float fb) {
+        const glm::vec4* m = p.molde[part];
+        glm::vec4 r[6];
+        for (int f = 0; f < 4; ++f) {
+            const glm::vec4 q = m[f];
+            r[f] = {q.x, q.y + (q.w - q.y) * fa, q.z, q.y + (q.w - q.y) * fb};
+        }
+        const glm::vec4 fr = m[0];
+        const float va = fr.y + (fr.w - fr.y) * fa, vb = fr.y + (fr.w - fr.y) * fb;
+        r[4] = fa <= 0.f ? m[4] : glm::vec4(fr.x, va, fr.z, va);
+        r[5] = fb >= 1.f ? m[5] : glm::vec4(fr.x, vb, fr.z, vb);
+        b.joint = joint;
+        b.faceRects = r;
+        b.box({x - w * 0.5f, yBot, z - d * 0.5f}, {w, yTop - yBot, d});
+        b.faceRects = nullptr;
+    };
+    const float tw = (sx - 0.05f * H) * 2.f, td = 0.12f * H;
+    // tronco: peito, barriga, cintura (0.84H .. 0.5H)
+    const float t0 = 0.84f * H, t1 = 0.68f * H, t2 = 0.6f * H, t3 = thighY, tl = t0 - t3;
+    seg(SP_Tronco, CJ_Chest, 0, 0, tw, td, t0, t1, 0.f, (t0 - t1) / tl);
+    seg(SP_Tronco, CJ_Spine, 0, 0, tw, td, t1, t2, (t0 - t1) / tl, (t0 - t2) / tl);
+    seg(SP_Tronco, CJ_Hips, 0, 0, tw, td, t2, t3, (t0 - t2) / tl, 1.f);
+    // cabeça e pescoço (o pescoço usa a base da cabeça)
+    const float hs = 0.15f * H, hy = 0.915f * H;
+    seg(SP_Cabeca, CJ_Head, 0, 0, hs, 0.14f * H, hy + hs / 2, hy - hs / 2, 0.f, 1.f);
+    {
+        glm::vec4 r[6];
+        const glm::vec4 bs = p.molde[SP_Cabeca][5];
+        const glm::vec4 c = {(bs.x + bs.z) * 0.5f, (bs.y + bs.w) * 0.5f, (bs.x + bs.z) * 0.5f, (bs.y + bs.w) * 0.5f};
+        for (auto& q : r) q = c;
+        b.joint = CJ_Neck; b.faceRects = r;
+        b.boxC({0, 0.842f * H, 0}, {0.07f * H, 0.02f * H, 0.07f * H});
+        b.faceRects = nullptr;
+    }
+    // braços: ombro, antebraço, mão (+X é o lado esquerdo do boneco)
+    const float aw = 0.085f * H, a0 = shoulderY + 0.015f * H, a3 = wristY - 0.07f * H, al = a0 - a3;
+    for (int side = 0; side < 2; ++side) {
+        const float x = side ? -sx : sx;
+        const int part = side ? SP_BracoDir : SP_BracoEsq;
+        seg(part, side ? CJ_RUpper : CJ_LUpper, x, 0, aw, aw, a0, elbowY, 0.f, (a0 - elbowY) / al);
+        seg(part, side ? CJ_RFore : CJ_LFore, x, 0, aw, aw, elbowY, wristY, (a0 - elbowY) / al, (a0 - wristY) / al);
+        seg(part, side ? CJ_RHand : CJ_LHand, x, 0, aw, aw, wristY, a3, (a0 - wristY) / al, 1.f);
+    }
+    // pernas: coxa e canela; pé separado
+    const float lw = 0.115f * H, ld = td * 0.95f, l0 = thighY + 0.005f * H, l1 = kneeY - 0.005f * H, l2 = ankleY + 0.005f * H;
+    for (int side = 0; side < 2; ++side) {
+        const float x = side ? -tx : tx;
+        const int part = side ? SP_PernaDir : SP_PernaEsq;
+        seg(part, side ? CJ_RThigh : CJ_LThigh, x, 0, lw, ld, l0, l1, 0.f, (l0 - l1) / (l0 - l2));
+        seg(part, side ? CJ_RShin : CJ_LShin, x, 0, lw, ld, l1, l2, (l0 - l1) / (l0 - l2), 1.f);
+        seg(side ? SP_PeDir : SP_PeEsq, side ? CJ_RFoot : CJ_LFoot, x, 0.018f * H, lw * 0.98f, td * 1.15f, 0.06f * H, 0.f, 0.f, 1.f);
+    }
+}
+
 // Corpo em blocos, parecido com os bonecos do Roblox (R15): cabeça quadrada com rostinho (olhos e sorriso),
 // tronco quadrado, braço (ombro, antebraço, mão) e perna (coxa, canela, pé) em blocos presos a um osso cada.
 // Roupa: cores de camisa/calça/tênis, estampas da camisa, colete, chapéu e luvas (CharacterParams).
@@ -479,7 +540,9 @@ void buildCharacter(const CharacterParams& p, LoadedModel& out, MeshBuilder& b) 
     auto part = [&](int joint, glm::vec4 col, glm::vec3 center, glm::vec3 size) {
         b.joint = joint; b.color = col; b.boxC(center, size);
     };
-    if (p.bloco) {
+    if (p.bloco && p.texturizado) {
+        buildTexturedBlockBody(p, b, H, sx, tx, shoulderY, elbowY, wristY, thighY, kneeY, ankleY);
+    } else if (p.bloco) {
         buildBlockBody(p, b, H, sx, tx, shoulderY, elbowY, wristY, thighY, kneeY, ankleY);
     } else {
     glm::vec4 dark = srgb(25, 20, 18), white = srgb(245, 245, 245), lips = p.skin * glm::vec4(0.75f, 0.55f, 0.55f, 1.f);

@@ -6,7 +6,7 @@
 
 const ANDROID = typeof window.Nativo === 'object' && window.Nativo !== null;
 const TOQUE = ANDROID || matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
-if (ANDROID) document.body.classList.add('android');
+if (ANDROID) { document.documentElement.classList.add('android'); document.body.classList.add('android'); }
 if (TOQUE) document.body.classList.add('toque');
 
 const CONFIG = (() => {

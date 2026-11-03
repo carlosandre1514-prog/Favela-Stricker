@@ -295,9 +295,17 @@ const SkinDef kSkins[2][5] = {
      {"Canarinho", 0, R"({"camisa":"#F5D21E","calca":"#1F4FA8","tenis":"#F2F2F2","estampa":"gola","cor2":"#1E8A3C","bermuda":true,"chapeu":"touca","cor_chapeu":"#1F4FA8"})"},
      {"Faixa", 0, R"({"camisa":"#18181C","calca":"#18181C","tenis":"#F2F2F2","estampa":"faixa","cor2":"#F2F2F2","bermuda":true,"chapeu":"bone","cor_chapeu":"#18181C"})"}}};
 
+// Nome do arquivo da skin pintada de cada roupa: shaders/kit/personagens/texturas/<nome>.png (molde em docs/skins).
+// Com o arquivo, o boneco usa a imagem; sem ele, as cores acima.
+const char* kSkinFile[2][5] = {{"pm", "civil", "exercito", "choque", "especial"},
+                               {"rubro", "alvinegro", "tricolor", "canarinho", "faixa"}};
+
 // Aparência do boneco de um lutador: a roupa do lado + tom de pele e cabelo que variam de pessoa para pessoa
 json fighterLook(int team, int skin, const std::string& name) {
-    json a = json::parse(kSkins[std::clamp(team, 0, 1)][std::clamp(skin, 0, 4)].look);
+    team = std::clamp(team, 0, 1);
+    skin = std::clamp(skin, 0, 4);
+    json a = json::parse(kSkins[team][skin].look);
+    a["textura"] = std::string("kit:personagens/texturas/") + kSkinFile[team][skin] + ".png";
     static const char* peles[] = {"#F2CCA8", "#E0AC84", "#C68C69", "#9A6444", "#6E4630", "#4E3222"};
     static const char* cabelos[] = {"#1A1410", "#3C2818", "#5A3A20", "#141414"};
     uint32_t h = 2166136261u;

@@ -44,7 +44,13 @@ struct CharacterParams {
     glm::vec4 cor2{1.f}, cor3{1.f};
     bool bermuda = false;     // perna de fora do joelho para baixo
     glm::vec4 luvas{0.f};     // alfa 0 = sem luva (mão de pele)
+    // Skin pintada (imagem no molde de tools/gerar_molde_personagem.py): só os blocos do corpo, com a imagem
+    // por cima. molde[parte][face]: (u0, v0, u1, v1) na imagem; partes na ordem de SkinPart, faces na ordem
+    // frente, costas, lado esquerdo (+X), lado direito (-X), topo, base.
+    bool texturizado = false;
+    glm::vec4 molde[8][6];
 };
+enum SkinPart { SP_Tronco, SP_Cabeca, SP_BracoEsq, SP_BracoDir, SP_PernaEsq, SP_PernaDir, SP_PeEsq, SP_PeDir };
 
 CharacterParams defaultCharacter();
 CharacterParams randomCharacter(uint32_t seed);
