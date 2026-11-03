@@ -58,13 +58,13 @@ static void recordEdit(Engine* e, const char* key, const std::string& value) {
 // ---------- ciclo de vida ----------
 namespace eng {
 // Nível gráfico escolhido no jogo. Vale ao abrir o motor (texturas e modelos são preparados no carregamento).
-//   texturas dos personagens: 256 · 512 · 512 · original   armas: 512 · 512 · 1024 · original
+//   texturas dos personagens: 256 · 512 · 512 · original   armas: 256 · 512 · 512 · original
 //   triângulos dos personagens: 25% · 35% · 50% · 100% (armas: no mínimo 50%)
 void applyQualityLevel(Engine* e, int nivel) {
     nivel = std::clamp(nivel, 0, 3);
     static const int kQuality[4] = {0, 0, 1, 2};
     static const int kCharMax[4] = {256, 512, 512, 0};
-    static const int kTexMax[4] = {512, 512, 1024, 0};
+    static const int kTexMax[4] = {256, 512, 512, 0};  // armas: eram 212 MB de textura na Intermediária (1024)
     static const float kTris[4] = {0.25f, 0.35f, 0.5f, 1.f};
     static const float kAniso[4] = {1.f, 2.f, 4.f, 16.f};
     e->quality = kQuality[nivel];
@@ -74,6 +74,7 @@ void applyQualityLevel(Engine* e, int nivel) {
     TextureManager::instance().modelMax = kTexMax[nivel];
     e->renderer.simplify = kTris[nivel];
     TextureManager::instance().anisotropia = kAniso[nivel];
+    e->renderer.shadowCascadesMax = nivel >= 3 ? 3 : 2;  // Intermediária: 2 faixas de sombra (cada faixa desenha o mapa de novo)
 }
 }  // namespace eng
 
@@ -147,9 +148,10 @@ void engine_frame(Engine* e, float dt) {
     e->camera.farZ = std::max(e->mapKind >= 0 ? 900.f : 200.f, d * 40.f);
     // jogando: vê até uma distância (o resto nem é enviado para a placa de vídeo); leve vê menos
     // por nível (Leve, Padrão, Intermediária, Ultra): visão, sombras e quando os detalhes somem
-    static const float kViewDist[4] = {150.f, 220.f, 320.f, 900.f};
-    static const float kShadowMax[4] = {0.f, 0.f, 60.f, 200.f};  // 0 = sem sombra (o mapa desenhado de novo custa caro)
-    static const float kLod[4] = {0.5f, 0.65f, 0.85f, 1.35f};  // Ultra: detalhes (plantas, objetos) aparecem mais longe
+    static const float kViewDist[4] = {120.f, 170.f, 240.f, 900.f};
+    static const float kFogMin[4] = {0.0085f, 0.006f, 0.003f, 0.f};  // neblina mínima jogando: esconde onde a visão acaba
+    static const float kShadowMax[4] = {0.f, 0.f, 35.f, 200.f};  // 0 = sem sombra (o mapa desenhado de novo custa caro)
+    static const float kLod[4] = {0.4f, 0.5f, 0.65f, 1.35f};  // Ultra: detalhes (plantas, objetos) aparecem mais longe
     const int nv = std::clamp(e->nivel, 0, 3);
     const float viewDist = !e->playing ? 1e9f : kViewDist[nv];
     if (e->playing) e->camera.farZ = std::min(e->camera.farZ, viewDist * 1.2f);
@@ -230,7 +232,7 @@ void engine_frame(Engine* e, float dt) {
     eng::Environment env = e->env;
     float fog = e->renderer.fogDensity;
     eng::weatherLook(e, env, sun, fog);  // chuva: céu fechado, neblina, clarão dos raios
-    if (e->playing && e->nivel <= 1) fog = std::max(fog, e->nivel == 0 ? 0.0085f : 0.006f);  // leve: neblina esconde onde a visão acaba
+    if (e->playing) fog = std::max(fog, kFogMin[nv]);  // neblina mínima do nível: esconde onde a visão acaba
     const float keepFog = e->renderer.fogDensity;
     e->renderer.fogDensity = fog;
     e->renderer.render(e->camera, sun, env, lights, nLights);

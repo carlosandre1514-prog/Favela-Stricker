@@ -91,6 +91,12 @@ async function iniciarPartida(time, roupa, sala, armaPrincipal) {
     c.remove();
   }
   iniciandoPartida = false;
+  // até o meu boneco estar no chão com a arma na mão, fica a tela de "entrando" (em vez do mapa visto de cima
+  // com o HUD vazio)
+  const entrando = html(`<div class="camada fixo" id="entrando"><div class="janela" style="align-items:center;text-align:center">
+    <span class="t">ENTRANDO NA PARTIDA…</span></div></div>`);
+  palco.appendChild(entrando);
+  setTimeout(() => entrando.remove(), 12000);  // nunca fica presa
   motor.girarMenu(false);
   ctxAudio();
   partida = { time, sala, fim: false, agachado: false, mirando: false, danoAntes: false };
@@ -110,6 +116,7 @@ async function iniciarPartida(time, roupa, sala, armaPrincipal) {
     if (!partida) return;
     const j = motor.hud();
     if (!j.ativo) return;
+    if ((j.armas || []).length) { const en = document.getElementById('entrando'); if (en) en.remove(); }
     ultimoHud = j;
     atualizarHud(j);
     if (partida.loja) atualizarLojaPartida();
@@ -123,6 +130,8 @@ async function iniciarPartida(time, roupa, sala, armaPrincipal) {
 
 function pararPartida() {
   if (!partida) return;
+  const en = document.getElementById('entrando');
+  if (en) en.remove();
   clearInterval(lacoHud);
   lacoHud = null;
   motor.atirar(false);

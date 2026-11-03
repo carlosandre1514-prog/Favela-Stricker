@@ -1715,6 +1715,15 @@ int main(int argc, char** argv) {
         }
         save(out, "40_partida.png");
         stats(e, "partida");
+        {   // de cima, olhando o mapa inteiro (onde a distância de visão e os detalhes contam)
+            engine_set_first_person(e, 0);
+            engine_set_camera(e, 0.f, 22.f, 45.f, 0.f, 0.35f, 30.f);
+            frames(e, 5);
+            stats(e, "partida (de cima)");
+            save(out, "40_de_cima.png");
+            engine_set_first_person(e, 1);
+            frames(e, 3);
+        }
         engine_set_play(e, 0);
         engine_set_first_person(e, 0);
         frames(e, 5);

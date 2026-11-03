@@ -156,7 +156,7 @@ function ajustarCanvas() {
   const cv = document.getElementById('tela');
   const n = motor.nivel();
   // Ultra: a resolução inteira da tela (até 2x em telas de alta densidade)
-  const escala = [0.55, 0.7, 0.85, 1][n] * Math.min(devicePixelRatio || 1, n >= 3 ? 2 : 1.5);
+  const escala = [0.5, 0.6, 0.7, 1][n] * Math.min(devicePixelRatio || 1, n >= 3 ? 2 : 1.5);
   cv.width = Math.max(1, Math.round(innerWidth * escala));
   cv.height = Math.max(1, Math.round(innerHeight * escala));
 }

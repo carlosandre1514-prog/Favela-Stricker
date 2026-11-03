@@ -101,7 +101,8 @@ public:
     std::map<std::string, MeshId> meshCache;
     // fração dos triângulos que fica nos modelos carregados (qualidades leves < 1)
     float simplify = 1.f;
-    float simplifyOverride = 0.f;  // > 0: fração de triângulos dos próximos modelos (versão de longe das armas)
+    float simplifyOverride = 0.f;
+    int shadowCascadesMax = kNumCascades;  // faixas de sombra desenhadas (as outras ficam sem sombra; Intermediária: 2)  // > 0: fração de triângulos dos próximos modelos (versão de longe das armas)
     // resolução da sombra e do reflexo do ambiente (definidas antes do init; Ultra: 2048 e 256)
     int shadowSize = kShadowMapSize;
     int envSize = kEnvSize;

@@ -363,12 +363,12 @@ void Renderer::submit(const GameObject& go, const glm::mat4& model, const glm::m
     glm::mat4 m = model;
     if (palette) {
         // Skinned: a pose muda os limites; sem culling (são poucos objetos)
-        mask = 1u | (mr.castShadows ? 0xEu : 0u);
+        mask = 1u | (mr.castShadows ? (0xEu & ((2u << shadowCascadesMax) - 2u)) : 0u);
     } else {
         AABB world = transformAABB(mesh.bounds, model);
         if (camFrustum_.intersects(world)) mask |= 1u;            // culling da câmera
         // objetos com LOD (detalhes, árvores) só fazem sombra nas 2 cascatas perto da câmera
-        const int shadowCascades = mr.lodFar < 1e29f ? 2 : kNumCascades;
+        const int shadowCascades = std::min(mr.lodFar < 1e29f ? 2 : kNumCascades, shadowCascadesMax);
         if (mr.castShadows)
             for (int c = 0; c < shadowCascades; ++c)              // culling por cascata
                 if (cascadeFrustum_[c].planes[0] != glm::vec4(0.f) && cascadeFrustum_[c].intersects(world)) mask |= 2u << c;
@@ -533,7 +533,7 @@ void Renderer::shadowPass(const CascadeSet& cs) {
     for (int c = 0; c < kNumCascades; ++c) {
         glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, shadowTex_, 0, c);
         glClear(GL_DEPTH_BUFFER_BIT);
-        drawBatches(2u << c, &cs.viewProj[c]);
+        if (c < shadowCascadesMax) drawBatches(2u << c, &cs.viewProj[c]);  // as de fora ficam limpas (sem sombra)
     }
     glDisable(GL_POLYGON_OFFSET_FILL);
     glEnable(GL_CULL_FACE);

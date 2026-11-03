@@ -1,4 +1,5 @@
 #pragma once
+#include <unordered_map>
 #include <deque>
 #include <map>
 #include <memory>
@@ -281,6 +282,7 @@ struct Engine {
     float castCooldown = 0.f;
 
     std::vector<std::unique_ptr<LoadedModel>> models;  // glTF e personagens procedurais
+    std::unordered_map<std::string, std::pair<std::vector<ProtoPart>, AABB>> weaponParts;  // peças de cada arma já carregada
     std::vector<Scene::Handle> objects;                // id público -> handle
     std::vector<Animator*> animators;
     std::vector<CharacterInfo> characters;
@@ -406,6 +408,8 @@ glm::mat4 renderMatrix(const Engine* e, const GameObject& go, const glm::mat4** 
 bool subtreeBounds(Engine* e, GameObject& root, AABB& out);
 void focusSceneOrSelection(Engine* e);
 void applyQualityLevel(Engine* e, int nivel);  // 0 Leve · 1 Padrão · 2 Intermediária · 3 Ultra
+void warmWeaponModel(Engine* e, const std::string& file, int kind);  // carrega as peças de uma arma (sem pôr na cena)
+void preloadMatchWeapons(Engine* e);  // todas as armas da partida (no carregamento do mapa)
 void releaseComponents(Engine* e, GameObject& g);
 void ensureBasics(Engine* e);
 void clearScene(Engine* e);

@@ -1050,6 +1050,11 @@ void teamStop(Engine* e) {
 }
 }  // namespace
 
+// Armas da partida carregadas junto com o mapa (a partida começa e as compras trocam a arma na hora)
+void preloadMatchWeapons(Engine* e) {
+    for (const GunDef& g : kGuns) warmWeaponModel(e, std::string("kit:armas/") + g.key, std::string(g.key) == "tt33" ? int(WK_Pistol) : int(WK_Rifle));
+}
+
 // Acabamento das skins de fuzil: Dourada = metal polido; as outras = pintura (pouco metal).
 // As da TT-33 foram pintadas no molde da arma e mantêm o metal/brilho de cada peça (-1).
 void gunSkinFinish(const std::string& gun, const std::string& skin, float& metal, float& rough) {

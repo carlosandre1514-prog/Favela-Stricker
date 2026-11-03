@@ -299,8 +299,8 @@ class JogoActivity : Activity() {
     private fun aplicarResolucao() {
         when (val n = nivelGrafico()) {
             0 -> motorView.applyQuality(0.5f, 30, n)
-            1 -> motorView.applyQuality(0.65f, 40, n)
-            2 -> motorView.applyQuality(0.8f, 50, n)
+            1 -> motorView.applyQuality(0.6f, 40, n)
+            2 -> motorView.applyQuality(0.7f, 45, n)
             else -> motorView.applyQuality(1f, 60, n)
         }
     }

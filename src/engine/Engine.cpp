@@ -396,6 +396,7 @@ void clearScene(Engine* e) {
     ++e->revision;
     e->attachments.clear();
     e->models.clear();
+    e->weaponParts.clear();
     e->snapshot.clear();
     e->player = -1;
     e->renderer.clearAssets();
@@ -589,22 +590,30 @@ static Scene::Handle spawnWeaponModel(Engine* e, int kind, const WeaponLook& loo
         // modelo do usuário: deita com o cano em +Z, tamanho do tipo, mão no cabo
         std::vector<ProtoPart> parts;
         AABB b;
-        if (!modelParts(e, look.file, nullptr, parts, b)) {
-            if (e->lastError.empty()) e->lastError = "o arquivo não tem malha para virar arma";
-            return {};
-        }
-        // Versão de longe (bem poucos triângulos): a arma da mão e as de perto ficam detalhadas; as dos outros
-        // lutadores, a partir de alguns metros, usam esta (as armas eram mais da metade dos triângulos da partida)
-        static const float kLowFrac[4] = {0.06f, 0.08f, 0.12f, 0.2f}, kLowDist[4] = {4.f, 5.f, 7.f, 12.f};
-        const int nv = std::clamp(e->nivel, 0, 3);
-        std::vector<ProtoPart> low;
-        AABB lb;
-        e->renderer.simplifyOverride = kLowFrac[nv];
-        const bool okLow = modelParts(e, look.file, nullptr, low, lb);
-        e->renderer.simplifyOverride = 0.f;
-        if (okLow && low.size() == parts.size()) {
-            for (ProtoPart& p : parts) p.lodFar = kLowDist[nv];
-            for (ProtoPart& p : low) { p.lodNear = kLowDist[nv]; parts.push_back(p); }
+        // As peças de cada arma ficam guardadas depois da primeira vez: renascer, trocar e comprar arma não lê o
+        // arquivo de novo (eram ~40 leituras de 1,5 a 6 MB no começo da partida, cada uma com 2 versões)
+        if (auto it = e->weaponParts.find(look.file); it != e->weaponParts.end()) {
+            parts = it->second.first;
+            b = it->second.second;
+        } else {
+            if (!modelParts(e, look.file, nullptr, parts, b)) {
+                if (e->lastError.empty()) e->lastError = "o arquivo não tem malha para virar arma";
+                return {};
+            }
+            // Versão de longe (bem poucos triângulos): a arma da mão e as de perto ficam detalhadas; as dos outros
+            // lutadores, a partir de alguns metros, usam esta (as armas eram mais da metade dos triângulos da partida)
+            static const float kLowFrac[4] = {0.06f, 0.08f, 0.12f, 0.2f}, kLowDist[4] = {4.f, 5.f, 7.f, 12.f};
+            const int nv = std::clamp(e->nivel, 0, 3);
+            std::vector<ProtoPart> low;
+            AABB lb;
+            e->renderer.simplifyOverride = kLowFrac[nv];
+            const bool okLow = modelParts(e, look.file, nullptr, low, lb);
+            e->renderer.simplifyOverride = 0.f;
+            if (okLow && low.size() == parts.size()) {
+                for (ProtoPart& p : parts) p.lodFar = kLowDist[nv];
+                for (ProtoPart& p : low) { p.lodNear = kLowDist[nv]; parts.push_back(p); }
+            }
+            e->weaponParts[look.file] = {parts, b};
         }
         glm::vec3 ext = b.max - b.min;
         glm::mat4 R(1.f);
@@ -637,6 +646,18 @@ static Scene::Handle spawnWeaponModel(Engine* e, int kind, const WeaponLook& loo
     addAccessories(e, *w, look.accessories, wb, look.file.empty());
     Scene::forEachInSubtree(*w, [](GameObject& o) { o.noCut = true; });  // passa pela porta sem ser cortada
     return h;
+}
+
+// Carrega as peças de uma arma do kit sem deixar nada na cena (para a partida já começar com elas prontas)
+void warmWeaponModel(Engine* e, const std::string& file, int kind) {
+    if (e->weaponParts.count(file)) return;
+    WeaponLook look;
+    look.file = file;
+    glm::vec3 muzzle;
+    AABB wb;
+    Scene::Handle h = spawnWeaponModel(e, kind, look, muzzle, wb);
+    if (e->scene.get(h)) deleteObject(e, h);
+    e->lastError.clear();
 }
 
 int createWeapon(Engine* e, int kind, int ch, const WeaponLook& look) {
