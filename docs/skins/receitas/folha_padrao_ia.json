@@ -1,12 +1,13 @@
 {
  "nota": "Recortes para a folha de skin de 1330 x 1182 (cabeça em cima à esquerda, camisa e colete em cima à direita, braços no meio à esquerda, calça e tênis embaixo).",
+ "limpar_fundo": ["cabeca", "braco_dir", "braco_esq"],
  "partes": {
   "cabeca": {
    "frente": [210, 92, 397, 350],
    "lado_dir": [14, 75, 200, 345],
    "lado_esq": [405, 75, 591, 345],
    "costas": [[14, 75, 112, 345]],
-   "topo": [210, 8, 398, 88],
+   "topo": [{"de": [210, 8, 398, 88], "limpar": false}],
    "base": [200, 362, 400, 450]
   },
   "tronco": {
