@@ -1100,7 +1100,10 @@ void applyFirstPerson(Engine* e) {
         if (head < 0) return;
         const Skeleton& S = *a->skeleton;
         int arms[2] = {-1, -1};
-        if (scoped && a->retarget) { arms[0] = a->retarget->targetOf[CJ_LUpper]; arms[1] = a->retarget->targetOf[CJ_RUpper]; }
+        if (scoped) {
+            arms[0] = a->retarget ? a->retarget->targetOf[CJ_LUpper] : int(CJ_LUpper);
+            arms[1] = a->retarget ? a->retarget->targetOf[CJ_RUpper] : int(CJ_RUpper);
+        }
         for (int root : {head, arms[0], arms[1]}) {
             if (root < 0) continue;
             glm::vec3 hp = glm::vec3(a->global[root][3]);
@@ -1112,6 +1115,14 @@ void applyFirstPerson(Engine* e) {
                 if (in[i]) a->palette[i] = M * a->global[i] * S.inverseBind[i];
             }
         }
+        // boneco em bloco (esqueleto do motor): a parte de cima do braço, grossa e colada na câmera, também some;
+        // ficam o antebraço, a mão e a arma (como nos jogos de tiro)
+        if (!a->retarget && S.jointCount == CJ_Total)
+            for (int up : {int(CJ_LUpper), int(CJ_RUpper)}) {
+                glm::vec3 hp = glm::vec3(a->global[up][3]);
+                glm::mat4 M = glm::translate(glm::mat4(1.f), hp) * glm::scale(glm::mat4(1.f), glm::vec3(1e-3f)) * glm::translate(glm::mat4(1.f), -hp);
+                a->palette[up] = M * a->global[up] * S.inverseBind[up];
+            }
     }
 }
 

@@ -994,12 +994,10 @@ int main(int argc, char** argv) {
         const char* ban[] = {"Magrão", "Baixinho", "Cabeça", "Zóio", "Bigode"};
         const char* ba[] = {"ak47", "ak74", "pistola", "escopeta", "ak47"};
         for (int i = 0; i < 5; ++i) {
-            // skin de cada um (a mesma da loja: "roupa" 0..4)
-            const char* pv[] = {"pm", "civil", "exercito", "choque", "especial"};
-            const char* bv[] = {"rubro", "alvinegro", "tricolor", "canarinho", "faixa"};
-            objs.push_back({{"tipo", "modelo"}, {"arquivo", std::string("kit:personagens/skins/") + pv[i]}, {"personagem", true},
+            // boneco em bloco; a roupa (0..4) entra na partida
+            objs.push_back({{"tipo", "personagem"}, {"aparencia", {{"estilo", "bloco"}}},
                             {"time", "policia"}, {"nome", pol[i]}, {"arma", pa[i]}, {"roupa", i}, {"pos", P(-6.f + i * 3.f, 104.f)}, {"rot_y", 180}});
-            objs.push_back({{"tipo", "modelo"}, {"arquivo", std::string("kit:personagens/skins/") + bv[i]}, {"personagem", true},
+            objs.push_back({{"tipo", "personagem"}, {"aparencia", {{"estilo", "bloco"}}},
                             {"time", "bandidos"}, {"nome", ban[i]}, {"arma", ba[i]}, {"roupa", i}, {"pos", P(-4.f + i * 3.f, -38.f)}, {"rot_y", 0}});
         }
         json res = json::parse(std::string(engine_tool_call(e, "criar_objetos", json{{"objetos", objs}}.dump().c_str())));
@@ -1138,11 +1136,39 @@ int main(int argc, char** argv) {
             frames(e, 12);
             save(out, ("50_volta_" + std::to_string(time) + "_" + std::to_string(k) + ".png").c_str());
         }
+        engine_player_swap(e);  // fuzil de volta na mão
         engine_set_first_person(e, 1);
         engine_set_play(e, 1);
         engine_set_camera(e, 0.f, 0.f, 0.f, time ? 3.14159f : 0.f, 0.05f, 3.f);
         frames(e, 40);
         save(out, ("50_fps_" + std::to_string(time) + ".png").c_str());
+        engine_destroy(e);
+        std::printf(g_fail ? "FALHOU\n" : "OK\n");
+        return g_fail ? 1 : 0;
+    }
+    // Fotos das roupas (bonecos em bloco) para as telas: fundo puro, recortadas por tools/recortar_previas.py
+    if (std::getenv("SO_RETRATOS_BLOCO")) {
+        using nlohmann::json;
+        static const char* keys[2][5] = {{"pm", "civil", "exercito", "choque", "especial"}, {"rubro", "alvinegro", "tricolor", "canarinho", "faixa"}};
+        engine_new_scene(e);
+        engine_tool_call(e, "definir_ambiente", R"({"hora":13,"grade":false,"neblina":0})");
+        engine_set_grid(e, 0);
+        engine_select(e, -1);
+        engine_set_quality(e, 0);  // sem sombra no chão (o recorte pega só o boneco)
+        engine_set_camera(e, 0.f, 0.95f, 0.f, 0.35f, 0.08f, 3.2f);
+        frames(e, 3);
+        save(out, "previa_fundo.png");
+        for (int t = 0; t < 2; ++t)
+            for (int k = 0; k < 5; ++k) {
+                json look = json::parse(engine_team_skin_look(e, t, k));
+                int id = engine_add_spec(e, json{{"tipo", "personagem"}, {"aparencia", look}, {"semente", 7}, {"pos", {0, 0, 0}}}.dump().c_str());
+                if (id < 0) { std::printf("  [ERRO] roupa %d %d: %s\n", t, k, engine_last_error(e)); ++g_fail; continue; }
+                engine_select(e, -1);
+                engine_set_camera(e, 0.f, 0.95f, 0.f, 0.35f, 0.08f, 3.2f);
+                frames(e, 4);
+                save(out, (std::string("previa_") + keys[t][k] + ".png").c_str());
+                engine_tool_call(e, "remover_objetos", json{{"ids", {id}}}.dump().c_str());
+            }
         engine_destroy(e);
         std::printf(g_fail ? "FALHOU\n" : "OK\n");
         return g_fail ? 1 : 0;

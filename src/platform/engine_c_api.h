@@ -139,6 +139,7 @@ int     engine_player_weapon(Engine*);                          // tipo da arma 
 // ---- Jogo (app do jogo): primeira pessoa, escolhas antes do Play e HUD
 void    engine_set_first_person(Engine*, int on);               // câmera no olho do jogador
 void    engine_team_loadout(Engine*, int team, int skin, const char* primary, const char* secondary);  // antes do Play ("" = sem 2ª arma)
+const char* engine_team_skin_look(Engine*, int team, int skin);  // aparência do boneco da roupa (JSON)
 void    engine_team_gun_skin(Engine*, const char* gun, const char* skin);  // skin da arma do jogador ("" = padrão)
 int     engine_player_swap(Engine*);                            // troca rápida principal <-> pistola
 int     engine_player_grenade(Engine*);                         // joga granada (1 se jogou)

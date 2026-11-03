@@ -899,17 +899,8 @@ void genFavela(Engine* e, Rng& r, glm::vec3& spawn, float& spawnYaw) {
     Cells cells(30.f, 2);
     cells.detailFar = 85.f;  // casas completas até 85 m; depois, blocos simples
     std::vector<BoxCollider> treeBoxes;
-    // ---- plantas do kit de vegetação (3 níveis de detalhe); sem os arquivos, as árvores feitas por código ----
-    const Prototype* trees[6] = {};
-    const Prototype* bushes[5] = {};
-    const Prototype* grass[4] = {};
-    int nTrees = 0, nBushes = 0, nGrass = 0;
-    for (const char* n : {"arvore_1", "arvore_2", "arvore_3", "arvore_4", "arvores_dupla", "arvore_5"})
-        if (const Prototype* p = vegPrototype(e, n)) trees[nTrees++] = p;
-    for (const char* n : {"arbusto_1", "arbusto_2", "arbusto_3", "arbusto_redondo_1", "arbusto_redondo_2"})
-        if (const Prototype* p = vegPrototype(e, n)) bushes[nBushes++] = p;
-    for (const char* n : {"capim_1", "capim_2", "capim_3", "capim_florido"})
-        if (const Prototype* p = vegPrototype(e, n)) grass[nGrass++] = p;
+    // Sem árvores, arbustos e capim (mapa leve para celular fraco). Onde havia plantas, os sorteios continuam
+    // sendo feitos para o resto do mapa (vans, carros, entulho) ficar no mesmo lugar de antes.
 
     // ---- rotas principais (escadarias de concreto pelos becos) ----
     const auto& routes = favelaRoutes();
@@ -1344,22 +1335,8 @@ void genFavela(Engine* e, Rng& r, glm::vec3& spawn, float& spawnYaw) {
             m.box(o + glm::vec3(0.75f, 0, -0.2f), {0.05f, 0.42f, 0.4f});
             g.collider(o + glm::vec3(-0.9f, 0, -0.3f), {1.8f, 0.46f, 0.6f});
         }
-        for (int k = 0; k < 5; ++k) {
-            glm::vec3 tp(c.x + (k % 2 ? -1.f : 1.f) * (P.half.x - 1.5f), P.y + 0.05f, c.z - P.half.y + 2.f + k * 3.5f);
-            if (trees[0]) spawnProto(e, *trees[k % std::min(nTrees, 4)], tp, r.range(0, 6.28f), r.range(1.7f, 2.1f), nullptr, &treeBoxes);
-            else spawnProto(e, e->treeProto[0], tp, r.range(0, 6.28f), r.range(0.8f, 1.1f), nullptr, &treeBoxes);
-        }
-        // floreiras com plantas no fundo da praça
-        if (const Prototype* fl = vegPrototype(e, "floreira_2")) {
-            const Prototype* fc[2] = {vegPrototype(e, "forracao_1"), vegPrototype(e, "arbusto_redondo_2")};
-            for (int k = 0; k < 3; ++k) {
-                glm::vec3 fp(c.x - 7.f + k * 7.f, P.y + 0.05f, c.z - P.half.y + 0.9f);
-                spawnProto(e, *fl, fp, 0.f, 1.f, nullptr, &treeBoxes);
-                for (int j = -1; j <= 1; ++j)
-                    if (const Prototype* pl = fc[(k + j + 3) % 2])
-                        spawnProto(e, *pl, fp + glm::vec3(j * 1.f, 0.4f, 0.f), r.range(0, 6.28f), r.range(0.9f, 1.2f), nullptr, nullptr);
-            }
-        }
+        // (árvores da praça e floreiras saíram: os mesmos sorteios de antes, sem plantar nada)
+        for (int k = 0; k < 5 + 9; ++k) { r.range(0, 6.28f); r.range(0.8f, 1.2f); }
         // luz da praça
         g.place(c + glm::vec3(0, 0.05f, 0), 0.f);
         buildStreetLight(g);
@@ -1484,46 +1461,9 @@ void genFavela(Engine* e, Rng& r, glm::vec3& spawn, float& spawnYaw) {
                 buildCar(gc, r);
             }
         }
-        // prédios do bairro do lado de fora, só ao sul (o resto é mata)
-        for (float x = -110.f; x < 110.f; x += 22.f) {
-            glm::vec3 p(x + r.range(-2.f, 2.f), 4.4f, 116.f);
-            Geo& gb = cells.at(p);
-            gb.place(p, 3.14159265f);
-            buildApartment(gb, r, r.range(14.f, 18.f), 12.f, r.irange(3, 6), buildingPaint(r));
-        }
     }
 
-    // ---- mata nas encostas e algumas árvores entre as casas ----
-    for (int k = 0; k < 260; ++k) {
-        float a = r.range(0, 6.2831853f), rr = r.range(1.7f, 2.05f);  // mata do lado de fora da rua de baixo
-        float x = std::cos(a) * 64.f * rr, z = std::sin(a) * 62.f * rr;
-        if (std::abs(x) > half - 3.f || std::abs(z) > half - 3.f || z > 104.f) continue;
-        // mata da encosta: árvores do kit (2 a 3x o tamanho do jardim), arbustos e capim; palmeira de vez em quando
-        float pick = r.f();
-        if (pick < 0.12f || !trees[0]) {
-            spawnProto(e, e->treeProto[2], {x, H(x, z) - 0.2f, z}, r.range(0, 6.28f), r.range(0.9f, 1.4f), nullptr, &treeBoxes);
-        } else if (pick < 0.62f) {
-            spawnProto(e, *trees[r.irange(0, nTrees - 1)], {x, H(x, z) - 0.15f, z}, r.range(0, 6.28f), r.range(2.f, 2.9f), nullptr, &treeBoxes);
-        } else if (pick < 0.85f && bushes[0]) {
-            spawnProto(e, *bushes[r.irange(0, nBushes - 1)], {x, H(x, z) - 0.05f, z}, r.range(0, 6.28f), r.range(1.6f, 2.6f), nullptr, &treeBoxes);
-        } else if (grass[0]) {
-            spawnProto(e, *grass[r.irange(0, nGrass - 1)], {x, H(x, z) - 0.05f, z}, r.range(0, 6.28f), r.range(1.f, 1.6f), nullptr, &treeBoxes);
-        }
-    }
-    for (int k = 0; k < 90; ++k) {
-        float x = r.range(-90.f, 90.f), z = r.range(-88.f, 86.f);
-        if (favelaEdge(x, z) > 1.42f) continue;
-        bool free = !nearRoute({x, z}, 1.6f);
-        for (auto& [lc, lh] : lots) if (std::abs(x - lc.x) < lh.x + 1.2f && std::abs(z - lc.y) < lh.y + 1.2f) { free = false; break; }
-        for (int p = 0; p < FP_Count && free; ++p) if (padDist(pads[p], x, z) < 1.f) free = false;
-        if (!free) continue;
-        if (trees[0] && !r.chance(0.3f))
-            spawnProto(e, *trees[r.irange(0, nTrees - 1)], {x, H(x, z) - 0.1f, z}, r.range(0, 6.28f), r.range(1.6f, 2.2f), nullptr, &treeBoxes);
-        else
-            spawnProto(e, e->treeProto[r.chance(0.3f) ? 2 : 0], {x, H(x, z) - 0.1f, z}, r.range(0, 6.28f), r.range(0.6f, 0.9f), nullptr, &treeBoxes);
-    }
-
-    // ---- ao fundo: morros com casinhas e o Cristo no alto (sem colisão, fora do limite) ----
+    // ---- ao fundo: morros e o Cristo no alto (sem colisão, fora do limite; sem as casinhas, para ficar leve) ----
     {
         auto far = [seed](float x, float z) {
             float r2 = std::sqrt(x * x + z * z);
@@ -1536,25 +1476,15 @@ void genFavela(Engine* e, Rng& r, glm::vec3& spawn, float& spawnYaw) {
         c.used = true;
         std::vector<Vertex> v; std::vector<uint32_t> idx;
         std::function<glm::vec3(float, float)> hint = [](float, float) { return glm::vec3(0.f, 1.f, 0.f); };
-        terrainMesh(v, idx, -700.f, -700.f, 1400.f, 120, far, nullptr, &hint);
+        terrainMesh(v, idx, -700.f, -700.f, 1400.f, 64, far, nullptr, &hint);
         c.mesh = e->renderer.createMesh(v.data(), uint32_t(v.size()), idx.data(), uint32_t(idx.size()), false);
         c.ground = addMeshObject(e, "Morros ao fundo", c.mesh, e->mats[int(Mat::Terrain)], glm::vec3(0.f), glm::vec3(1.f), glm::vec3(0.f), false);
         if (GameObject* go = e->scene.get(c.ground)) if (go->meshRenderer) go->meshRenderer->castShadows = false;
         c.cx = (1 << 20) + 1;
-        // casinhas coloridas nas encostas viradas para cá
         Geo& g = cells.at({1e4f, 0, 1e4f});
         g.place(glm::vec3(0.f), 0.f);
         MeshBuilder& p = g[Mat::Painted];
         p.uvTile = {0.f, 0.f};
-        for (int k = 0; k < 1400; ++k) {
-            float a = r.range(0, 6.2831853f), d = r.range(230.f, 450.f);
-            float x = std::cos(a) * d, z = std::sin(a) * d;
-            float h = far(x, z);
-            if (h < 6.f || h > 50.f) continue;
-            p.color = favelaPaint(r) * r.range(0.75f, 1.f);
-            float w = r.range(4.f, 7.f), hh = r.range(3.f, 8.f);
-            p.box({x - w / 2, h - 1.f, z - w / 2}, {w, hh + 1.f, w * r.range(0.8f, 1.2f)});
-        }
         // Cristo Redentor (silhueta) no morro mais alto ao norte
         glm::vec3 cb(-120.f, far(-120.f, -380.f) - 2.f, -380.f);
         p.color = srgb(235, 232, 225);
@@ -1573,7 +1503,7 @@ void genFavela(Engine* e, Rng& r, glm::vec3& spawn, float& spawnYaw) {
     e->renderer.fogDensity = 0.0018f;
     setTimeOfDay(e, 16.9f);   // fim de tarde, luz dourada
     e->dayCycleMin = 10.f;    // no Play: dia e noite em 10 minutos
-    e->rainMode = 1;          // e chove em algum momento
+    e->rainMode = 0;          // sem chuva (o chão molhado e os reflexos pesam no celular)
 }
 
 void genSchool(Engine* e, Rng& r, glm::vec3& spawn, float& spawnYaw) {

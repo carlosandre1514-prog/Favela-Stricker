@@ -33,6 +33,17 @@ struct CharacterParams {
     glm::vec4 skin, shirt, pants, shoes, hair;
     int hairStyle = 1;        // 0 careca, 1 curto, 2 comprido, 3 boné
     bool longSleeves = false;
+    // Estilo bloco (parecido com Roblox): cabeça quadrada com rostinho, tronco, braços e pernas em blocos.
+    // Os ossos e as animações são os mesmos; só muda a malha (bem mais leve).
+    bool bloco = false;
+    int chapeu = 0;           // 0 nada, 1 boné, 2 capacete, 3 touca ninja, 4 capacete com viseira
+    glm::vec4 chapeuCor{0.f};
+    bool colete = false;
+    glm::vec4 coleteCor{0.f};
+    int estampa = 0;          // camisa: 0 lisa, 1 listras deitadas, 2 listras em pé, 3 faixa diagonal, 4 três cores em pé, 5 gola e punhos
+    glm::vec4 cor2{1.f}, cor3{1.f};
+    bool bermuda = false;     // perna de fora do joelho para baixo
+    glm::vec4 luvas{0.f};     // alfa 0 = sem luva (mão de pele)
 };
 
 CharacterParams defaultCharacter();

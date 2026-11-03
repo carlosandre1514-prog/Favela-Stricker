@@ -541,6 +541,7 @@ void teamChoose(Engine* e, int team);
 // Antes do Play: lado, roupa (0..4 na lista do lado) e arma principal ("m4a1", "ak47"...; "" = a do projeto)
 void teamLoadout(Engine* e, int team, int skin, const std::string& primary, const std::string& secondary = "");
 bool teamSwapWeapon(Engine* e);     // troca rápida principal <-> segunda arma
+std::string teamSkinLook(int team, int skin);  // aparência do boneco da roupa (JSON)
 void teamGunSkin(Engine* e, const std::string& gun, const std::string& skin);  // skin da arma do jogador ("" = padrão)
 void applyKitTexture(Engine* e, GameObject& g, const std::string& kitName, float metal = -1.f, float rough = -1.f);  // textura de cor do kit no objeto
 void gunSkinFinish(const std::string& gun, const std::string& skin, float& metal, float& rough);  // acabamento da skin de arma

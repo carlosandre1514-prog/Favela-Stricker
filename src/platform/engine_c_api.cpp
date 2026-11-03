@@ -757,6 +757,7 @@ void engine_set_first_person(Engine* e, int on) {
 void engine_team_loadout(Engine* e, int team, int skin, const char* primary, const char* secondary) {
     if (e) eng::teamLoadout(e, team, skin, primary ? primary : "", secondary ? secondary : "");
 }
+const char* engine_team_skin_look(Engine* e, int team, int skin) { if (!e) return "{}"; e->toolResult = eng::teamSkinLook(team, skin); return e->toolResult.c_str(); }
 void engine_team_gun_skin(Engine* e, const char* gun, const char* skin) { if (e && gun) eng::teamGunSkin(e, gun, skin ? skin : ""); }
 int engine_player_swap(Engine* e) { return e && eng::teamSwapWeapon(e) ? 1 : 0; }
 int engine_player_grenade(Engine* e) { return e && eng::teamThrowGrenade(e) ? 1 : 0; }

@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Recorta as prévias de arma renderizadas pelo motor (SO_PREVIAS) em PNG com fundo transparente.
 
-Uso: python3 tools/recortar_previas.py <pasta_com_previa_*.png> <pasta_saida>
+Uso: python3 tools/recortar_previas.py <pasta_com_previa_*.png> <pasta_saida> [largura altura]
+(tamanho máximo da imagem final; padrão 360 x 140, o das armas; as fotos das roupas usam 300 x 420)
 O fundo é a imagem previa_fundo.png (a mesma cena sem a arma): o que difere dela é a arma.
 """
 import os
@@ -10,7 +11,7 @@ import sys
 from PIL import Image, ImageChops, ImageFilter
 
 
-def recortar(img, fundo):
+def recortar(img, fundo, larg=360, alt=140):
     dif = ImageChops.difference(img.convert('RGB'), fundo.convert('RGB')).convert('L')
     alfa = dif.point(lambda v: 0 if v < 6 else min(255, (v - 6) * 12)).filter(ImageFilter.MaxFilter(3)).filter(ImageFilter.GaussianBlur(0.7))
     out = img.convert('RGBA')
@@ -21,18 +22,19 @@ def recortar(img, fundo):
     m = 6
     caixa = (max(0, caixa[0] - m), max(0, caixa[1] - m), min(img.width, caixa[2] + m), min(img.height, caixa[3] + m))
     out = out.crop(caixa)
-    escala = min(360 / out.width, 140 / out.height)
+    escala = min(larg / out.width, alt / out.height)
     return out.resize((max(1, int(out.width * escala)), max(1, int(out.height * escala))), Image.LANCZOS)
 
 
 def main():
     entrada, saida = sys.argv[1], sys.argv[2]
+    larg, alt = (int(sys.argv[3]), int(sys.argv[4])) if len(sys.argv) > 4 else (360, 140)
     fundo = Image.open(os.path.join(entrada, 'previa_fundo.png'))
     os.makedirs(saida, exist_ok=True)
     for nome in sorted(os.listdir(entrada)):
         if not nome.startswith('previa_') or nome == 'previa_fundo.png':
             continue
-        r = recortar(Image.open(os.path.join(entrada, nome)), fundo)
+        r = recortar(Image.open(os.path.join(entrada, nome)), fundo, larg, alt)
         if r:
             destino = os.path.join(saida, nome[len('previa_'):])
             r.save(destino, optimize=True)

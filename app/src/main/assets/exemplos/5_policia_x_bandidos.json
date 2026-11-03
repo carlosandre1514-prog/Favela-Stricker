@@ -1,6 +1,6 @@
 {
  "ambiente": {
-  "chuva": "automatica",
+  "chuva": "nunca",
   "ciclo_min": 10.0,
   "exposicao": 1.0,
   "grade": true,
@@ -26,7 +26,9 @@
  "nome": "Polícia x Bandidos",
  "objetos": [
   {
-   "aparencia": "aleatorio",
+   "aparencia": {
+    "estilo": "bloco"
+   },
    "jogador": true,
    "nome": "Jogador",
    "pos": [
@@ -127,9 +129,7 @@
    "tipo": "loja"
   },
   {
-   "arquivo": "kit:personagens/skins/pm",
    "nome": "Sgt. Rocha",
-   "personagem": true,
    "pos": [
     -6.0,
     4.2,
@@ -138,12 +138,13 @@
    "rot_y": 180.0,
    "roupa": 0,
    "time": "policia",
-   "tipo": "modelo"
+   "tipo": "personagem",
+   "aparencia": {
+    "estilo": "bloco"
+   }
   },
   {
-   "arquivo": "kit:personagens/skins/rubro",
    "nome": "Magrão",
-   "personagem": true,
    "pos": [
     -4.0,
     23.5,
@@ -151,12 +152,13 @@
    ],
    "roupa": 0,
    "time": "bandidos",
-   "tipo": "modelo"
+   "tipo": "personagem",
+   "aparencia": {
+    "estilo": "bloco"
+   }
   },
   {
-   "arquivo": "kit:personagens/skins/civil",
    "nome": "Cb. Lima",
-   "personagem": true,
    "pos": [
     -3.0,
     4.2,
@@ -165,12 +167,13 @@
    "rot_y": 180.0,
    "roupa": 1,
    "time": "policia",
-   "tipo": "modelo"
+   "tipo": "personagem",
+   "aparencia": {
+    "estilo": "bloco"
+   }
   },
   {
-   "arquivo": "kit:personagens/skins/alvinegro",
    "nome": "Baixinho",
-   "personagem": true,
    "pos": [
     -1.0,
     23.5,
@@ -178,12 +181,13 @@
    ],
    "roupa": 1,
    "time": "bandidos",
-   "tipo": "modelo"
+   "tipo": "personagem",
+   "aparencia": {
+    "estilo": "bloco"
+   }
   },
   {
-   "arquivo": "kit:personagens/skins/exercito",
    "nome": "Sd. Nunes",
-   "personagem": true,
    "pos": [
     0.0,
     4.2,
@@ -192,12 +196,13 @@
    "rot_y": 180.0,
    "roupa": 2,
    "time": "policia",
-   "tipo": "modelo"
+   "tipo": "personagem",
+   "aparencia": {
+    "estilo": "bloco"
+   }
   },
   {
-   "arquivo": "kit:personagens/skins/tricolor",
    "nome": "Cabeça",
-   "personagem": true,
    "pos": [
     2.0,
     23.5,
@@ -205,12 +210,13 @@
    ],
    "roupa": 2,
    "time": "bandidos",
-   "tipo": "modelo"
+   "tipo": "personagem",
+   "aparencia": {
+    "estilo": "bloco"
+   }
   },
   {
-   "arquivo": "kit:personagens/skins/choque",
    "nome": "Ten. Costa",
-   "personagem": true,
    "pos": [
     3.0,
     4.2,
@@ -219,12 +225,13 @@
    "rot_y": 180.0,
    "roupa": 3,
    "time": "policia",
-   "tipo": "modelo"
+   "tipo": "personagem",
+   "aparencia": {
+    "estilo": "bloco"
+   }
   },
   {
-   "arquivo": "kit:personagens/skins/canarinho",
    "nome": "Zóio",
-   "personagem": true,
    "pos": [
     5.0,
     23.5,
@@ -232,12 +239,13 @@
    ],
    "roupa": 3,
    "time": "bandidos",
-   "tipo": "modelo"
+   "tipo": "personagem",
+   "aparencia": {
+    "estilo": "bloco"
+   }
   },
   {
-   "arquivo": "kit:personagens/skins/especial",
    "nome": "Sd. Alves",
-   "personagem": true,
    "pos": [
     6.0,
     4.2,
@@ -246,12 +254,13 @@
    "rot_y": 180.0,
    "roupa": 4,
    "time": "policia",
-   "tipo": "modelo"
+   "tipo": "personagem",
+   "aparencia": {
+    "estilo": "bloco"
+   }
   },
   {
-   "arquivo": "kit:personagens/skins/faixa",
    "nome": "Bigode",
-   "personagem": true,
    "pos": [
     8.0,
     23.5,
@@ -259,7 +268,10 @@
    ],
    "roupa": 4,
    "time": "bandidos",
-   "tipo": "modelo"
+   "tipo": "personagem",
+   "aparencia": {
+    "estilo": "bloco"
+   }
   }
  ],
  "regras": {

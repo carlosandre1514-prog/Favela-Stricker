@@ -289,6 +289,20 @@ CharacterParams characterParams(const json& spec, uint32_t seed) {
     if (auto k = a.find("estilo_cabelo"); k != a.end() && k->is_string())
         p.hairStyle = lookup(k->get<std::string>(), {{"careca", 0}, {"curto", 1}, {"comprido", 2}, {"longo", 2}, {"bone", 3}}, p.hairStyle);
     p.longSleeves = flag(a, "manga_comprida", p.longSleeves);
+    // estilo bloco (tipo Roblox) e a roupa dele
+    if (auto k = a.find("estilo"); k != a.end() && k->is_string()) p.bloco = k->get<std::string>() == "bloco";
+    if (auto k = a.find("chapeu"); k != a.end() && k->is_string())
+        p.chapeu = lookup(k->get<std::string>(), {{"nada", 0}, {"bone", 1}, {"capacete", 2}, {"touca", 3}, {"touca_ninja", 3}, {"viseira", 4}}, 0);
+    if (auto k = a.find("cor_chapeu"); k != a.end() && colorOf(*k, c)) p.chapeuCor = linear(c);
+    p.colete = flag(a, "colete", false);
+    if (auto k = a.find("cor_colete"); k != a.end() && colorOf(*k, c)) p.coleteCor = linear(c);
+    if (auto k = a.find("estampa"); k != a.end() && k->is_string())
+        p.estampa = lookup(k->get<std::string>(), {{"lisa", 0}, {"listras", 1}, {"listras_em_pe", 2}, {"faixa", 3}, {"tres_cores", 4}, {"gola", 5}}, 0);
+    if (auto k = a.find("cor2"); k != a.end() && colorOf(*k, c)) p.cor2 = linear(c);
+    if (auto k = a.find("cor3"); k != a.end() && colorOf(*k, c)) p.cor3 = linear(c);
+    p.bermuda = flag(a, "bermuda", false);
+    if (auto k = a.find("luvas"); k != a.end() && colorOf(*k, c)) p.luvas = linear(c);
+    if (p.bloco) { p.height = 1.75f; p.build = 1; }  // todos do mesmo tamanho
     return p;
 }
 

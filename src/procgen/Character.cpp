@@ -313,14 +313,110 @@ void wave(ClipWriter& w, const Joints& J) {
 
 }  // namespace
 
+
+// Corpo em blocos, parecido com os bonecos do Roblox (R15): cabeça quadrada com rostinho (olhos e sorriso),
+// tronco quadrado, braço (ombro, antebraço, mão) e perna (coxa, canela, pé) em blocos presos a um osso cada.
+// Roupa: cores de camisa/calça/tênis, estampas da camisa, colete, chapéu e luvas (CharacterParams).
+static void buildBlockBody(const CharacterParams& p, MeshBuilder& b, float H, float sx, float tx, float shoulderY, float elbowY,
+                    float wristY, float thighY, float kneeY, float ankleY) {
+    auto part = [&](int joint, glm::vec4 col, glm::vec3 center, glm::vec3 size) {
+        b.joint = joint; b.color = col; b.boxC(center, size);
+    };
+    const glm::vec4 preto = srgb(22, 22, 26);
+    const float tw = (sx - 0.05f * H) * 2.f, td = 0.12f * H;    // tronco: largura e profundidade
+    const float waist = thighY, chestTop = 0.84f * H;
+    // ---- tronco: cintura (calça), barriga e peito (camisa)
+    part(CJ_Hips, p.pants, {0, (waist + 0.6f * H) * 0.5f, 0}, {tw, 0.6f * H - waist + 0.002f * H, td});
+    part(CJ_Spine, p.shirt, {0, 0.64f * H, 0}, {tw, 0.08f * H, td});
+    part(CJ_Chest, p.shirt, {0, (0.68f * H + chestTop) * 0.5f, 0}, {tw, chestTop - 0.68f * H, td});
+    // estampas da camisa (um pouco por fora do tronco, para não piscar)
+    const float e = 0.004f * H, y0 = 0.6f * H, y1 = chestTop;
+    auto faixa = [&](int joint, glm::vec4 col, float ya, float yb, float xa, float xb, bool todaVolta) {
+        part(joint, col, {(xa + xb) * 0.5f, (ya + yb) * 0.5f, 0}, {xb - xa + (todaVolta ? 2.f * e : 0.f), yb - ya, td + 2.f * e});
+    };
+    if (p.estampa == 1) {  // listras deitadas (dão a volta na camisa)
+        for (float y = y0 + 0.03f * H; y + 0.03f * H <= y1; y += 0.06f * H) faixa(y < 0.68f * H ? CJ_Spine : CJ_Chest, p.cor2, y, y + 0.03f * H, -tw / 2, tw / 2, true);
+    } else if (p.estampa == 2) {  // listras em pé (frente e costas)
+        for (float x = -tw / 2 + 0.03f * H; x + 0.03f * H <= tw / 2 + 1e-4f; x += 0.06f * H) {
+            faixa(CJ_Spine, p.cor2, y0, 0.68f * H, x, x + 0.03f * H, false);
+            faixa(CJ_Chest, p.cor2, 0.68f * H, y1, x, x + 0.03f * H, false);
+        }
+    } else if (p.estampa == 4) {  // três cores em pé: camisa | cor2 | cor3
+        for (int k = 1; k < 3; ++k) {
+            float xa = -tw / 2 + tw * k / 3.f, xb = xa + tw / 3.f;
+            faixa(CJ_Spine, k == 1 ? p.cor2 : p.cor3, y0, 0.68f * H, xa, xb, k == 2);
+            faixa(CJ_Chest, k == 1 ? p.cor2 : p.cor3, 0.68f * H, y1, xa, xb, k == 2);
+        }
+    } else if (p.estampa == 3) {  // faixa na diagonal, do ombro esquerdo até o quadril direito (frente e costas)
+        for (float lado : {1.f, -1.f}) {
+            b.xf = glm::translate(glm::mat4(1.f), glm::vec3(0, (y0 + y1) * 0.5f, lado * (td / 2 + e * 0.5f))) *
+                   glm::rotate(glm::mat4(1.f), lado * 0.75f, glm::vec3(0, 0, 1));
+            part(CJ_Chest, p.cor2, {0, 0, 0}, {0.055f * H, (y1 - y0) * 1.25f, e});
+            b.xf = glm::mat4(1.f);
+        }
+    } else if (p.estampa == 5) {  // gola
+        part(CJ_Chest, p.cor2, {0, chestTop - 0.012f * H, 0}, {0.1f * H, 0.024f * H, td + 2.f * e});
+    }
+    if (p.colete) {  // colete por cima da camisa, com bolsos
+        part(CJ_Chest, p.coleteCor, {0, 0.745f * H, 0}, {tw + 4.f * e, 0.15f * H, td + 4.f * e});
+        part(CJ_Spine, p.coleteCor, {0, 0.655f * H, 0}, {tw + 4.f * e, 0.04f * H, td + 4.f * e});
+        for (float x : {-0.06f, 0.f, 0.06f})
+            part(CJ_Spine, p.coleteCor * 0.8f, {x * H, 0.66f * H, td / 2 + 3.f * e}, {0.04f * H, 0.05f * H, 0.02f * H});
+    }
+    // ---- cabeça: bloco com rostinho
+    const float hs = 0.15f * H, hy = 0.915f * H, hf = 0.07f * H;  // tamanho, centro e frente
+    const bool touca = p.chapeu == 3;
+    part(CJ_Neck, p.skin, {0, 0.842f * H, 0}, {0.07f * H, 0.02f * H, 0.07f * H});
+    part(CJ_Head, touca ? p.chapeuCor : p.skin, {0, hy, 0}, {hs, hs, 0.14f * H});
+    if (touca) part(CJ_Head, p.skin, {0, hy + 0.012f * H, hf + 0.0015f * H}, {0.115f * H, 0.04f * H, 0.003f * H});  // abertura dos olhos
+    for (float x : {-0.032f, 0.032f})
+        part(CJ_Head, preto, {x * H, hy + 0.012f * H, hf + 0.003f * H}, {0.018f * H, 0.03f * H, 0.004f * H});  // olhos
+    if (!touca) {  // sorriso
+        part(CJ_Head, preto, {0, hy - 0.035f * H, hf + 0.003f * H}, {0.04f * H, 0.008f * H, 0.004f * H});
+        for (float x : {-0.024f, 0.024f}) part(CJ_Head, preto, {x * H, hy - 0.028f * H, hf + 0.003f * H}, {0.01f * H, 0.012f * H, 0.004f * H});
+    }
+    const float topo = hy + hs / 2;
+    if (p.chapeu == 0 && !touca && p.hairStyle > 0) {  // cabelo: tampa em cima e atrás
+        part(CJ_Head, p.hair, {0, topo + 0.008f * H, -0.006f * H}, {hs + 0.008f * H, 0.022f * H, 0.152f * H});
+        part(CJ_Head, p.hair, {0, hy + 0.02f * H, -0.072f * H}, {hs + 0.008f * H, 0.1f * H, 0.012f * H});
+    } else if (p.chapeu == 1) {  // boné com aba
+        part(CJ_Head, p.chapeuCor, {0, topo + 0.012f * H, -0.004f * H}, {hs + 0.01f * H, 0.035f * H, 0.15f * H});
+        part(CJ_Head, p.chapeuCor * 0.85f, {0, topo - 0.002f * H, hf + 0.035f * H}, {hs * 0.85f, 0.01f * H, 0.07f * H});
+    } else if (p.chapeu == 2 || p.chapeu == 4) {  // capacete (e viseira escura no choque)
+        part(CJ_Head, p.chapeuCor, {0, topo - 0.015f * H, -0.004f * H}, {hs + 0.016f * H, 0.075f * H, 0.155f * H});
+        if (p.chapeu == 4) part(CJ_Head, srgb(30, 36, 48), {0, hy + 0.012f * H, hf + 0.01f * H}, {hs + 0.01f * H, 0.05f * H, 0.012f * H});
+    }
+    // ---- braços: ombro (camisa), antebraço (camisa ou pele), mão (pele ou luva)
+    const glm::vec4 mao = p.luvas.a > 0.f ? p.luvas : p.skin;
+    const float aw = 0.085f * H;
+    for (int side = 0; side < 2; ++side) {
+        float x = side ? -sx : sx;
+        int up = side ? CJ_RUpper : CJ_LUpper, fo = side ? CJ_RFore : CJ_LFore, ha = side ? CJ_RHand : CJ_LHand;
+        part(up, p.shirt, {x, (shoulderY + 0.015f * H + elbowY) * 0.5f, 0}, {aw, shoulderY + 0.015f * H - elbowY, aw});
+        if (p.estampa == 5) part(up, p.cor2, {x, elbowY + 0.008f * H, 0}, {aw + 2.f * e, 0.016f * H, aw + 2.f * e});  // punho da manga
+        part(fo, p.longSleeves ? p.shirt : p.skin, {x, (elbowY + wristY) * 0.5f, 0}, {aw * 0.96f, elbowY - wristY, aw * 0.96f});
+        part(ha, mao, {x, wristY - 0.035f * H, 0.004f * H}, {aw * 0.92f, 0.07f * H, aw * 0.8f});
+    }
+    // ---- pernas: coxa e canela (calça ou bermuda), pé (tênis)
+    const float lw = 0.115f * H;
+    for (int side = 0; side < 2; ++side) {
+        float x = side ? -tx : tx;
+        int th = side ? CJ_RThigh : CJ_LThigh, sh = side ? CJ_RShin : CJ_LShin, ft = side ? CJ_RFoot : CJ_LFoot;
+        part(th, p.pants, {x, (thighY + kneeY) * 0.5f, 0}, {lw, thighY - kneeY + 0.01f * H, td * 0.95f});
+        part(sh, p.bermuda ? p.skin : p.pants, {x, (kneeY + ankleY) * 0.5f + 0.01f * H, 0}, {lw * 0.94f, kneeY - ankleY + 0.01f * H, td * 0.9f});
+        part(ft, p.shoes, {x, 0.03f * H, 0.018f * H}, {lw * 0.98f, 0.06f * H, td * 1.15f});
+    }
+}
+
 void buildCharacter(const CharacterParams& p, LoadedModel& out, MeshBuilder& b) {
     const float H = p.height;
     const float s = p.build == 0 ? 0.85f : p.build == 2 ? 1.2f : 1.f;
     Joints J;
-    const float chestHalf = 0.115f * H * s, armHalf = 0.034f * H * (0.9f + 0.1f * s);
-    const float sx = chestHalf + armHalf + 0.004f * H, tx = 0.055f * H * s;
-    const float shoulderY = 0.825f * H, elbowY = shoulderY - 0.175f * H, wristY = elbowY - 0.155f * H;
-    const float thighY = 0.52f * H, kneeY = 0.285f * H, ankleY = 0.045f * H;
+    // bloco (tipo Roblox): tronco largo e quadrado, braços e pernas grossos
+    const float chestHalf = p.bloco ? 0.12f * H : 0.115f * H * s, armHalf = p.bloco ? 0.05f * H : 0.034f * H * (0.9f + 0.1f * s);
+    const float sx = chestHalf + armHalf + (p.bloco ? 0.f : 0.004f * H), tx = p.bloco ? 0.06f * H : 0.055f * H * s;
+    const float shoulderY = 0.825f * H, elbowY = shoulderY - (p.bloco ? 0.165f : 0.175f) * H, wristY = elbowY - (p.bloco ? 0.15f : 0.155f) * H;
+    const float thighY = (p.bloco ? 0.5f : 0.52f) * H, kneeY = (p.bloco ? 0.27f : 0.285f) * H, ankleY = 0.045f * H;
     glm::vec3 pos[CJ_Total] = {
         {0, 0.53f * H, 0}, {0, 0.62f * H, 0}, {0, 0.72f * H, 0}, {0, 0.865f * H, 0},
         {sx, shoulderY, 0}, {sx, elbowY, 0}, {sx, wristY, 0}, {-sx, shoulderY, 0}, {-sx, elbowY, 0}, {-sx, wristY, 0},
@@ -383,6 +479,9 @@ void buildCharacter(const CharacterParams& p, LoadedModel& out, MeshBuilder& b) 
     auto part = [&](int joint, glm::vec4 col, glm::vec3 center, glm::vec3 size) {
         b.joint = joint; b.color = col; b.boxC(center, size);
     };
+    if (p.bloco) {
+        buildBlockBody(p, b, H, sx, tx, shoulderY, elbowY, wristY, thighY, kneeY, ankleY);
+    } else {
     glm::vec4 dark = srgb(25, 20, 18), white = srgb(245, 245, 245), lips = p.skin * glm::vec4(0.75f, 0.55f, 0.55f, 1.f);
     lips.a = 1.f;
     // tronco
@@ -443,6 +542,7 @@ void buildCharacter(const CharacterParams& p, LoadedModel& out, MeshBuilder& b) 
         part(sh, p.pants, {x, (kneeY + ankleY) / 2 + 0.01f * H, 0}, {0.076f * H * s, kneeY - ankleY + 0.01f * H, 0.082f * H * s});
         part(ft, p.shoes, {x, 0.026f * H, 0.026f * H}, {0.078f * H, 0.052f * H, 0.155f * H});
     }
+    }  // fim do corpo realista
     b.joint = -1;
     b.color = glm::vec4(1.f);
     // skinning rígido: todos os vértices já têm joints/weights do osso

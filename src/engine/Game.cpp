@@ -280,12 +280,34 @@ int enemyTarget(Engine* e) {
 
 
 // ================= Polícia x Bandidos (partida de times) =================
-// Roupas da partida: as skins de personagem do jogo (kit:personagens/skins), cada uma já com farda, colete,
-// capacete, boné e acessórios no próprio modelo
-struct SkinDef { const char* name; int price; const char* file; };
-const SkinDef kSkins[2][5] = {  // as 10 são gratuitas (skins pagas novas entram no mercado do jogo)
-    {{"PM", 0, "pm"}, {"Polícia Civil", 0, "civil"}, {"Exército", 0, "exercito"}, {"Choque", 0, "choque"}, {"Especial", 0, "especial"}},
-    {{"Rubro", 0, "rubro"}, {"Alvinegro", 0, "alvinegro"}, {"Tricolor", 0, "tricolor"}, {"Canarinho", 0, "canarinho"}, {"Faixa", 0, "faixa"}}};
+// Roupas da partida: o personagem é sempre o mesmo boneco em blocos (estilo Roblox); cada roupa é um conjunto
+// de cores, estampa da camisa, colete, chapéu e luvas. As 10 são gratuitas (pagas novas entram no mercado).
+struct SkinDef { const char* name; int price; const char* look; };
+const SkinDef kSkins[2][5] = {
+    {{"PM", 0, R"({"camisa":"#6E86A8","calca":"#25324A","tenis":"#16161A","chapeu":"bone","cor_chapeu":"#25324A","colete":true,"cor_colete":"#1E1E22","manga_comprida":true})"},
+     {"Polícia Civil", 0, R"({"camisa":"#1C1C20","calca":"#2E4A78","tenis":"#3A2A20","chapeu":"bone","cor_chapeu":"#1C1C20","colete":true,"cor_colete":"#2A2A2E","estampa":"gola","cor2":"#D9B24A"})"},
+     {"Exército", 0, R"({"camisa":"#5C6B3A","calca":"#4A5530","tenis":"#3B2E22","chapeu":"capacete","cor_chapeu":"#4E5A32","colete":true,"cor_colete":"#6B7A45","manga_comprida":true,"luvas":"#2E2A22"})"},
+     {"Choque", 0, R"({"camisa":"#16181C","calca":"#16181C","tenis":"#0E0E10","chapeu":"viseira","cor_chapeu":"#202228","colete":true,"cor_colete":"#2B2E34","manga_comprida":true,"luvas":"#0E0E10"})"},
+     {"Especial", 0, R"({"camisa":"#8A7A5C","calca":"#6E6046","tenis":"#3B3024","chapeu":"capacete","cor_chapeu":"#5E5440","colete":true,"cor_colete":"#4A4234","manga_comprida":true,"luvas":"#2A261E"})"}},
+    {{"Rubro", 0, R"({"camisa":"#C8202A","calca":"#18181C","tenis":"#F2F2F2","estampa":"listras","cor2":"#18181C","bermuda":true,"chapeu":"touca","cor_chapeu":"#18181C"})"},
+     {"Alvinegro", 0, R"({"camisa":"#F2F2F2","calca":"#18181C","tenis":"#18181C","estampa":"listras_em_pe","cor2":"#18181C","bermuda":true,"chapeu":"touca","cor_chapeu":"#18181C"})"},
+     {"Tricolor", 0, R"({"camisa":"#1E7A3C","calca":"#F2F2F2","tenis":"#F2F2F2","estampa":"tres_cores","cor2":"#F2F2F2","cor3":"#8E1B2E","bermuda":true,"chapeu":"bone","cor_chapeu":"#F2F2F2"})"},
+     {"Canarinho", 0, R"({"camisa":"#F5D21E","calca":"#1F4FA8","tenis":"#F2F2F2","estampa":"gola","cor2":"#1E8A3C","bermuda":true,"chapeu":"touca","cor_chapeu":"#1F4FA8"})"},
+     {"Faixa", 0, R"({"camisa":"#18181C","calca":"#18181C","tenis":"#F2F2F2","estampa":"faixa","cor2":"#F2F2F2","bermuda":true,"chapeu":"bone","cor_chapeu":"#18181C"})"}}};
+
+// Aparência do boneco de um lutador: a roupa do lado + tom de pele e cabelo que variam de pessoa para pessoa
+json fighterLook(int team, int skin, const std::string& name) {
+    json a = json::parse(kSkins[std::clamp(team, 0, 1)][std::clamp(skin, 0, 4)].look);
+    static const char* peles[] = {"#F2CCA8", "#E0AC84", "#C68C69", "#9A6444", "#6E4630", "#4E3222"};
+    static const char* cabelos[] = {"#1A1410", "#3C2818", "#5A3A20", "#141414"};
+    uint32_t h = 2166136261u;
+    for (char ch : name) h = (h ^ uint8_t(ch)) * 16777619u;
+    a["estilo"] = "bloco";
+    a["pele"] = peles[h % 6];
+    a["cabelo"] = cabelos[(h >> 8) % 4];
+    a["estilo_cabelo"] = "curto";
+    return a;
+}
 // Armas da partida (tabela de dano aprovada): dano no corpo (cabeça = 2,5x), intervalo entre tiros, dispersão do
 // robô, rajada do robô, bagos, pente, reserva e a partir de quantos metros o dano cai (até 30% bem de longe)
 struct GunDef { const char* key; const char* name; int price; int team; float dmg, interval, spread; int burst, pellets, mag, reserve; float falloff; };
@@ -384,8 +406,7 @@ std::string g_killWeapon;  // arma do abate em andamento ("" = a arma de quem at
 
 // Cria (ou recria, ao trocar de roupa) o personagem em jogo do lutador, em pos/yaw
 void spawnFighterBody(Engine* e, Fighter& f, glm::vec3 pos, float yaw) {
-    const SkinDef& sk = kSkins[f.team][std::clamp(f.skin, 0, 4)];
-    json spec = {{"tipo", "modelo"}, {"arquivo", std::string("kit:personagens/skins/") + sk.file}, {"personagem", true}};
+    json spec = {{"tipo", "personagem"}, {"aparencia", fighterLook(f.team, f.skin, f.name)}, {"semente", 7}};
     spec["pos"] = {pos.x, pos.y, pos.z};
     spec["rot_y"] = glm::degrees(yaw);
     spec["nome"] = f.name;
@@ -1383,6 +1404,13 @@ void teamLoadout(Engine* e, int team, int skin, const std::string& primary, cons
     M.playerSkin = skin;
     M.playerPrimary = primary;
     M.playerSecondary = secondary;
+}
+
+// Aparência (JSON) do boneco de uma roupa: usada pelas fotos das roupas nas telas do jogo
+std::string teamSkinLook(int team, int skin) {
+    json a = fighterLook(team, skin, "retrato");
+    a["pele"] = "#C68C69";
+    return a.dump();
 }
 
 void teamGunSkin(Engine* e, const std::string& gun, const std::string& skin) { e->match.gunSkins[gun] = skin; }

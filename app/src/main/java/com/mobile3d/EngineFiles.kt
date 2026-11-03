@@ -9,6 +9,8 @@ object EngineFiles {
     fun copy(ctx: Context, progress: (Int, Int) -> Unit = { _, _ -> }): String {
         val assets = ctx.assets
         val dir = File(ctx.filesDir, "shaders").apply { mkdirs() }
+        // pastas que saíram do jogo (skins antigas e plantas): libera o espaço no celular
+        for (velha in listOf("kit/personagens/skins", "kit/vegetacao")) File(dir, velha).deleteRecursively()
         for (name in assets.list("").orEmpty()) {
             if (!(name.endsWith(".vert") || name.endsWith(".frag") || name.endsWith(".glsl") || name.endsWith(".jpg"))) continue
             assets.open(name).use { input -> File(dir, name).outputStream().use { input.copyTo(it) } }
