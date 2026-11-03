@@ -26,6 +26,7 @@
 #include "jogo/jogo_api.h"
 #include "engine/Engine.h"
 #include "jogo/Partida.h"
+#include "jogo/MapaFavela.h"
 
 static const int W = 960, H = 540;
 static GLuint g_fbo = 0;
@@ -60,6 +61,7 @@ static void stats(Engine* e, const char* label) {
 
 
 int main(int argc, char** argv) {
+    setvbuf(stdout, nullptr, _IOLBF, 0);  // mensagens na hora (testes longos)
     if (argc < 3) { std::printf("uso: %s <shaders> <saida>\n", argv[0]); return 2; }
     std::string out = argv[2];
 
@@ -440,6 +442,63 @@ int main(int argc, char** argv) {
             engine_set_quality(e, 3);
             engine_remove_object(e, id);
         }
+        engine_destroy(e);
+        std::printf(g_fail ? "FALHOU\n" : "OK\n");
+        return g_fail ? 1 : 0;
+    }
+    // Caminhada pelas escadarias principais: o boneco anda (e corre) por cada rota e o teste anota onde ele trava
+    // (velocidade bem abaixo da pedida por vários quadros seguidos). SO_CAMINHADA=1
+    if (std::getenv("SO_CAMINHADA")) {
+        abrirPartida();
+        jogo_escolhas(e, 1, 0, "ak47", "tt33");
+        engine_set_play(e, 1);
+        frames(e, 10);
+        const int ch = engine_player_id(e);
+        int travadas = 0, quadros = 0;
+        double perda = 0.0;
+        const size_t nRotas = std::getenv("ROTAS") ? size_t(std::atoi(std::getenv("ROTAS"))) : eng::favelaRotas().size();
+        for (int corre = 0; corre < 2; ++corre)
+        for (size_t ri = 0; ri < std::min(nRotas, eng::favelaRotas().size()); ++ri) {
+            const auto& rt = eng::favelaRotas()[ri];
+            for (int sentido = 0; sentido < 2; ++sentido) {
+                std::vector<glm::vec2> pts(rt.begin(), rt.end());
+                if (sentido) std::reverse(pts.begin(), pts.end());
+                float p[3], r[3], sc[3];
+                engine_get_transform(e, ch, p, r, sc);
+                p[0] = pts[0].x; p[2] = pts[0].y; p[1] = 60.f;  // cai no começo da rota
+                engine_set_transform(e, ch, p, r, sc);
+                for (int k = 0; k < 60; ++k) frames(e, 1);
+                size_t alvo = 1;
+                glm::vec3 ant(p[0], p[1], p[2]);
+                int lento = 0;
+                const float pedida = corre ? 6.5f : 2.6f;
+                for (int k = 0; k < 60 * 90 && alvo < pts.size(); ++k) {
+                    engine_get_transform(e, ch, p, r, sc);
+                    glm::vec2 pos(p[0], p[2]);
+                    if (glm::length(pts[alvo] - pos) < 1.2f) { ++alvo; continue; }
+                    glm::vec2 d = glm::normalize(pts[alvo] - pos);
+                    engine_set_camera(e, p[0], p[1] + 1.f, p[2], 0.f, 0.3f, 4.f);
+                    engine_player_input(e, d.x, -d.y, corre);
+                    frames(e, 1);
+                    engine_get_transform(e, ch, p, r, sc);
+                    glm::vec3 agora(p[0], p[1], p[2]);
+                    float v = glm::length(glm::vec2(agora.x - ant.x, agora.z - ant.z)) * 60.f;
+                    ant = agora;
+                    ++quadros;
+                    perda += std::max(0.f, pedida - v) / pedida;
+                    if (v < pedida * 0.4f) {
+                        if (++lento == 6) {
+                            ++travadas;
+                            if (travadas <= 25) std::printf("  trava: rota %zu %s %s em (%.1f, %.1f, %.1f) v=%.2f\n", ri, sentido ? "descendo" : "subindo",
+                                                            corre ? "correndo" : "andando", agora.x, agora.y, agora.z, v);
+                        }
+                    } else lento = 0;
+                }
+                if (alvo < pts.size()) { std::printf("  [ERRO] rota %zu não chegou ao fim (parou no ponto %zu de %zu)\n", ri, alvo, pts.size()); ++g_fail; }
+                engine_player_input(e, 0.f, 0.f, 0);
+            }
+        }
+        std::printf("  travadas: %d · velocidade perdida em média: %.0f%% (%d quadros)\n", travadas, perda / std::max(1, quadros) * 100.0, quadros);
         engine_destroy(e);
         std::printf(g_fail ? "FALHOU\n" : "OK\n");
         return g_fail ? 1 : 0;

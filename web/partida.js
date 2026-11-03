@@ -344,7 +344,7 @@ function ligarControlesToque(t) {
     ctxAudio();
     dedoAndar = e.pointerId;
     [ox, oy] = pontoPalco(e);
-    // analógico flutuante: aparece onde o dedo encostou
+    // analógico flutuante: aparece onde o dedo encostou e fica parado ali enquanto o dedo não soltar
     analog.style.left = ox + 'px';
     analog.style.top = oy + 'px';
     capturar(e.currentTarget, e.pointerId);
@@ -356,10 +356,9 @@ function ligarControlesToque(t) {
     const R = raio();
     let dx = (px - ox) / R, dy = (py - oy) / R;
     const len = Math.hypot(dx, dy);
-    if (len > 1) {  // passou da borda: o analógico acompanha o dedo
-      ox += (dx - dx / len) * R; oy += (dy - dy / len) * R; dx /= len; dy /= len;
-      analog.style.left = ox + 'px'; analog.style.top = oy + 'px';
-    }
+    // a base fica parada onde o dedo encostou (até soltar); o dedo pode ir para qualquer lugar da tela e a
+    // bolinha fica na borda, apontando para o lado do dedo
+    if (len > 1) { dx /= len; dy /= len; }
     bola.style.transform = `translate(${dx * R * 0.55 / layout.analogico.s}px, ${dy * R * 0.55 / layout.analogico.s}px)`;
     motor.andar(dx, -dy, -dy > 0.93);  // empurrando até o fim para frente: corre
   };

@@ -993,6 +993,8 @@ void favelaNavGraph(Engine* e, std::vector<glm::vec3>& nodes, std::vector<std::v
     }
 }
 
+const std::vector<std::vector<glm::vec2>>& favelaRotas() { return favelaRoutes(); }
+
 void registrarMapaFavela() {
     registerMap({"favela", genFavela, [](Engine* e, float x, float z) { return favelaHeight(x, z, e->mapSeed); }});
 }
