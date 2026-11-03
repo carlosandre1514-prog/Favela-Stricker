@@ -21,16 +21,26 @@ Tem duas versões, as duas com **as mesmas telas** (pasta `web/`) e ligadas ao m
 - **Site:** o motor compilado para WebAssembly. O GitHub Actions (**Site do jogo**) monta e publica no ramo `site`;
   o Render coloca no ar.
 
+## Jogo e motor
+
+O Favela Stricker é um jogo feito **com** o motor, do mesmo jeito que os jogos feitos com outros motores:
+
+- o **motor** (`motor/`) é uma biblioteca separada, sem editor, que não conhece nada do jogo. Ele desenha,
+  simula a física, anima, carrega modelos e monta mapas a partir de geradores cadastrados;
+- o **jogo** (`jogo/`) liga o módulo dele no motor (`GameModule`: Play, quadro, dano, interagir...),
+  cadastra o mapa da Favela (`registerMap`) e oferece a API dele (`jogo_api.h`) para o app e o site.
+
 ## O que tem em cada pasta
 
 | Pasta | O que é |
 |---|---|
-| `src/` | o motor 3D (C++): gráficos, física, personagens, armas, a partida, a loja da partida e o online |
+| `jogo/` | **o jogo** (C++): a partida Polícia x Bandidos (robôs, loja, granadas, online), o mapa da Favela, a API do jogo (`jogo_api.h`) e a ligação com o Android e o site (`plataforma/`) |
+| `motor/` | **o motor 3D** (C++), à parte: gráficos, física, cena, animação, modelos, peças e mapas cadastrados. Não tem editor e não sabe nada do jogo |
 | `shaders/` | os arquivos do jogo: shaders, modelos (skins, armas, mapa), animações, texturas |
 | `web/` | as telas do jogo (HTML/JS): `motor.js` (ponte com o motor), `conta.js` (catálogo, conta, salas), `ui.js`, `partida.js` (HUD, controles, editor do HUD, partida ao vivo, voz), `jogo.js` (telas) |
 | `app/` | o app Android (Kotlin): motor + WebView com as telas (`JogoActivity`, `PonteJogo`), sons |
 | `servidor/` | o servidor (Node.js) do Render: entrega o site e faz as partidas ao vivo e a voz |
-| `tools/` | testes do motor sem celular (`headless_test.cpp`), gerador das skins de fuzil e das prévias da loja |
+| `tools/` | testes do jogo sem celular (`teste_jogo.cpp`), molde e montador de skins, gerador das skins de fuzil e das prévias da loja |
 
 A configuração do Firebase e o endereço do servidor ficam em `app/src/main/assets/config_jogo.json` (APK)
 e `web/config_jogo.js` (site).
@@ -71,10 +81,11 @@ Enquanto isso, a partida online segue pelo Firebase (sem voz).
 ## Testes no PC (sem celular)
 
 ```
-cmake -S . -B build && cmake --build build --target mobile3d_headless
-SO_ONLINE=1 ./build/mobile3d_headless shaders saida        # partida online simulada
+cmake -S . -B build && cmake --build build --target favela_testes
+./build/favela_testes shaders saida                        # partida e online
+SO_ESCADA_EXTERNA=1 ./build/favela_testes shaders saida    # sobe a escada até a laje sem cair
 echo 0 > shaders/qualidade.txt                             # nível Leve
-SO_MEMORIA=app/src/main/assets/exemplos/5_policia_x_bandidos.json ./build/mobile3d_headless shaders saida
+SO_MEMORIA=app/src/main/assets/exemplos/5_policia_x_bandidos.json ./build/favela_testes shaders saida
 ```
 
 ## Créditos

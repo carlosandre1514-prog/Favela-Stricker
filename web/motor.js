@@ -1,5 +1,5 @@
 // Favela Stricker — ponte com o motor 3D.
-// No site o motor é WebAssembly (favela.js, funções web_* de src/platform/web_main.cpp).
+// No site o motor é WebAssembly (favela.js, funções web_* de jogo/plataforma/web_main.cpp).
 // No APK a página roda num WebView por cima do motor nativo e fala com ele pelo objeto Nativo
 // (app/src/main/java/com/mobile3d/PonteJogo.kt). As telas usam só o objeto `motor` abaixo.
 'use strict';

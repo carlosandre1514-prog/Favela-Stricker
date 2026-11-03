@@ -11,7 +11,7 @@
 #include "assets/TextureManager.h"
 #include "engine/Engine.h"
 
-// O tipo opaco da API C é o estado do motor (eng::Engine, em src/engine/Engine.h)
+// O tipo opaco da API C é o estado do motor (eng::Engine, em motor/engine/Engine.h)
 struct Engine : eng::Engine {};
 
 using eng::AABB;

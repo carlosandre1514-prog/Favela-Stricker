@@ -6,7 +6,7 @@
 #include <string>
 #include <vector>
 #include "assets/GltfLoader.h"
-#include "editor/EditorCamera.h"
+#include "scene/EditorCamera.h"
 #include "physics/Physics.h"
 #include "procgen/Buildings.h"
 #include "procgen/Character.h"
@@ -315,7 +315,6 @@ GameObject* objectById(Engine* e, int id);
 int registerObject(Engine* e, Scene::Handle h);
 glm::mat4 renderMatrix(const Engine* e, const GameObject& go, const glm::mat4** palette);
 bool subtreeBounds(Engine* e, GameObject& root, AABB& out);
-void focusSceneOrSelection(Engine* e);
 void applyQualityLevel(Engine* e, int nivel);  // 0 Leve · 1 Padrão · 2 Intermediária · 3 Ultra
 void warmWeaponModel(Engine* e, const std::string& file, int kind);  // carrega as peças de uma arma (sem pôr na cena)
 void releaseComponents(Engine* e, GameObject& g);

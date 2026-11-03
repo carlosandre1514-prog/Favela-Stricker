@@ -43,12 +43,14 @@ jobs:
       - name: Compilar
         run: |
           cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-          cmake --build build -j4 --target mobile3d_headless
+          cmake --build build -j4 --target favela_testes
       - name: Partida online simulada
         run: |
           mkdir -p saida
-          SO_ONLINE=1 ./build/mobile3d_headless shaders saida
+          SO_ONLINE=1 ./build/favela_testes shaders saida
+      - name: Escada externa (sobe até a laje sem cair)
+        run: SO_ESCADA_EXTERNA=1 ./build/favela_testes shaders saida
       - name: Memória no nível Leve (o mesmo mapa do APK)
         run: |
           echo 0 > shaders/qualidade.txt
-          SO_MEMORIA=app/src/main/assets/exemplos/5_policia_x_bandidos.json ./build/mobile3d_headless shaders saida
+          SO_MEMORIA=app/src/main/assets/exemplos/5_policia_x_bandidos.json ./build/favela_testes shaders saida

@@ -28,9 +28,9 @@ jobs:
       - name: Cache das texturas (motor no Linux)
         run: |
           cmake -S . -B build-pc -DCMAKE_BUILD_TYPE=Release -DMOTOR_CACHE_KEY=${{ github.sha }}
-          cmake --build build-pc -j4 --target mobile3d_headless
+          cmake --build build-pc -j4 --target favela_testes
           mkdir -p saida
-          SO_ONLINE=1 ./build-pc/mobile3d_headless shaders saida
+          SO_ONLINE=1 ./build-pc/favela_testes shaders saida
           ls -la shaders/cache
 
       - uses: mymindstorm/setup-emsdk@v14

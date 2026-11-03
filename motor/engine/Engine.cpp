@@ -56,29 +56,6 @@ bool subtreeBounds(Engine* e, GameObject& root, AABB& out) {
     return any;
 }
 
-static void focusBounds(Engine* e, const AABB& b) {
-    glm::vec3 c = (b.min + b.max) * 0.5f;
-    float radius = std::max(glm::length(b.max - b.min) * 0.5f, 0.05f);
-    e->editorCam.target = c;
-    e->editorCam.distance = std::clamp(radius / std::tan(glm::radians(e->camera.fovYDeg) * 0.5f) * 1.1f, 0.3f, 5000.f);
-}
-
-void focusSceneOrSelection(Engine* e) {
-    e->scene.updateTransforms();
-    AABB total{glm::vec3(1e30f), glm::vec3(-1e30f)};
-    bool any = false;
-    if (GameObject* sel = e->scene.get(e->selected)) any = subtreeBounds(e, *sel, total);
-    if (!any) {
-        e->scene.forEach([&](GameObject& g, Scene::Handle) {
-            if (g.transform.parent || g.id < 0) return;          // cenário de mapa não conta
-            if (std::strcmp(g.name, "Chao") == 0) return;        // nem o chão
-            AABB b;
-            if (subtreeBounds(e, g, b)) { total.min = glm::min(total.min, b.min); total.max = glm::max(total.max, b.max); any = true; }
-        });
-    }
-    if (any) focusBounds(e, total);
-}
-
 void releaseComponents(Engine* e, GameObject& g) {
     if (g.rigidBody) {
         RigidBody* rb = g.rigidBody;
@@ -1746,21 +1723,6 @@ void drawEffectsOverlay(Engine* e, const glm::mat4& vp, bool editor) {
         e->renderer.line(vp, p + glm::vec3(0, 0, -s), p + glm::vec3(0, 0, s), col, 2.f, false);
         e->renderer.line(vp, p, p + glm::vec3(0, 2.f * s, 0), col, 2.f, false);
     });
-}
-
-bool pickEmitter(Engine* e, glm::vec3 o, glm::vec3 d, float& best, GameObject*& hit) {
-    bool any = false;
-    e->emitters.forEach([&](Emitter& em, EmitterPool::Handle) {
-        if (!em.owner || em.owner->id < 0) return;
-        glm::vec3 c = em.owner->transform.worldPosition() + glm::vec3(0, 0.5f, 0);
-        float r = 0.8f * std::max(0.3f, em.owner->transform.scale.x);
-        glm::vec3 oc = o - c;
-        float b = glm::dot(oc, d), cc = glm::dot(oc, oc) - r * r, disc = b * b - cc;
-        if (disc < 0.f) return;
-        float t = -b - std::sqrt(disc);
-        if (t > 0.f && t < best) { best = t; hit = em.owner; any = true; }
-    });
-    return any;
 }
 
 // ---------------- modelo importado -> personagem ----------------

@@ -1,6 +1,7 @@
 #pragma once
 #include <stdint.h>
-// API C estável: consumida via JNI (Android), dart:ffi (Flutter) e Swift/ObjC (iOS).
+// API C do motor (runtime, sem editor): tela, câmera, Play, controles do jogador, cena por receitas.
+// O jogo tem a API dele por cima (jogo/jogo_api.h).
 // Todas as funções devem ser chamadas na thread que tem o contexto GL (thread de render).
 #ifdef __cplusplus
 extern "C" {

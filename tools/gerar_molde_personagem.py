@@ -10,7 +10,7 @@ Gera:
 
 Cada parte é uma caixa aberta em cruz:  [LADO DIREITO][FRENTE][LADO ESQUERDO][COSTAS], com o TOPO em cima
 da FRENTE e a BASE embaixo dela. "Direito/esquerdo" são do boneco (o lado direito dele fica à esquerda
-de quem olha de frente). As medidas são as do motor (src/procgen/Character.cpp, buildBlockBody).
+de quem olha de frente). As medidas são as do motor (motor/procgen/Character.cpp, buildBlockBody).
 
 Uso: python3 tools/gerar_molde_personagem.py
 """
