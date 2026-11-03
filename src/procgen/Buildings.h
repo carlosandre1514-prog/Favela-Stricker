@@ -155,6 +155,7 @@ struct ModuleSpec {
     float stairsW = 1.f;
     int stairsLane = 0;
     bool stairsToFront = false;
+    bool stairsZigzag = false;  // escada em zigue-zague: patamar no fim de cada lance (o próximo sai dele)
 };
 // Altura do topo do módulo (onde o próximo andar começa)
 float moduleTop(const ModuleSpec& s);

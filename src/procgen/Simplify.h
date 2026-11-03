@@ -12,4 +12,8 @@ namespace eng {
 // Devolve os triângulos que sobraram; os vértices sem uso saem de v.
 void simplifyMesh(std::vector<Vertex>& v, std::vector<uint32_t>& idx, float ratio, float maxErro = 0.012f);
 
+// Versão de longe (bem grosseira): junta os vértices que caem no mesmo cubinho de uma grade com `res` cubos no lado
+// maior da malha (e com a normal para o mesmo lado). Ignora costuras de textura: serve para o que só aparece longe.
+void clusterSimplify(std::vector<Vertex>& v, std::vector<uint32_t>& idx, int res);
+
 }  // namespace eng

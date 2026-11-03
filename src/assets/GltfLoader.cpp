@@ -274,7 +274,12 @@ bool loadGltf(const char* path, LoadContext& ctx, LoadedModel& out) {
     for (size_t mi = 0; mi < model.meshes.size(); ++mi)
         for (size_t pi = 0; pi < model.meshes[mi].primitives.size(); ++pi) {
             const auto& prim = model.meshes[mi].primitives[pi];
-            const std::string cacheKey = std::string(path) + "#" + std::to_string(mi) + "#" + std::to_string(pi);
+            // personagens: a fração do nível; o resto (armas aparecem de perto) no máximo pela metade; a versão de
+            // longe das armas pede a sua (simplifyOverride)
+            const float fracao = renderer.simplifyOverride > 0.f ? renderer.simplifyOverride
+                               : personagem ? renderer.simplify : std::max(renderer.simplify, 0.5f);
+            const std::string cacheKey = std::string(path) + "#" + std::to_string(mi) + "#" + std::to_string(pi) + "#" +
+                                         std::to_string(int(fracao * 1000.f));
             auto cached = renderer.meshCache.find(cacheKey);
             MeshId id = cached != renderer.meshCache.end() ? cached->second : kInvalidId;
             if (id == kInvalidId) {
@@ -285,9 +290,8 @@ bool loadGltf(const char* path, LoadContext& ctx, LoadedModel& out) {
                     for (auto& vx : v)
                         for (int k = 0; k < 4; ++k) vx.joints[k] = uint16_t(vx.joints[k] < remap.size() ? remap[vx.joints[k]] : 0);
                 }
-                // personagens: a fração do nível; o resto (armas aparecem de perto) no máximo pela metade
-                const float fracao = personagem ? renderer.simplify : std::max(renderer.simplify, 0.5f);
-                if (fracao < 1.f) simplifyMesh(v, idx, fracao);
+                if (renderer.simplifyOverride > 0.f) clusterSimplify(v, idx, int(24.f + renderer.simplifyOverride * 200.f));
+                else if (fracao < 1.f) simplifyMesh(v, idx, fracao);
                 id = renderer.createMesh(v.data(), uint32_t(v.size()), idx.data(), uint32_t(idx.size()), skinned);
                 if (id == kInvalidId) continue;
                 renderer.meshCache[cacheKey] = id;

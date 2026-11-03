@@ -747,9 +747,9 @@ void favelaHouse(Geo& g, Rng& r, float w, float d, int floors, float footLow, bo
     const bool outsideStairs = r.chance(0.5f);
     const bool porchGround = frontOpen && r.chance(0.3f);
     // Escada externa do lado -X. Com mais de um andar: zigue-zague em 2 corredores de 0,9 m (cada andar no outro
-    // corredor e no outro sentido; o último lance chega colado na laje do telhado). Casa estreita demais para
-    // isso: a escada externa só vai até a primeira laje.
-    const bool zigzag = outsideStairs && floors > 1 && w - 1.85f >= 2.4f;
+    // corredor e no outro sentido, com patamar no fim de cada lance; o último lance chega colado na laje do
+    // telhado). Casa estreita ou curta demais para isso: a escada externa só vai até a primeira laje.
+    const bool zigzag = outsideStairs && floors > 1 && w - 1.85f >= 2.4f && d >= 5.f;  // fundo para lance + 2 patamares
     const float lane = zigzag ? 0.9f : 1.f;
     const float stairsBand = outsideStairs ? (zigzag ? 2.f * lane : lane) + 0.05f : 0.f;
     float bw = w - stairsBand;
@@ -789,6 +789,7 @@ void favelaHouse(Geo& g, Rng& r, float w, float d, int floors, float footLow, bo
             const int fromTop = floors - 1 - f;               // o último lance fica no corredor colado na casa
             ms.stairsLane = zigzag ? fromTop % 2 : 0;
             ms.stairsToFront = zigzag && f % 2 == 1;         // lances alternam o sentido
+            ms.stairsZigzag = zigzag;
         } else if (outsideStairs) {
         } else if (bd >= 4.4f && bw >= 3.4f) ms.stairs = SK_Straight;
         ms.porch = f == 0 ? porchGround : (frontOpen && r.chance(0.3f));
@@ -1005,6 +1006,9 @@ void genFavela(Engine* e, Rng& r, glm::vec3& spawn, float& spawnYaw) {
 
     // ---- casas: lotes em grade, becos entre eles ----
     std::vector<std::pair<glm::vec2, glm::vec2>> lots;  // centro, meio tamanho (para os testes)
+    int houseTotal = 0, houseKept = 0;
+    const float kHouseThinFrom = 1.12f;   // a partir daqui (fração do raio da favela) as casas ficam mais raras
+    const unsigned kHouseThinKeep = 35;   // % das casas que ficam nessa faixa
     const float pitchX = 7.6f, pitchZ = 7.2f;
     for (float gz = -94.f; gz < 92.f; gz += pitchZ)
         for (float gx = -98.f; gx < 98.f; gx += pitchX) {
@@ -1045,11 +1049,28 @@ void genFavela(Engine* e, Rng& r, glm::vec3& spawn, float& spawnYaw) {
             float w = yaw == 0.f ? lw : ld, d = yaw == 0.f ? ld : lw;
             bool frontOpen = true;
             glm::vec3 pos(c.x, mx + 0.05f, c.y);
+            // Mapa mais leve: na beirada do morro (longe do miolo onde a partida acontece) só fica parte das casas.
+            // A casa que sai é montada numa peça descartada, para os sorteios (e o resto do mapa) não mudarem; o lote
+            // fica de chão batido (sem cimento). Igual para todo mundo (online: o mapa é o mesmo em todo aparelho).
+            const float edge = favelaEdge(c.x, c.y);
+            uint32_t hh = uint32_t(int(c.x * 10.f)) * 73856093u ^ uint32_t(int(c.y * 10.f)) * 19349663u;
+            hh ^= hh >> 13; hh *= 0x5bd1e995u; hh ^= hh >> 15;
+            const bool keep = edge < kHouseThinFrom || (hh % 100u) < kHouseThinKeep;
+            ++houseTotal;
+            if (!keep) {
+                Geo descarte;
+                descarte.place(pos, yaw);
+                favelaHouse(descarte, r, w, d, floors, mx - mn + 0.05f, frontOpen);
+                lots.push_back({c, hs});
+                continue;
+            }
+            ++houseKept;
             Geo& g = cells.at(pos);
             g.place(pos, yaw);
             favelaHouse(g, r, w, d, floors, mx - mn + 0.05f, frontOpen);
             lots.push_back({c, hs});
         }
+    if (std::getenv("MAPA_DEBUG")) std::printf("  casas: %d de %d\n", houseKept, houseTotal);
 
     // ---- chão cimentado (becos, quintais), com alguns cantos de terra; onde é muito inclinado vira escadinha ----
     {

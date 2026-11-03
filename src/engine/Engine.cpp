@@ -511,6 +511,7 @@ static Scene::Handle spawnParts(Engine* e, const std::vector<ProtoPart>& parts, 
         auto rh = e->meshRenderers.acquire();
         if (MeshRenderer* mr = e->meshRenderers.get(rh)) {
             mr->mesh = pp.mesh; mr->material = material != kInvalidId ? material : pp.mat; mr->castShadows = true;
+            mr->lodNear = pp.lodNear; mr->lodFar = pp.lodFar;
             c->meshRenderer = mr;
         }
         registerObject(e, ch);
@@ -591,6 +592,19 @@ static Scene::Handle spawnWeaponModel(Engine* e, int kind, const WeaponLook& loo
         if (!modelParts(e, look.file, nullptr, parts, b)) {
             if (e->lastError.empty()) e->lastError = "o arquivo não tem malha para virar arma";
             return {};
+        }
+        // Versão de longe (bem poucos triângulos): a arma da mão e as de perto ficam detalhadas; as dos outros
+        // lutadores, a partir de alguns metros, usam esta (as armas eram mais da metade dos triângulos da partida)
+        static const float kLowFrac[4] = {0.06f, 0.08f, 0.12f, 0.2f}, kLowDist[4] = {4.f, 5.f, 7.f, 12.f};
+        const int nv = std::clamp(e->nivel, 0, 3);
+        std::vector<ProtoPart> low;
+        AABB lb;
+        e->renderer.simplifyOverride = kLowFrac[nv];
+        const bool okLow = modelParts(e, look.file, nullptr, low, lb);
+        e->renderer.simplifyOverride = 0.f;
+        if (okLow && low.size() == parts.size()) {
+            for (ProtoPart& p : parts) p.lodFar = kLowDist[nv];
+            for (ProtoPart& p : low) { p.lodNear = kLowDist[nv]; parts.push_back(p); }
         }
         glm::vec3 ext = b.max - b.min;
         glm::mat4 R(1.f);

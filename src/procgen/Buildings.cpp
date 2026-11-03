@@ -511,6 +511,64 @@ void railing(Geo& g, float x0, float z0, float x1, float z1, float y, float h) {
     g.collider({mn.x - 0.05f, y, mn.y - 0.05f}, {mx.x - mn.x + 0.1f, h, mx.y - mn.y + 0.1f});
 }
 
+// Guarda-corpo ao longo de um lance (na lateral x), acompanhando os degraus, com colisão em cada degrau
+static void stairsSideRail(Geo& g, float x, float zs, float dir, float run, float rise) {
+    DetailScope ds(g);  // a grade só aparece de perto (a colisão vale sempre)
+    MeshBuilder& m = g[Mat::GunMetal];
+    m.color = glm::vec4(1.f); m.uvTile = {0.f, 0.f};
+    const int n = std::max(4, int(rise / 0.18f + 0.5f));
+    const float H = 0.95f;
+    for (int i = 0; i < n; ++i) {
+        float za = zs + dir * run * i / n, zb = zs + dir * run * (i + 1) / n;
+        float y = rise * (i + 1) / n, lo = std::min(za, zb), hi = std::max(za, zb);
+        g.collider({x - 0.04f, y, lo}, {0.08f, H + 0.1f, hi - lo + 0.002f});
+        if (i % 3 == 0 || i == n - 1) m.box({x - 0.025f, y, (lo + hi) * 0.5f - 0.025f}, {0.05f, H, 0.05f});
+    }
+    // barra de cima inclinada
+    glm::vec3 a(x, rise / n + H, zs + dir * run * 0.5f / n), b(x, rise + H, zs + dir * run * (n - 0.5f) / n);
+    glm::vec3 c = (a + b) * 0.5f, dv = b - a;
+    glm::mat4 keep = m.xf;
+    m.xf = keep * glm::translate(glm::mat4(1.f), c) * glm::rotate(glm::mat4(1.f), std::atan2(-dv.y, dv.z), glm::vec3(1, 0, 0));
+    m.boxC({0.f, 0.f, 0.f}, {0.05f, 0.05f, glm::length(dv) + 0.05f});
+    m.xf = keep;
+}
+
+// Escada externa de um andar, pela lateral -X da casa (corredor x0..x0+sw), subindo `rise` no sentido dir a partir
+// da borda z0. Termina num patamar (largura dos dois corredores no zigue-zague) de onde sai o próximo lance, no
+// corredor do lado e no sentido contrário; o lance de um andar de cima começa no patamar do anterior.
+// Proteções: guarda-corpo dos dois lados do lance (o lado da parede não precisa) e em volta do patamar.
+void outsideStairs(Geo& g, const ModuleSpec& s, float w, float d, float rise) {
+    const float sw = s.stairsW, x0 = -w / 2 - sw * float(s.stairsLane + 1);
+    const float dir = s.stairsToFront ? 1.f : -1.f, z0 = s.stairsToFront ? -d / 2 : d / 2;
+    const bool raised = !s.floor;
+    const float L = s.stairsZigzag ? 0.9f : 0.f;               // patamar no fim de cada lance
+    const float startOff = raised && s.stairsZigzag ? L : 0.f;  // começa no patamar do lance de baixo
+    const float zs = z0 + dir * startOff, run = d - startOff - L, zEnd = zs + dir * run;
+    // térreo maciço até o chão; andares de cima só com os degraus (passa gente embaixo)
+    stairsRun(g, Mat::Concrete, x0, sw, 0.f, zs, run, rise, 1e9f, dir, raised);
+    // guarda-corpo dos lados do lance: o de fora sempre (no corredor de dentro, é o lado do outro corredor); no
+    // corredor de fora, também o de dentro (o outro corredor está em outra altura). O lado da parede não precisa.
+    stairsSideRail(g, x0, zs, dir, run, rise);
+    if (s.stairsZigzag && s.stairsLane == 1) stairsSideRail(g, x0 + sw, zs, dir, run, rise);
+    const float H = 0.95f, edge = z0 + dir * d;  // borda da casa onde o lance termina
+    if (s.stairsZigzag) {
+        // patamar: dos dois corredores, do fim do lance até a borda, na altura de cima (laje fina, livre por baixo)
+        const float xa = -w / 2 - 2.f * sw, xb = -w / 2, za = std::min(zEnd, edge), zb = std::max(zEnd, edge);
+        MeshBuilder& c = g[Mat::Concrete];
+        c.color = glm::vec4(1.f); c.uvTile = {1.f, 1.f};
+        const float t = 0.15f;
+        c.box({xa, rise - t, za}, {xb - xa, t, zb - za});
+        g.collider({xa, rise - t, za}, {xb - xa, t, zb - za});
+        // grade do patamar: no lado de fora e na borda (só aparece de perto; a colisão vale sempre)
+        DetailScope ds(g);
+        railing(g, xa, za, xa, zb, rise, H);
+        railing(g, xa, edge + dir * 0.03f, xb, edge + dir * 0.03f, rise, H);
+    } else {
+        DetailScope ds(g);
+        railing(g, x0, zEnd + dir * 0.03f, x0 + sw, zEnd + dir * 0.03f, rise, H);  // batente na ponta de cima
+    }
+}
+
 glm::mat4 wallXf(int side, float w, float d) {  // canto inicial e direção de cada parede (por fora, olhando para ela)
     auto rot = [](float a) { return glm::rotate(glm::mat4(1.f), a, glm::vec3(0, 1, 0)); };
     switch (side) {
@@ -653,19 +711,7 @@ void buildModulePiece(Geo& g, int piece, const ModuleSpec& s, int wallKind) {
             cornerStairs(g, s.stairs, w / 2, -d / 2, w, d, 0.f, s.h, nullptr);
             break;
         case MP_StairsOut: {  // pela lateral direita (-X), de frente para o fundo, até o topo da laje; corrimão do lado de fora
-            const float sw = s.stairsW, x0 = -w / 2 - sw * float(s.stairsLane + 1), rise = top + (s.slab ? kSlabT : 0.f);
-            const float dir = s.stairsToFront ? 1.f : -1.f, z0 = s.stairsToFront ? -d / 2 : d / 2;
-            // térreo maciço até o chão; andares de cima só com os degraus (passa gente embaixo)
-            stairsRun(g, Mat::Concrete, x0, sw, 0.f, z0, d, rise, 1e9f, dir, !s.floor);
-            // corrimão do lado de fora (no corredor de fora); só no meio do lance, as pontas ficam livres para
-            // passar para o lance do lado
-            if (s.stairsLane == 1 || s.stairsW >= 1.f) {
-                MeshBuilder& m = g[Mat::GunMetal];
-                for (int i = 1; i <= 3; ++i) {
-                    float z = z0 + dir * d * i / 4.f, y = rise * i / 4.f;
-                    m.box({x0 - 0.03f, y, z - 0.03f}, {0.05f, 0.95f, 0.05f});
-                }
-            }
+            outsideStairs(g, s, w, d, top + (s.slab ? kSlabT : 0.f));
             break;
         }
         case MP_Porch: {  // varanda coberta (no chão) ou sacada com grade (andar de cima), 2 m à frente

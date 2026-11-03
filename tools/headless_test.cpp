@@ -1736,7 +1736,7 @@ int main(int argc, char** argv) {
         for (int f = 0; f < 3; ++f) {
             nlohmann::json m = {{"tipo", "modulo"}, {"largura", W}, {"profundidade", D}, {"altura", 2.7}, {"laje", true},
                                 {"paredes", {"porta", "lisa", "lisa", "lisa"}}, {"escada", "externa"}, {"largura_escada", lane},
-                                {"corredor_escada", (2 - f) % 2}, {"escada_para_frente", f % 2 == 1}};
+                                {"corredor_escada", (2 - f) % 2}, {"escada_para_frente", f % 2 == 1}, {"zigue_zague", true}};
             if (base < 0) m["pos"] = {0, 0, 0}; else m["sobre"] = base;
             base = engine_add_spec(e, m.dump().c_str());
             if (base < 0) { std::printf("  [ERRO] andar %d: %s\n", f, engine_last_error(e)); ++g_fail; }
@@ -1751,18 +1751,25 @@ int main(int argc, char** argv) {
         engine_set_play(e, 1);
         frames(e, 20);
         int etapa = 0;
-        // lances: 0 sobe para o fundo no corredor de dentro; passa de lado para o de fora; 1 sobe para a frente;
-        // passa de lado para o de dentro; 2 sobe para o fundo; vai para a laje (+X)
-        glm::vec3 fim = steer(ch, 700, [&](glm::vec3 p) -> glm::vec2 {
+        // lances com patamar no fim: 0 sobe para o fundo no corredor de dentro; no patamar, força para fora pela
+        // borda (não pode cair); passa para o corredor de fora; 1 sobe para a frente; no patamar passa para o de
+        // dentro; 2 sobe para o fundo; no último patamar força para o lado de fora; vai para a laje (+X)
+        int empurra = 0;
+        float yPonta0 = 1e9f, yPonta2 = 1e9f;
+        glm::vec3 fim = steer(ch, 1100, [&](glm::vec3 p) -> glm::vec2 {
             switch (etapa) {
-                case 0: case 4: if (p.z < -D / 2 + 0.3f) { ++etapa; return {0.f, 0.f}; } return {(xi - p.x) * 3.f, -1.f};
-                case 1: if (p.x < xo + 0.08f) { ++etapa; return {0.f, 0.f}; } return {-1.f, 0.f};
-                case 2: if (p.z > D / 2 - 0.3f) { ++etapa; return {0.f, 0.f}; } return {(xo - p.x) * 3.f, 1.f};
-                case 3: if (p.x > xi - 0.08f) { ++etapa; return {0.f, 0.f}; } return {1.f, 0.f};
+                case 0: case 5: if (p.z < -D / 2 + 0.45f) { ++etapa; empurra = 0; return {0.f, 0.f}; } return {(xi - p.x) * 3.f, -1.f};
+                case 1: yPonta0 = std::min(yPonta0, p.y); if (++empurra > 70) ++etapa; return {0.f, -1.f};
+                case 2: if (p.x < xo + 0.08f) { ++etapa; return {0.f, 0.f}; } return {-1.f, 0.f};
+                case 3: if (p.z > D / 2 - 0.45f) { ++etapa; return {0.f, 0.f}; } return {(xo - p.x) * 3.f, 1.f};
+                case 4: if (p.x > xi - 0.08f) { ++etapa; return {0.f, 0.f}; } return {1.f, 0.f};
+                case 6: yPonta2 = std::min(yPonta2, p.y); if (++empurra > 70) ++etapa; return {-1.f, -0.3f};
                 default: return p.x > 0.f ? glm::vec2(0.f) : glm::vec2(1.f, 0.f);
             }
         });
-        std::printf("  chegou em %.2f %.2f %.2f (etapa %d)\n", fim.x, fim.y, fim.z, etapa);
+        std::printf("  chegou em %.2f %.2f %.2f (etapa %d) · empurrando nas pontas: y mín %.2f e %.2f\n", fim.x, fim.y, fim.z, etapa, yPonta0, yPonta2);
+        if (yPonta0 < 2.4f) { std::printf("  [ERRO] caiu pela ponta do primeiro lance\n"); ++g_fail; }
+        if (yPonta2 < 8.f) { std::printf("  [ERRO] caiu pelo lado no fim do último lance\n"); ++g_fail; }
         save(out, "escada_externa_play.png");
         if (fim.y < 8.f || fim.x < -W / 2) { std::printf("  [ERRO] não chegou na laje do telhado\n"); ++g_fail; }
         engine_destroy(e);

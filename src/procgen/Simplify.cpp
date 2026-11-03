@@ -186,4 +186,46 @@ void simplifyMesh(std::vector<Vertex>& vs, std::vector<uint32_t>& idx, float rat
     idx.swap(outI);
 }
 
+void clusterSimplify(std::vector<Vertex>& v, std::vector<uint32_t>& idx, int res) {
+    if (v.empty() || idx.size() < 3 || res < 2) return;
+    glm::vec3 mn(1e30f), mx(-1e30f);
+    for (const Vertex& x : v) { mn = glm::min(mn, x.pos); mx = glm::max(mx, x.pos); }
+    const glm::vec3 ext = mx - mn;
+    const float cell = std::max({ext.x, ext.y, ext.z, 1e-6f}) / float(res);
+    std::unordered_map<uint64_t, uint32_t> cluster;
+    std::vector<Vertex> out;
+    std::vector<uint32_t> count, remap(v.size());
+    for (size_t i = 0; i < v.size(); ++i) {
+        const Vertex& x = v[i];
+        glm::uvec3 c = glm::uvec3(glm::clamp((x.pos - mn) / cell, glm::vec3(0.f), glm::vec3(float((1 << 19) - 1))));
+        const glm::vec3 n = x.normal, a = glm::abs(n);
+        const uint64_t bin = a.x >= a.y && a.x >= a.z ? (n.x > 0 ? 0 : 1) : a.y >= a.z ? (n.y > 0 ? 2 : 3) : (n.z > 0 ? 4 : 5);
+        const uint64_t key = uint64_t(c.x) | (uint64_t(c.y) << 19) | (uint64_t(c.z) << 38) | (bin << 57);
+        auto [it, novo] = cluster.try_emplace(key, uint32_t(out.size()));
+        if (novo) { out.push_back(x); count.push_back(1); }
+        else {
+            Vertex& o = out[it->second];
+            o.pos += x.pos;
+            o.normal += x.normal;
+            ++count[it->second];
+        }
+        remap[i] = it->second;
+    }
+    for (size_t k = 0; k < out.size(); ++k) {
+        out[k].pos /= float(count[k]);
+        float l = glm::length(out[k].normal);
+        out[k].normal = l > 1e-6f ? out[k].normal / l : glm::vec3(0, 1, 0);
+    }
+    std::vector<uint32_t> ni;
+    ni.reserve(idx.size() / 4);
+    for (size_t t = 0; t + 2 < idx.size(); t += 3) {
+        uint32_t a = remap[idx[t]], b = remap[idx[t + 1]], c = remap[idx[t + 2]];
+        if (a == b || b == c || a == c) continue;
+        ni.push_back(a); ni.push_back(b); ni.push_back(c);
+    }
+    if (ni.empty()) return;  // sumiu tudo: fica a malha original
+    v.swap(out);
+    idx.swap(ni);
+}
+
 }  // namespace eng
