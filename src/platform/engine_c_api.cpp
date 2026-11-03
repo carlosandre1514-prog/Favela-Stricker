@@ -10,6 +10,7 @@
 #include <stb_image.h>
 #include "assets/TextureManager.h"
 #include "engine/Engine.h"
+#include "jogo/Partida.h"  // (provisório: a API do jogo sai deste arquivo)
 
 // O tipo opaco da API C é o estado do motor (eng::Engine, em src/engine/Engine.h)
 struct Engine : eng::Engine {};

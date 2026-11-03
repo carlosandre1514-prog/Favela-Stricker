@@ -142,69 +142,20 @@ struct GameState {
     std::vector<RigidBody*> disabledBodies;
     std::string message;                          // aviso curto (ex.: "Vitória!")
 };
-// Partida de times (Polícia x Bandidos): cada lutador é um personagem criado no Play (cópia do que está no projeto)
-struct Fighter {
-    Scene::Handle root;            // personagem em jogo
-    Scene::Handle original;        // o do projeto (escondido durante o Play)
-    std::string name;
-    int team = 0;                  // 0 polícia, 1 bandido
-    bool bot = true, dead = false;
-    float hp = 100.f, deadTime = 0.f;
-    int kills = 0, deaths = 0, money = 800;
-    int skin = 0;                  // roupa (índice na lista do time)
-    std::string weapon = "pistola";
-    std::vector<int> owned;        // armas/roupas compradas (ids da loja)
-    // jogador: arma principal e secundária (troca rápida), balas de cada uma e granadas
-    std::string primary, secondary;
-    int slot = 0, mag[2] = {0, 0}, reserve[2] = {0, 0}, grenades = 2;
-    // robô
-    std::vector<int> path;
-    size_t pathPos = 0;
-    int target = -1;
-    float think = 0.f, fireTimer = 0.f, stuckTimer = 0.f, strafe = 1.f, strafeTimer = 0.f;
-    int burst = 0;
-    float shotAgo = 99.f;          // segundos desde o último tiro (aparece no minimapa do inimigo)
-    // online: lutador comandado por outro celular (jogador da sala, ou robô de quem criou a sala)
-    bool remote = false, left = false;
-    std::string netId;             // id na sala (jogador: id do Firebase; robô: "b<time>_<n>")
-    glm::vec3 netPos{0.f};
-    float netYaw = 0.f, netPitch = 0.f;
-    bool netHas = false, netAlive = true, netCrouch = false, netAim = false, netAir = false, netReload = false;
-    glm::vec3 netVel{0.f};         // velocidade (prevê a posição entre um pacote e outro)
-    float netAge = 0.f;
-    int netShots = 0;
-    std::string netWeapon;
-    std::map<std::string, std::string> gunSkins;  // online: skins das armas de outra pessoa (arma -> skin)
-    glm::vec3 lastPos{0.f}, goal{0.f};
-};
-struct ShopRT { Scene::Handle obj; int kind = 0; int team = 0; };  // kind 0 armas, 1 roupas
-struct TeamMatch {
-    bool active = false;
-    std::vector<Fighter> f;
-    int score[2] = {0, 0};
-    glm::vec3 base[2]{};                  // centro dos pontos de renascimento de cada time
-    std::vector<glm::vec3> spawns[2];     // cada "base" do time é um ponto de renascimento
-    std::vector<glm::vec3> nav;                // pontos de caminho (escadarias, rua de baixo, patamares)
-    std::vector<std::vector<int>> navAdj;
-    std::vector<ShopRT> shops;
-    int playerTeam = -1;                       // escolhido no app antes do Play (-1: o do personagem)
-    int openShop = -1;                         // loja aberta pelo jogador
-    int attacker = -1;                         // quem está atirando agora (crédito do abate)
-    float feedTimer = 0.f;
-    // escolhas do jogador antes do Play (app do jogo): roupa (índice na lista do time) e arma principal
-    int playerSkin = -1;
-    std::string playerPrimary, playerSecondary;
-    std::map<std::string, std::string> gunSkins;   // skin escolhida de cada arma do jogador
-    struct Nade { Scene::Handle h; glm::vec3 pos{0.f}, vel{0.f}; float t = 3.f; int owner = -1; bool visual = false; };
-    std::vector<Nade> nades;                   // granadas no ar/no chão (explodem em 3 s)
-    struct Feed { std::string killer, victim, weapon; int kt = 0, vt = 0; bool you = false; float age = 0.f; };
-    std::vector<Feed> feed;                    // últimos abates (quadro do HUD)
-    float lastDamage = 0.f;                    // tempo desde o último dano no jogador
-    // partida online (sala do Firebase): quem é o jogador local, se ele criou a sala (comanda os robôs),
-    // os jogadores da sala e os eventos a enviar (dano, abate, granada) em JSON
-    bool online = false, host = false;
-    std::string localId, roster;
-    std::vector<std::string> netOut;
+struct Engine;
+// Jogo rodando por cima do motor (como os scripts de um jogo): o motor só avisa os momentos e o jogo decide.
+// O motor não conhece as regras do jogo; o jogo instala o seu módulo em Engine::module.
+struct GameModule {
+    virtual ~GameModule() = default;
+    virtual void onPlayStart(Engine*) {}                       // Play: monta a partida
+    virtual void onPlayStop(Engine*) {}                        // Stop: antes de o motor desfazer o Play
+    virtual void onPlayEnded(Engine*) {}                       // Stop: depois (objetos criados no Play já saíram)
+    virtual bool onUpdate(Engine*, float) { return false; }    // true = o jogo cuidou das regras neste quadro
+    virtual bool onDamage(Engine*, GameObject*, float) { return false; }  // true = o jogo cuidou do dano
+    virtual bool onInteract(Engine*) { return false; }         // botão de interagir (true = usado)
+    virtual void onProjectLoaded(Engine*) {}                   // mapa/projeto aberto (pré-carregar o que precisar)
+    virtual std::string statusText(Engine*) { return ""; }     // texto do objetivo ("" = o do motor)
+    virtual std::string interactLabel(Engine*) { return ""; }  // botão de interagir do jogo ("" = nenhum)
 };
 
 // Animações criadas no editor (ou carregadas do projeto) acrescentadas à lista de um Animator
@@ -359,7 +310,7 @@ struct Engine {
     MeshId doorMesh = kInvalidId;
     GameRules rules;
     GameState game;
-    TeamMatch match;
+    std::unique_ptr<GameModule> module;   // o jogo (regras próprias), instalado por ele
     float nearOverride = 0.f;  // > 0: plano de corte próximo fixo (primeira pessoa: não desenha a própria cabeça)
     // Primeira pessoa (jogo): câmera no olho do jogador, cabeça escondida, arma e braços à vista
     bool firstPerson = false;
@@ -409,7 +360,6 @@ bool subtreeBounds(Engine* e, GameObject& root, AABB& out);
 void focusSceneOrSelection(Engine* e);
 void applyQualityLevel(Engine* e, int nivel);  // 0 Leve · 1 Padrão · 2 Intermediária · 3 Ultra
 void warmWeaponModel(Engine* e, const std::string& file, int kind);  // carrega as peças de uma arma (sem pôr na cena)
-void preloadMatchWeapons(Engine* e);  // todas as armas da partida (no carregamento do mapa)
 void releaseComponents(Engine* e, GameObject& g);
 void ensureBasics(Engine* e);
 void clearScene(Engine* e);
@@ -507,6 +457,12 @@ void animEditEnd(Engine* e);
 void drawAnimEditOverlay(Engine* e, const glm::mat4& vp);
 
 // ---- jogo (Game.cpp)
+// ajudas de jogabilidade (o jogo também usa)
+CharacterInfo* charOf(Engine* e, GameObject* g);     // personagem cuja raiz é g
+CharacterInfo* playerChar(Engine* e);                // personagem do jogador (nullptr = nenhum)
+void setSubtreeActive(GameObject& g, bool on);
+void hideObject(Engine* e, GameObject& g);           // esconde até o Stop
+void hurtPlayer(Engine* e, float dmg);
 void gameStart(Engine* e);
 void gameStop(Engine* e);
 void gameUpdate(Engine* e, float dt);
@@ -540,31 +496,9 @@ int loadModelFile(Engine* e, const char* path); // .glb/.gltf/.fbx -> id da raiz
 // Equipamento do personagem (shaders/kit/personagens/equip/<nome>.glb, osso em equipamento.txt): preso ao osso
 bool attachGear(Engine* e, int character, const std::string& name);
 std::string gameStatusText(Engine* e);
-// Partida de times: escolha do lado, lojas (o app mostra a lista e compra), caminhos dos robôs
-void teamChoose(Engine* e, int team);
-// Antes do Play: lado, roupa (0..4 na lista do lado) e arma principal ("m4a1", "ak47"...; "" = a do projeto)
-void teamLoadout(Engine* e, int team, int skin, const std::string& primary, const std::string& secondary = "");
-bool teamSwapWeapon(Engine* e);     // troca rápida principal <-> segunda arma
-std::string teamSkinLook(int team, int skin);  // aparência do boneco da roupa (JSON)
-void teamGunSkin(Engine* e, const std::string& gun, const std::string& skin);  // skin da arma do jogador ("" = padrão)
 void applyKitTexture(Engine* e, GameObject& g, const std::string& kitName, float metal = -1.f, float rough = -1.f);  // textura de cor do kit no objeto
-void gunSkinFinish(const std::string& gun, const std::string& skin, float& metal, float& rough);  // acabamento da skin de arma
-bool teamThrowGrenade(Engine* e);   // joga granada para onde a câmera olha
-std::string hudJson(Engine* e);     // estado da partida para o HUD do jogo (JSON)
-// Online (antes do Play): sala com jogadores [{"id","nome","time","skin","arma"}]; "" sai do modo online
-void netRoster(Engine* e, bool host, const std::string& localId, const std::string& rosterJson);
-std::string netCollect(Engine* e);                     // estado dos meus lutadores: {"id":{p,y,pi,c,a,w,v,n}}
-void netApply(Engine* e, const std::string& states);   // estado dos lutadores dos outros celulares
-std::string netTakeEvents(Engine* e);                  // eventos a enviar (array JSON) e limpa a fila
-void netEvent(Engine* e, const std::string& ev);       // evento recebido (dano, abate, granada, saiu)
-std::string shopLabel(Engine* e);            // botão perto de uma loja ("" = nenhuma)
-bool shopInteract(Engine* e);
-std::string shopJson(Engine* e);             // loja aberta: itens, preços, dinheiro ("" = nenhuma)
-std::string shopBuy(Engine* e, int item);
-void shopClose(Engine* e);
-int playerFighter(Engine* e);
 // Caminhos da favela para os robôs (escadarias, patamares, rua em volta)
-void favelaNavGraph(Engine* e, std::vector<glm::vec3>& nodes, std::vector<std::vector<int>>& adj);
+void favelaNavGraph(Engine* e, std::vector<glm::vec3>& nodes, std::vector<std::vector<int>>& adj, const std::vector<glm::vec3>& extra);
 // Exporta para .glb: rootId >= 0 = só esse objeto (na origem), -1 = cena inteira (Export.cpp)
 bool exportGlb(Engine* e, int rootId, const std::string& path, std::string* err);         // texto do objetivo para o HUD
 

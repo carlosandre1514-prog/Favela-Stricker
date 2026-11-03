@@ -1936,7 +1936,7 @@ void spawnPrototype(Engine* e, const Prototype& p, glm::vec3 pos, float yaw, flo
 }
 
 // Grafo de caminhos da favela para os robôs: escadarias, patamares, a rua de acesso e a rua em volta do morro
-void favelaNavGraph(Engine* e, std::vector<glm::vec3>& nodes, std::vector<std::vector<int>>& adj) {
+void favelaNavGraph(Engine* e, std::vector<glm::vec3>& nodes, std::vector<std::vector<int>>& adj, const std::vector<glm::vec3>& extra) {
     nodes.clear(); adj.clear();
     auto node = [&](glm::vec2 p) {
         for (size_t i = 0; i < nodes.size(); ++i)
@@ -1990,10 +1990,8 @@ void favelaNavGraph(Engine* e, std::vector<glm::vec3>& nodes, std::vector<std::v
         }
         if (best >= 0) link(int(i), best);
     }
-    // bases dos times: entram no grafo ligadas ao nó mais perto
-    std::vector<glm::vec3> pts;
-    for (int t = 0; t < 2; ++t) { pts.push_back(e->match.base[t]); for (const glm::vec3& sp : e->match.spawns[t]) pts.push_back(sp); }
-    for (const glm::vec3& b : pts) {
+    // pontos extras (bases dos times): entram no grafo ligados ao nó mais perto
+    for (const glm::vec3& b : extra) {
         int best = -1; float bd = 1e9f;
         for (size_t j = 0; j < nodes.size(); ++j) {
             float d = glm::length(glm::vec2(nodes[j].x - b.x, nodes[j].z - b.z));

@@ -1309,7 +1309,7 @@ std::string interactLabel(Engine* e, int* which) {
     GameObject* pg = e->scene.get(e->characters[e->player].root);
     if (!pg) return "";
     glm::vec3 p = pg->transform.position;
-    if (std::string shop = shopLabel(e); !shop.empty()) { if (which) *which = -2; return shop; }  // loja da partida de times
+    if (e->module) if (std::string l = e->module->interactLabel(e); !l.empty()) { if (which) *which = -2; return l; }  // o jogo (ex.: loja)
     for (size_t i = 0; i < e->teles.size(); ++i) {
         const TeleRT& t = e->teles[i];
         GameObject* r = e->scene.get(t.root);
@@ -1327,7 +1327,7 @@ std::string interactLabel(Engine* e, int* which) {
 }
 
 bool interact(Engine* e) {
-    if (e->match.active && shopInteract(e)) return true;
+    if (e->module && e->module->onInteract(e)) return true;  // o jogo (ex.: loja)
     int which = -1;
     if (interactLabel(e, &which).empty() || which < 0) return false;
     const TeleRT& t = e->teles[which / 2];

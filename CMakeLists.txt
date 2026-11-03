@@ -61,6 +61,8 @@ add_library(mobile3d ${MOBILE3D_LIB_TYPE}
   src/engine/World.cpp
   src/engine/Project.cpp
   src/engine/Game.cpp
+  src/jogo/Partida.cpp
+  src/jogo/jogo_api.cpp
   src/engine/Weather.cpp
   src/engine/Export.cpp
   src/engine/AnimEdit.cpp

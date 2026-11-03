@@ -1362,8 +1362,7 @@ bool importProject(Engine* e, const std::string& text, std::string* err) {
         e->editorCam.pitch = std::clamp(num(cam, "pitch", e->editorCam.pitch), -1.5f, 1.5f);
         e->editorCam.distance = std::clamp(num(cam, "distancia", e->editorCam.distance), 0.3f, 5000.f);
     }
-    // mapa da partida: as armas já carregam aqui (atrás da tela de carregamento), não no começo da partida
-    if (e->mapKind == MAP_Favela) preloadMatchWeapons(e);
+    if (e->module) e->module->onProjectLoaded(e);  // o jogo pré-carrega o que precisa (atrás do carregamento)
     selectHandle(e, {});
     e->lastError = errors;
     if (err) *err = errors;

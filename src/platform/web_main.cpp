@@ -5,6 +5,7 @@
 #include <cstdio>
 #include <string>
 #include "platform/engine_c_api.h"
+#include "jogo/jogo_api.h"
 
 static Engine* g = nullptr;
 static double g_last = 0.0;
@@ -43,7 +44,7 @@ EMSCRIPTEN_KEEPALIVE int web_iniciar(int quality) {
     emscripten_webgl_enable_extension(ctx, "OES_texture_float_linear");
     emscripten_webgl_enable_extension(ctx, "EXT_texture_filter_anisotropic");
     if (FILE* f = std::fopen("/jogo/qualidade.txt", "w")) { std::fprintf(f, "%d", quality); std::fclose(f); }
-    g = engine_create("/jogo");
+    g = jogo_criar("/jogo");  // motor + o jogo ligado nele
     if (!g) return 0;
     engine_set_quality(g, quality);
     emscripten_set_main_loop(frame, 0, 0);

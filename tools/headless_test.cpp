@@ -21,9 +21,11 @@
 #include <sys/stat.h>
 #include "json.hpp"
 #include "platform/engine_c_api.h"
+#include "jogo/jogo_api.h"
 #include "procgen/TextureGen.h"
 #include "assets/TextureManager.h"
 #include "engine/Engine.h"
+#include "jogo/Partida.h"
 
 static const int W = 960, H = 540;
 static GLuint g_fbo = 0;
@@ -87,7 +89,7 @@ int main(int argc, char** argv) {
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, depth);
 
     auto tCreate = std::chrono::steady_clock::now();
-    Engine* e = engine_create(argv[1]);
+    Engine* e = jogo_criar(argv[1]);  // motor + o jogo ligado nele
     std::printf("motor iniciado em %.2f s\n", std::chrono::duration<float>(std::chrono::steady_clock::now() - tCreate).count());
     if (!e) { std::printf("engine_create falhou (shaders?)\n"); return 1; }
     engine_set_target_fbo(e, g_fbo);

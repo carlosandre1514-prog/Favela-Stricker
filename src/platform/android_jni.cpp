@@ -12,6 +12,7 @@
 #include <cstring>
 #include <string>
 #include "platform/engine_c_api.h"
+#include "jogo/jogo_api.h"
 
 static Engine* g_engine = nullptr;
 
@@ -103,7 +104,7 @@ JNI_FN(void, nativeSetCrashFile)(JNIEnv* env, jclass, jstring path) {
 JNI_FN(jboolean, nativeCreate)(JNIEnv* env, jclass, jstring shaderDir) {
     g_phase = "abrindo o motor";
     if (g_engine) { engine_destroy(g_engine); g_engine = nullptr; }
-    g_engine = engine_create(str(env, shaderDir).c_str());
+    g_engine = jogo_criar(str(env, shaderDir).c_str());  // motor + o jogo ligado nele
     g_phase = "pronto";
     if (!g_engine) __android_log_print(ANDROID_LOG_ERROR, "Mobile3D", "engine_create falhou (shaders?)");
     return g_engine != nullptr;

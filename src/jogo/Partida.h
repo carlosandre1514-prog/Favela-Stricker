@@ -1,0 +1,115 @@
+#pragma once
+// Favela Stricker — a partida Polícia x Bandidos: estado, módulo de jogo e o que o app/site chamam.
+#include <map>
+#include <string>
+#include <vector>
+#include "engine/Engine.h"
+
+namespace eng {
+
+// Partida de times (Polícia x Bandidos): cada lutador é um personagem criado no Play (cópia do que está no projeto)
+struct Fighter {
+    Scene::Handle root;            // personagem em jogo
+    Scene::Handle original;        // o do projeto (escondido durante o Play)
+    std::string name;
+    int team = 0;                  // 0 polícia, 1 bandido
+    bool bot = true, dead = false;
+    float hp = 100.f, deadTime = 0.f;
+    int kills = 0, deaths = 0, money = 800;
+    int skin = 0;                  // roupa (índice na lista do time)
+    std::string weapon = "pistola";
+    std::vector<int> owned;        // armas/roupas compradas (ids da loja)
+    // jogador: arma principal e secundária (troca rápida), balas de cada uma e granadas
+    std::string primary, secondary;
+    int slot = 0, mag[2] = {0, 0}, reserve[2] = {0, 0}, grenades = 2;
+    // robô
+    std::vector<int> path;
+    size_t pathPos = 0;
+    int target = -1;
+    float think = 0.f, fireTimer = 0.f, stuckTimer = 0.f, strafe = 1.f, strafeTimer = 0.f;
+    int burst = 0;
+    float shotAgo = 99.f;          // segundos desde o último tiro (aparece no minimapa do inimigo)
+    // online: lutador comandado por outro celular (jogador da sala, ou robô de quem criou a sala)
+    bool remote = false, left = false;
+    std::string netId;             // id na sala (jogador: id do Firebase; robô: "b<time>_<n>")
+    glm::vec3 netPos{0.f};
+    float netYaw = 0.f, netPitch = 0.f;
+    bool netHas = false, netAlive = true, netCrouch = false, netAim = false, netAir = false, netReload = false;
+    glm::vec3 netVel{0.f};         // velocidade (prevê a posição entre um pacote e outro)
+    float netAge = 0.f;
+    int netShots = 0;
+    std::string netWeapon;
+    std::map<std::string, std::string> gunSkins;  // online: skins das armas de outra pessoa (arma -> skin)
+    glm::vec3 lastPos{0.f}, goal{0.f};
+};
+struct ShopRT { Scene::Handle obj; int kind = 0; int team = 0; };  // kind 0 armas, 1 roupas
+struct TeamMatch {
+    bool active = false;
+    std::vector<Fighter> f;
+    int score[2] = {0, 0};
+    glm::vec3 base[2]{};                  // centro dos pontos de renascimento de cada time
+    std::vector<glm::vec3> spawns[2];     // cada "base" do time é um ponto de renascimento
+    std::vector<glm::vec3> nav;                // pontos de caminho (escadarias, rua de baixo, patamares)
+    std::vector<std::vector<int>> navAdj;
+    std::vector<ShopRT> shops;
+    int playerTeam = -1;                       // escolhido no app antes do Play (-1: o do personagem)
+    int openShop = -1;                         // loja aberta pelo jogador
+    int attacker = -1;                         // quem está atirando agora (crédito do abate)
+    float feedTimer = 0.f;
+    // escolhas do jogador antes do Play (app do jogo): roupa (índice na lista do time) e arma principal
+    int playerSkin = -1;
+    std::string playerPrimary, playerSecondary;
+    std::map<std::string, std::string> gunSkins;   // skin escolhida de cada arma do jogador
+    struct Nade { Scene::Handle h; glm::vec3 pos{0.f}, vel{0.f}; float t = 3.f; int owner = -1; bool visual = false; };
+    std::vector<Nade> nades;                   // granadas no ar/no chão (explodem em 3 s)
+    struct Feed { std::string killer, victim, weapon; int kt = 0, vt = 0; bool you = false; float age = 0.f; };
+    std::vector<Feed> feed;                    // últimos abates (quadro do HUD)
+    float lastDamage = 0.f;                    // tempo desde o último dano no jogador
+    // partida online (sala do Firebase): quem é o jogador local, se ele criou a sala (comanda os robôs),
+    // os jogadores da sala e os eventos a enviar (dano, abate, granada) em JSON
+    bool online = false, host = false;
+    std::string localId, roster;
+    std::vector<std::string> netOut;
+};
+
+// O jogo instalado no motor: guarda a partida e responde aos avisos do motor
+struct Partida : GameModule {
+    TeamMatch M;
+    void onPlayStart(Engine* e) override;
+    void onPlayStop(Engine* e) override;
+    void onPlayEnded(Engine* e) override;
+    bool onUpdate(Engine* e, float dt) override;
+    bool onDamage(Engine* e, GameObject* root, float dmg) override;
+    bool onInteract(Engine* e) override;
+    void onProjectLoaded(Engine* e) override;
+    std::string statusText(Engine* e) override;
+    std::string interactLabel(Engine* e) override;
+};
+void jogoInstalar(Engine* e);   // liga o Favela Stricker no motor (depois de criar o motor)
+TeamMatch& matchOf(Engine* e);  // a partida do jogo instalado
+
+// Partida de times: escolha do lado, lojas (o app mostra a lista e compra), caminhos dos robôs
+void teamChoose(Engine* e, int team);
+// Antes do Play: lado, roupa (0..4 na lista do lado) e arma principal ("m4a1", "ak47"...; "" = a do projeto)
+void teamLoadout(Engine* e, int team, int skin, const std::string& primary, const std::string& secondary = "");
+bool teamSwapWeapon(Engine* e);     // troca rápida principal <-> segunda arma
+std::string teamSkinLook(int team, int skin);  // aparência do boneco da roupa (JSON)
+void teamGunSkin(Engine* e, const std::string& gun, const std::string& skin);  // skin da arma do jogador ("" = padrão)
+void gunSkinFinish(const std::string& gun, const std::string& skin, float& metal, float& rough);  // acabamento da skin de arma
+bool teamThrowGrenade(Engine* e);   // joga granada para onde a câmera olha
+std::string hudJson(Engine* e);     // estado da partida para o HUD do jogo (JSON)
+// Online (antes do Play): sala com jogadores [{"id","nome","time","skin","arma"}]; "" sai do modo online
+void netRoster(Engine* e, bool host, const std::string& localId, const std::string& rosterJson);
+std::string netCollect(Engine* e);                     // estado dos meus lutadores: {"id":{p,y,pi,c,a,w,v,n}}
+void netApply(Engine* e, const std::string& states);   // estado dos lutadores dos outros celulares
+std::string netTakeEvents(Engine* e);                  // eventos a enviar (array JSON) e limpa a fila
+void netEvent(Engine* e, const std::string& ev);       // evento recebido (dano, abate, granada, saiu)
+std::string shopLabel(Engine* e);            // botão perto de uma loja ("" = nenhuma)
+bool shopInteract(Engine* e);
+std::string shopJson(Engine* e);             // loja aberta: itens, preços, dinheiro ("" = nenhuma)
+std::string shopBuy(Engine* e, int item);
+void shopClose(Engine* e);
+int playerFighter(Engine* e);
+void preloadMatchWeapons(Engine* e);  // todas as armas da partida (no carregamento do mapa)
+
+}  // namespace eng
