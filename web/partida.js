@@ -198,21 +198,21 @@ function desenharMira(cv, mirando, acerto, cabeca) {
   c.clearRect(0, 0, w, w);
   c.lineCap = 'round';
   if (mirando) {  // mirando: a bolinha vermelha é onde a bala vai
-    c.fillStyle = 'rgba(0,0,0,.75)'; c.beginPath(); c.arc(cx, cy, 3.4 * k, 0, 7); c.fill();
-    c.fillStyle = '#FF2A1F'; c.beginPath(); c.arc(cx, cy, 2.4 * k, 0, 7); c.fill();
-  } else {  // cruz do modelo (com contorno escuro para ver em fundo claro)
-    const g = 5 * k, l = 9 * k;
-    for (const [cor, lw] of [['rgba(0,0,0,.55)', 4 * k], ['#fff', 2 * k]]) {
+    c.fillStyle = 'rgba(0,0,0,.75)'; c.beginPath(); c.arc(cx, cy, 2.2 * k, 0, 7); c.fill();
+    c.fillStyle = '#FF2A1F'; c.beginPath(); c.arc(cx, cy, 1.5 * k, 0, 7); c.fill();
+  } else {  // cruz pequena (com contorno escuro para ver em fundo claro)
+    const g = 2.6 * k, l = 4.6 * k;
+    for (const [cor, lw] of [['rgba(0,0,0,.5)', 2.6 * k], ['#fff', 1.3 * k]]) {
       c.strokeStyle = cor; c.lineWidth = lw; c.beginPath();
       c.moveTo(cx, cy - g - l); c.lineTo(cx, cy - g); c.moveTo(cx, cy + g); c.lineTo(cx, cy + g + l);
       c.moveTo(cx - g - l, cy); c.lineTo(cx - g, cy); c.moveTo(cx + g, cy); c.lineTo(cx + g + l, cy); c.stroke();
     }
-    c.fillStyle = 'rgba(0,0,0,.55)'; c.beginPath(); c.arc(cx, cy, 2.4 * k, 0, 7); c.fill();
-    c.fillStyle = '#fff'; c.beginPath(); c.arc(cx, cy, 1.5 * k, 0, 7); c.fill();
+    c.fillStyle = 'rgba(0,0,0,.5)'; c.beginPath(); c.arc(cx, cy, 1.4 * k, 0, 7); c.fill();
+    c.fillStyle = '#fff'; c.beginPath(); c.arc(cx, cy, 0.8 * k, 0, 7); c.fill();
   }
   if (acerto) {  // marca de acerto (cabeça: maior e vermelha)
     c.strokeStyle = cabeca ? '#FF3B30' : '#fff'; c.lineWidth = 2 * k;
-    const a = (cabeca ? 13 : 10) * k, b = 5 * k;
+    const a = (cabeca ? 9 : 7) * k, b = 3.5 * k;
     c.beginPath();
     c.moveTo(cx - a, cy - a); c.lineTo(cx - b, cy - b); c.moveTo(cx + a, cy - a); c.lineTo(cx + b, cy - b);
     c.moveTo(cx - a, cy + a); c.lineTo(cx - b, cy + b); c.moveTo(cx + a, cy + a); c.lineTo(cx + b, cy + b); c.stroke();

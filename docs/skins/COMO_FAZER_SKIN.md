@@ -10,6 +10,7 @@ A skin é **uma imagem PNG quadrada** onde cada bloco aparece "desmontado", como
 | `molde_personagem.png` | Molde com o nome de cada parte (use como guia e para mandar para a IA) |
 | `molde_limpo.png` | Só as bordas, sem texto (para pintar por cima no editor de imagem) |
 | `exemplo_pm.png` | Uma skin pronta de exemplo (policial) |
+| `molde_cabeca.png` | Só a cabeça, grande, com as linhas do rosto (cabelo, olhos, nariz, boca, queixo) |
 
 ## Como cada parte está aberta
 
@@ -85,6 +86,61 @@ Troque o trecho em **negrito** pela roupa que você quer. O prompt em inglês co
 **Em português:**
 
 > Use a imagem anexada como molde de UV exato. Mantenha todos os retângulos na mesma posição e tamanho, em uma tela quadrada de 1024x1024, e preencha cada retângulo com textura chapada pronta para jogo. É a skin de um personagem de blocos low-poly (estilo Roblox). Personagem: [ROUPA]. Cada parte é uma caixa aberta: na fileira do meio [LADO DIREITO][FRENTE][LADO ESQUERDO][COSTAS], com o TOPO acima da FRENTE e a BASE abaixo. Vista de frente, sem perspectiva, sem sombra, sem luz, sem cenário, sem textos de legenda e sem contorno entre os retângulos. Pinte só dentro dos retângulos; fora deles, cinza liso.
+
+## Rosto proporcional à cabeça (o mais importante)
+
+A cabeça do boneco é **um cubo**. O rosto tem que ocupar o **quadrado da FRENTE inteiro**, como um adesivo colado na frente do cubo.
+O erro mais comum é a IA desenhar a **cabeça inteira** (com cabelo alto, orelhas e pescoço) dentro do quadrado da frente.
+Aí o rosto fica pequeno e espremido, e sobra fundo em volta.
+
+Use o `molde_cabeca.png` (a cabeça grande, com as linhas do rosto).
+
+**Regras para o rosto:**
+- O rosto vai **de uma borda à outra**: as bochechas encostam nos lados do quadrado e o queixo encosta na borda de baixo.
+- Linhas do rosto, de cima para baixo (veja as linhas tracejadas no molde da cabeça):
+
+| Linha | Distância a partir do alto do quadrado |
+|---|---|
+| Linha do cabelo | 16% |
+| Sobrancelhas | 36% |
+| Olhos | 45% |
+| Ponta do nariz | 62% |
+| Boca | 74% |
+| Queixo | 92% |
+
+- **Orelhas** só nos LADOS. Na frente não aparecem.
+- **Pescoço** só na BASE.
+- **Cabelo** no TOPO, nas COSTAS e na parte de cima dos lados.
+- Vista **reta de frente**, sem sombra, sem luz de lado e **sem nenhum fundo** (nem preto, nem branco).
+- Estilo: para combinar com o boneco de blocos, um rosto **mais simples e chapado** (estilo desenho ou pixel) fica melhor do que foto realista.
+  Foto realista esticada num cubo sempre parece "máscara".
+
+### Prompt da cabeça (mande junto o `molde_cabeca.png`)
+
+> Use the attached image as an exact UV template for a cube-shaped head of a blocky game character (Roblox style). Keep every rectangle in the same position and size on a square 1024x1024 canvas and fill each one completely, edge to edge, with no background visible.
+> FRONT square: a flat front-facing face that fills the whole square like a sticker on a cube: cheeks touching the left and right edges, chin touching the bottom edge, hairline at 16% from the top, eyebrows at 36%, eyes at 45%, nose tip at 62%, mouth at 74%. No ears, no neck, no hair below the hairline on the front.
+> LEFT SIDE and RIGHT SIDE: side of the head with one ear each (the ear is closer to the back edge), hair on top 16%, skin below.
+> BACK: back of the head, hair on top, skin of the nape at the bottom.
+> TOP: hair seen from above. BOTTOM: neck skin.
+> Character: **[DESCREVA, ex.: young Brazilian man, brown skin, short black fade haircut, thin goatee, small diamond earrings]**.
+> Style: **[clean cartoon / semi-realistic painted / pixel art]**, flat lighting, no shadows, no perspective, no text, no labels, no lines between rectangles.
+
+**Em português:**
+
+> Use a imagem anexada como molde de UV exato da cabeça em forma de cubo de um boneco de blocos (estilo Roblox). Mantenha todos os retângulos na mesma posição e tamanho, numa tela quadrada de 1024x1024, e preencha cada um por inteiro, de borda a borda, sem fundo aparecendo.
+> - FRENTE: rosto de frente, chapado, ocupando o quadrado todo como um adesivo no cubo. As bochechas encostam nas laterais e o queixo encosta embaixo. Linha do cabelo a 16% do alto, sobrancelhas a 36%, olhos a 45%, ponta do nariz a 62%, boca a 74%. Sem orelhas, sem pescoço e sem cabelo abaixo da linha do cabelo na frente.
+> - LADOS: o lado da cabeça com uma orelha (mais perto da borda de trás), cabelo nos 16% de cima e pele embaixo.
+> - COSTAS: nuca, com cabelo em cima e pele embaixo.
+> - TOPO: o cabelo visto de cima.
+> - BASE: o pescoço.
+>
+> Personagem: [DESCREVA]. Estilo: [desenho limpo / semi-realista pintado / pixel art], luz chapada, sem sombra, sem perspectiva, sem texto e sem linhas entre os retângulos.
+
+### Se a IA continuar errando
+
+- Peça **só o rosto** num quadrado: "a square image of only the face, filling the whole square, chin touching the bottom edge, hairline 16% from the top, front view, flat light, no background". Depois cole esse quadrado na FRENTE.
+- Peça os lados separados ("side of the head, square, one ear, short hair on top, no face").
+- Quando a IA entregar a folha numa disposição diferente da nossa, me mande que eu remonto no molde (tools/montar_skin.py).
 
 ## Prompts por parte (se a IA errar o molde inteiro)
 

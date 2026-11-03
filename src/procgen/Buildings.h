@@ -149,6 +149,12 @@ struct ModuleSpec {
     int stairs = SK_None;   // StairKind; as internas ficam no canto esquerdo-fundo e abrem a laje
     bool porch = false;     // varanda coberta na frente (no chão) ou sacada (andar de cima)
     float porchD = 2.f;     // profundidade da varanda/sacada
+    // escada externa (SK_Outside) pela lateral -X: largura do corredor, corredor (0 = colado na parede, 1 = o de fora)
+    // e sentido (false: sobe da frente para o fundo; true: do fundo para a frente). Em zigue-zague, cada andar usa
+    // o outro corredor e o outro sentido, para um lance não ficar por cima do outro.
+    float stairsW = 1.f;
+    int stairsLane = 0;
+    bool stairsToFront = false;
 };
 // Altura do topo do módulo (onde o próximo andar começa)
 float moduleTop(const ModuleSpec& s);

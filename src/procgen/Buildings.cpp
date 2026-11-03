@@ -429,20 +429,26 @@ void slabWithHole(Geo& g, Mat mat, float x0, float x1, float z0, float z1, float
 
 // Escada reta subindo de (x, y0, zStart) até a altura `rise`, andando `run` metros para -Z
 // baseY: de onde os degraus começam por baixo (lance de cima de uma escada em L/U fica maciço até o chão)
-void stairsRun(Geo& g, Mat mat, float x0, float width, float y0, float zStart, float run, float rise, float baseY = 1e9f) {
+// dirZ = -1: sobe andando para -Z (padrão); +1: sobe para +Z. degrauSo: cada degrau é só uma placa (por baixo
+// fica livre, para passar embaixo da escada) em vez de bloco maciço até baseY.
+void stairsRun(Geo& g, Mat mat, float x0, float width, float y0, float zStart, float run, float rise, float baseY = 1e9f,
+               float dirZ = -1.f, bool degrauSo = false) {
     MeshBuilder& m = g[mat];
     m.color = glm::vec4(1.f); m.uvTile = {1.f, 1.f};
     if (baseY > y0) baseY = y0;
     int n = std::max(4, int(rise / 0.18f + 0.5f));
     for (int i = 0; i < n; ++i) {
-        float z1 = zStart - run * i / n, z0 = zStart - run * (i + 1) / n;
-        m.box({x0, baseY, z0}, {width, y0 - baseY + rise * (i + 1) / n, z1 - z0 + 0.001f});
+        float za = zStart + dirZ * run * i / n, zb = zStart + dirZ * run * (i + 1) / n;
+        float z0 = std::min(za, zb), z1 = std::max(za, zb);
+        float topY = y0 + rise * (i + 1) / n;
+        float bottom = degrauSo ? std::max(baseY, topY - 0.38f) : baseY;
+        m.box({x0, bottom, z0}, {width, topY - bottom, z1 - z0 + 0.001f});
     }
     float th = std::atan2(rise, run), len = std::sqrt(rise * rise + run * run);
-    glm::vec3 nrm(0.f, std::cos(th), std::sin(th));
+    glm::vec3 nrm(0.f, std::cos(th), -dirZ * std::sin(th));
     // rampa invisível por cima dos degraus (o personagem sobe andando)
-    glm::vec3 c(x0 + width * 0.5f, y0 + rise * 0.5f, zStart - run * 0.5f);
-    g.colliderTilted(c - nrm * 0.12f, {width * 0.5f, 0.12f, len * 0.5f}, th);
+    glm::vec3 c(x0 + width * 0.5f, y0 + rise * 0.5f, zStart + dirZ * run * 0.5f);
+    g.colliderTilted(c - nrm * 0.12f, {width * 0.5f, 0.12f, len * 0.5f}, -dirZ * th);
 }
 
 // Placa com vários buracos retangulares (escada em L, caracol...): divide em células e junta as cheias por linha
@@ -647,13 +653,18 @@ void buildModulePiece(Geo& g, int piece, const ModuleSpec& s, int wallKind) {
             cornerStairs(g, s.stairs, w / 2, -d / 2, w, d, 0.f, s.h, nullptr);
             break;
         case MP_StairsOut: {  // pela lateral direita (-X), de frente para o fundo, até o topo da laje; corrimão do lado de fora
-            const float sw = 1.f, x0 = -w / 2 - sw, rise = top + (s.slab ? kSlabT : 0.f);
-            stairsRun(g, Mat::Concrete, x0, sw, 0.f, d / 2, d, rise);
-            // corrimão: postes ao longo da escada, altura acompanhando os degraus
-            MeshBuilder& m = g[Mat::GunMetal];
-            for (int i = 0; i <= 4; ++i) {
-                float z = d / 2 - d * i / 4.f, y = rise * i / 4.f;
-                m.box({x0 - 0.03f, y, z - 0.03f}, {0.05f, 0.95f, 0.05f});
+            const float sw = s.stairsW, x0 = -w / 2 - sw * float(s.stairsLane + 1), rise = top + (s.slab ? kSlabT : 0.f);
+            const float dir = s.stairsToFront ? 1.f : -1.f, z0 = s.stairsToFront ? -d / 2 : d / 2;
+            // térreo maciço até o chão; andares de cima só com os degraus (passa gente embaixo)
+            stairsRun(g, Mat::Concrete, x0, sw, 0.f, z0, d, rise, 1e9f, dir, !s.floor);
+            // corrimão do lado de fora (no corredor de fora); só no meio do lance, as pontas ficam livres para
+            // passar para o lance do lado
+            if (s.stairsLane == 1 || s.stairsW >= 1.f) {
+                MeshBuilder& m = g[Mat::GunMetal];
+                for (int i = 1; i <= 3; ++i) {
+                    float z = z0 + dir * d * i / 4.f, y = rise * i / 4.f;
+                    m.box({x0 - 0.03f, y, z - 0.03f}, {0.05f, 0.95f, 0.05f});
+                }
             }
             break;
         }

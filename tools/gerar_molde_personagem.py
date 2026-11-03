@@ -6,6 +6,7 @@ Gera:
   docs/skins/molde_personagem.png      o molde para pintar (2048 x 2048), com o nome de cada parte
   docs/skins/molde_limpo.png           o mesmo molde só com as bordas (para colar na IA ou pintar por cima)
   docs/skins/exemplo_pm.png            uma skin de exemplo (policial) pintada no molde
+  docs/skins/molde_cabeca.png          só a cabeça, grande, com as linhas do rosto (cabelo, olhos, nariz, boca, queixo)
 
 Cada parte é uma caixa aberta em cruz:  [LADO DIREITO][FRENTE][LADO ESQUERDO][COSTAS], com o TOPO em cima
 da FRENTE e a BASE embaixo dela. "Direito/esquerdo" são do boneco (o lado direito dele fica à esquerda
@@ -175,6 +176,57 @@ def pintar_exemplo(tam=1024):
     return img
 
 
+# Proporção do rosto na FRENTE da cabeça (fração da altura, de cima para baixo)
+ROSTO = [('linha do cabelo', 0.16), ('sobrancelhas', 0.36), ('olhos', 0.45), ('ponta do nariz', 0.62), ('boca', 0.74),
+         ('queixo', 0.92)]
+
+
+def desenhar_molde_cabeca(tam=1024):
+    """A cabeça aberta em cruz, grande, com as linhas de proporção do rosto na FRENTE e das orelhas nos lados."""
+    p = PARTES['cabeca']
+    W, Hh, D = p['w'], p['h'], p['d']
+    s = (tam - 40) / (2 * W + 2 * D)
+    ox, oy = 20, (tam - (Hh + 2 * D) * s) / 2
+    img = Image.new('RGB', (tam, tam), (245, 245, 245))
+    d = ImageDraw.Draw(img)
+    xr, xf = ox, ox + D * s
+    xl, xb = xf + W * s, xf + W * s + D * s
+    y0, y1 = oy + D * s, oy + D * s + Hh * s
+    caixas = {'LADO DIR.': (xr, y0, xf, y1), 'FRENTE (rosto)': (xf, y0, xl, y1), 'LADO ESQ.': (xl, y0, xb, y1),
+              'COSTAS (nuca)': (xb, y0, xb + W * s, y1), 'TOPO (cabelo)': (xf, oy, xl, y0), 'BASE (pescoço)': (xf, y1, xl, y1 + D * s)}
+    for nome, r in caixas.items():
+        d.rectangle(r, fill=(252, 226, 190) if 'FRENTE' in nome else (250, 236, 214), outline=(30, 30, 30), width=3)
+        ft = fonte(18)
+        d.text((r[0] + 6, r[1] + 4), nome, fill=(20, 20, 20), font=ft)
+    fx0, fy0, fx1, fy1 = caixas['FRENTE (rosto)']
+    fw, fh = fx1 - fx0, fy1 - fy0
+    ft = fonte(14, False)
+    for nome, fr in ROSTO:
+        y = fy0 + fh * fr
+        for x in range(int(fx0), int(fx1), 12):
+            d.line([x, y, min(x + 6, fx1), y], fill=(180, 40, 40), width=2)
+        d.text((fx1 - d.textlength(nome, font=ft) - 4, y - 17), nome, fill=(150, 30, 30), font=ft)
+    # olhos: dois quadros entre 25-42% e 58-75% da largura; boca entre 35% e 65%
+    for a, b in ((0.25, 0.42), (0.58, 0.75)):
+        d.rectangle([fx0 + fw * a, fy0 + fh * 0.4, fx0 + fw * b, fy0 + fh * 0.5], outline=(40, 80, 180), width=2)
+    d.rectangle([fx0 + fw * 0.35, fy0 + fh * 0.7, fx0 + fw * 0.65, fy0 + fh * 0.78], outline=(40, 80, 180), width=2)
+    # orelhas nos lados (perto da nuca), na altura dos olhos até o nariz
+    for (x0, _, x1, _), perto in ((caixas['LADO DIR.'], 0.25), (caixas['LADO ESQ.'], 0.75)):
+        cx = x0 + (x1 - x0) * perto
+        d.ellipse([cx - (x1 - x0) * 0.1, fy0 + fh * 0.42, cx + (x1 - x0) * 0.1, fy0 + fh * 0.64], outline=(40, 80, 180), width=2)
+    for nome in ('LADO DIR.', 'LADO ESQ.', 'COSTAS (nuca)'):
+        r = caixas[nome]
+        for x in range(int(r[0]), int(r[2]), 12):
+            d.line([x, fy0 + fh * 0.16, min(x + 6, r[2]), fy0 + fh * 0.16], fill=(180, 40, 40), width=2)
+    ft = fonte(16, False)
+    txt = ['Rosto inteiro dentro da FRENTE, do tamanho do quadrado: queixo encostando embaixo,',
+           'cabelo só no alto (até a linha do cabelo). Orelhas nos LADOS, não na frente.',
+           'Pescoço na BASE; cabelo no TOPO e nas COSTAS. Sem fundo preto em volta.']
+    for i, l in enumerate(txt):
+        d.text((20, tam - 90 + i * 24), l, fill=(30, 30, 30), font=ft)
+    return img
+
+
 def main():
     rects = {}
     for chave, p in PARTES.items():
@@ -187,6 +239,7 @@ def main():
     os.makedirs(pasta, exist_ok=True)
     desenhar_molde(True).save(os.path.join(pasta, 'molde_personagem.png'), optimize=True)
     desenhar_molde(False).save(os.path.join(pasta, 'molde_limpo.png'), optimize=True)
+    desenhar_molde_cabeca().save(os.path.join(pasta, 'molde_cabeca.png'), optimize=True)
     pintar_exemplo().save(os.path.join(pasta, 'exemplo_pm.png'), optimize=True)
     print('ok:', saida_json, pasta)
 

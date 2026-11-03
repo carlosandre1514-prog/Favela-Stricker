@@ -746,8 +746,14 @@ void favelaHouse(Geo& g, Rng& r, float w, float d, int floors, float footLow, bo
     const bool rawUpper = r.chance(0.45f);
     const bool outsideStairs = r.chance(0.5f);
     const bool porchGround = frontOpen && r.chance(0.3f);
-    float bw = outsideStairs ? w - 1.05f : w;          // escada externa ocupa 1 m do lado -X
-    float bx = outsideStairs ? 0.525f : 0.f;
+    // Escada externa do lado -X. Com mais de um andar: zigue-zague em 2 corredores de 0,9 m (cada andar no outro
+    // corredor e no outro sentido; o último lance chega colado na laje do telhado). Casa estreita demais para
+    // isso: a escada externa só vai até a primeira laje.
+    const bool zigzag = outsideStairs && floors > 1 && w - 1.85f >= 2.4f;
+    const float lane = zigzag ? 0.9f : 1.f;
+    const float stairsBand = outsideStairs ? (zigzag ? 2.f * lane : lane) + 0.05f : 0.f;
+    float bw = w - stairsBand;
+    float bx = stairsBand * 0.5f;
     float bd = porchGround ? d - 2.f : d;              // varanda coberta na frente
     float bz = porchGround ? -1.f : 0.f;
     // fundação até o chão (terreno inclinado)
@@ -777,8 +783,14 @@ void favelaHouse(Geo& g, Rng& r, float w, float d, int floors, float footLow, bo
         ms.walls[3] = r.chance(0.25f) ? MW_Window : MW_Plain;
         if (bw < 3.2f || bd < 3.2f) ms.walls[2] = ms.walls[3] = MW_Plain;
         // acesso à laje: escada externa em todo andar, ou interna (reta) quando cabe
-        if (outsideStairs) ms.stairs = SK_Outside;
-        else if (bd >= 4.4f && bw >= 3.4f) ms.stairs = SK_Straight;
+        if (outsideStairs && (zigzag || f == 0)) {
+            ms.stairs = SK_Outside;
+            ms.stairsW = lane;
+            const int fromTop = floors - 1 - f;               // o último lance fica no corredor colado na casa
+            ms.stairsLane = zigzag ? fromTop % 2 : 0;
+            ms.stairsToFront = zigzag && f % 2 == 1;         // lances alternam o sentido
+        } else if (outsideStairs) {
+        } else if (bd >= 4.4f && bw >= 3.4f) ms.stairs = SK_Straight;
         ms.porch = f == 0 ? porchGround : (frontOpen && r.chance(0.3f));
         ms.porchD = f == 0 ? 2.f : 1.1f;
         ms.parapet = f == floors - 1 && r.chance(0.35f);

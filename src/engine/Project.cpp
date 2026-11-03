@@ -900,6 +900,10 @@ int createFromSpecJson(Engine* e, const std::string& specJson, std::string* err)
         ms.stairs = lookup(str(spec, "escada", "nenhuma"), {{"nenhuma", SK_None}, {"sem", SK_None}, {"interna", SK_Straight}, {"reta", SK_Straight},
             {"externa", SK_Outside}, {"lateral", SK_Outside}, {"l", SK_L}, {"em_l", SK_L}, {"u", SK_U}, {"em_u", SK_U},
             {"caracol", SK_Spiral}, {"espiral", SK_Spiral}, {"helicoidal", SK_Spiral}}, SK_None);
+        // escada externa em zigue-zague: corredor 0 (colado na parede) ou 1 (o de fora), largura e sentido
+        ms.stairsLane = std::clamp(inum(spec, "corredor_escada", 0), 0, 1);
+        ms.stairsW = std::clamp(num(spec, "largura_escada", 1.f), 0.6f, 3.f);
+        ms.stairsToFront = flag(spec, "escada_para_frente", false);
         // empilhar: em cima do objeto escolhido (mesma posição e giro); andar de cima não tem piso próprio
         if (auto it = spec.find("sobre"); it != spec.end() && it->is_number()) {
             GameObject* base = rootOf(e, objectById(e, it->get<int>()));

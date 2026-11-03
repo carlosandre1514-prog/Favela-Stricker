@@ -1728,6 +1728,47 @@ int main(int argc, char** argv) {
         return g_fail ? 1 : 0;
     }
     if (std::getenv("SO_ONLINE")) { online(); engine_destroy(e); std::printf(g_fail ? "FALHOU\n" : "OK\n"); return g_fail ? 1 : 0; }
+    // Escada externa em zigue-zague (casa de 3 andares da favela): o boneco sobe da rua até a laje do telhado
+    if (std::getenv("SO_ESCADA_EXTERNA")) {
+        engine_new_scene(e);
+        const float W = 4.f, D = 5.f, lane = 0.9f;
+        int base = -1;
+        for (int f = 0; f < 3; ++f) {
+            nlohmann::json m = {{"tipo", "modulo"}, {"largura", W}, {"profundidade", D}, {"altura", 2.7}, {"laje", true},
+                                {"paredes", {"porta", "lisa", "lisa", "lisa"}}, {"escada", "externa"}, {"largura_escada", lane},
+                                {"corredor_escada", (2 - f) % 2}, {"escada_para_frente", f % 2 == 1}};
+            if (base < 0) m["pos"] = {0, 0, 0}; else m["sobre"] = base;
+            base = engine_add_spec(e, m.dump().c_str());
+            if (base < 0) { std::printf("  [ERRO] andar %d: %s\n", f, engine_last_error(e)); ++g_fail; }
+        }
+        engine_select(e, -1);
+        engine_set_camera(e, -2.f, 3.5f, 0.f, -1.1f, 0.3f, 13.f);
+        frames(e, 3);
+        save(out, "escada_externa.png");
+        int ch = engine_create_random_character(e, 7, 1);
+        const float xi = -W / 2 - lane * 0.5f, xo = -W / 2 - lane * 1.5f;
+        placeChar(ch, {xi, 0.3f, D / 2 + 0.8f});
+        engine_set_play(e, 1);
+        frames(e, 20);
+        int etapa = 0;
+        // lances: 0 sobe para o fundo no corredor de dentro; passa de lado para o de fora; 1 sobe para a frente;
+        // passa de lado para o de dentro; 2 sobe para o fundo; vai para a laje (+X)
+        glm::vec3 fim = steer(ch, 700, [&](glm::vec3 p) -> glm::vec2 {
+            switch (etapa) {
+                case 0: case 4: if (p.z < -D / 2 + 0.3f) { ++etapa; return {0.f, 0.f}; } return {(xi - p.x) * 3.f, -1.f};
+                case 1: if (p.x < xo + 0.08f) { ++etapa; return {0.f, 0.f}; } return {-1.f, 0.f};
+                case 2: if (p.z > D / 2 - 0.3f) { ++etapa; return {0.f, 0.f}; } return {(xo - p.x) * 3.f, 1.f};
+                case 3: if (p.x > xi - 0.08f) { ++etapa; return {0.f, 0.f}; } return {1.f, 0.f};
+                default: return p.x > 0.f ? glm::vec2(0.f) : glm::vec2(1.f, 0.f);
+            }
+        });
+        std::printf("  chegou em %.2f %.2f %.2f (etapa %d)\n", fim.x, fim.y, fim.z, etapa);
+        save(out, "escada_externa_play.png");
+        if (fim.y < 8.f || fim.x < -W / 2) { std::printf("  [ERRO] não chegou na laje do telhado\n"); ++g_fail; }
+        engine_destroy(e);
+        std::printf(g_fail ? "FALHOU\n" : "OK\n");
+        return g_fail ? 1 : 0;
+    }
     if (std::getenv("SO_JOGO")) { jogo(); engine_destroy(e); std::printf(g_fail ? "FALHOU\n" : "OK\n"); return g_fail ? 1 : 0; }
     if (std::getenv("SO_TIMES")) { times(); engine_destroy(e); std::printf(g_fail ? "FALHOU\n" : "OK\n"); return g_fail ? 1 : 0; }
     if (std::getenv("SO_FAVELA")) { favela(); engine_destroy(e); std::printf(g_fail ? "FALHOU\n" : "OK\n"); return g_fail ? 1 : 0; }
