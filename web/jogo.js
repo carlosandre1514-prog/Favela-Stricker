@@ -164,7 +164,7 @@ function telaLado() {
         <div class="linha" style="justify-content:space-between"><span style="font-size:12px;color:#FDE68A">4 robôs + você</span><span class="entrar" style="background:#F59E0B;color:#111827">ENTRAR</span></div>
       </button>
     </div></div>`), 'lado');
-  t.prepend(topo('ESCOLHA SEU LADO', telaInicio, '', '<span class="dica">Partida até 25 abates · 10 min</span>'));
+  t.prepend(topo('ESCOLHA SEU LADO', telaInicio, '', '<span class="dica">Partida até 25 abates · 20 min</span>'));
   for (const b of $$('[data-time]', t)) b.onclick = () => telaRoupa(Number(b.dataset.time));
 }
 

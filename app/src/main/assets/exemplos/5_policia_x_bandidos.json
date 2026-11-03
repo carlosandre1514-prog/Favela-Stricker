@@ -278,7 +278,7 @@
   "descricao": "5 contra 5 na favela. Abates dão $300: compre armas e roupas nas lojas do seu time. Vence quem fizer 25 abates.",
   "objetivo": "times",
   "quantidade": 25,
-  "tempo": 600.0,
+  "tempo": 1200.0,
   "titulo": "Polícia x Bandidos",
   "vida_jogador": 100.0
  },
