@@ -11,6 +11,9 @@ if(EMSCRIPTEN)
   string(APPEND CMAKE_C_FLAGS " -fexceptions")
 endif()
 
+# CMake 4 recusa bibliotecas com cmake_minimum_required antigo (a Bullet pede < 3.5): aceita assim mesmo
+set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
+
 include(FetchContent)
 FetchContent_Declare(glm GIT_REPOSITORY https://github.com/g-truc/glm.git GIT_TAG 1.0.1)
 FetchContent_Declare(tinygltf GIT_REPOSITORY https://github.com/syoyo/tinygltf.git GIT_TAG v2.9.3)
