@@ -1344,6 +1344,26 @@ bool driveCharacter(Engine* e, CharacterInfo& c, glm::vec3 move, float speed, bo
     bool grounded = e->physics.raycastIgnoring(center, center - glm::vec3(0, c.height * 0.5f + 0.25f, 0), b, hit, obj, frac);
     btVector3 nv(move.x * speed * mag, vel.y(), move.z * speed * mag);
     if (jump && grounded) nv.setY(5.2f);
+    // Degrau, batente ou quina no caminho: quando o boneco trava, olha o chão um pouco à frente dos pés; se estiver até
+    // 45 cm mais alto (e não for parede na altura do joelho), sobe junto. Assim anda liso nas escadarias e becos.
+    const float hvAgora = std::sqrt(float(vel.x() * vel.x() + vel.z() * vel.z()));
+    if (mag > 0.05f && !jump && (grounded || vel.y() < 1.f) && hvAgora < speed * mag * 0.6f) {  // só quando travou
+        const float r = 0.19f * c.height / 1.75f;
+        const glm::vec3 feet = go->transform.position;
+        const glm::vec3 knee = feet + glm::vec3(0, 0.55f * c.height / 1.75f, 0);
+        glm::vec3 h2; GameObject* o2 = nullptr; float f2;
+        const bool wall = e->physics.raycastIgnoring(knee, knee + move * (r + 0.2f), b, h2, o2, f2);
+        if (!wall) {
+            const glm::vec3 ahead = feet + move * (r + 0.14f);
+            glm::vec3 h3; GameObject* o3 = nullptr; float f3;
+            if (e->physics.raycastIgnoring(ahead + glm::vec3(0, 0.5f, 0), ahead - glm::vec3(0, 0.15f, 0), b, h3, o3, f3)) {
+                const float dh = h3.y - feet.y;
+                if (dh > 0.03f && dh < 0.46f) nv.setY(std::max(float(nv.y()), std::min(dh / 0.09f, 4.5f)));
+            }
+        }
+    }
+    // atrito só parado (segura na rampa); andando, escorrega pelas quinas e paredes em vez de grudar
+    b->setFriction(mag > 0.05f ? 0.f : 0.4f);
     // parado no chão (rampa, escada): sem gravidade, senão escorrega para baixo
     const bool anchor = grounded && !jump && mag < 0.05f && vel.y() < 0.5f && frac * (c.height * 0.5f + 0.25f) < c.height * 0.5f + 0.08f;
     b->setGravity(anchor ? btVector3(0, 0, 0) : btVector3(0, -9.81f, 0));
