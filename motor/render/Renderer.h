@@ -71,6 +71,8 @@ struct FrameStats {
 class Renderer {
 public:
     static constexpr uint32_t kMaxDraws = 16384;
+    // testes: triângulos visíveis por nome de objeto (nullptr = desligado)
+    std::map<std::string, long>* trisPorNome = nullptr;
     static constexpr uint32_t kMaxMeshes = 12288, kMaxMaterials = 2048;
     static constexpr uint32_t kMaxLineVerts = 6 * 4096;
     static constexpr int kEnvSize = 128;

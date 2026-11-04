@@ -560,7 +560,7 @@ static Scene::Handle spawnWeaponModel(Engine* e, int kind, const WeaponLook& loo
             }
             // Versão de longe (bem poucos triângulos): a arma da mão e as de perto ficam detalhadas; as dos outros
             // lutadores, a partir de alguns metros, usam esta (as armas eram mais da metade dos triângulos da partida)
-            static const float kLowFrac[4] = {0.06f, 0.08f, 0.12f, 0.2f}, kLowDist[4] = {4.f, 5.f, 7.f, 12.f};
+            static const float kLowFrac[4] = {0.035f, 0.08f, 0.12f, 0.2f}, kLowDist[4] = {4.f, 5.f, 7.f, 12.f};  // Leve: 3,5%
             const int nv = std::clamp(e->nivel, 0, 3);
             std::vector<ProtoPart> low;
             AABB lb;

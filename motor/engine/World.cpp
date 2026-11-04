@@ -208,10 +208,10 @@ void segBox(MeshBuilder& m, glm::vec3 a, glm::vec3 b, float t, float t2) {
     m.xf = keep;
 }
 
-void yawBox(MeshBuilder& m, glm::vec3 base, glm::vec3 size, float yaw) {
+void yawBox(MeshBuilder& m, glm::vec3 base, glm::vec3 size, float yaw, unsigned skipFaces) {
     glm::mat4 keep = m.xf;
     m.xf = glm::rotate(glm::translate(keep, base), yaw, glm::vec3(0, 1, 0));
-    m.box({-size.x / 2, 0.f, -size.z / 2}, size);
+    m.box({-size.x / 2, 0.f, -size.z / 2}, size, skipFaces);
     m.xf = keep;
 }
 

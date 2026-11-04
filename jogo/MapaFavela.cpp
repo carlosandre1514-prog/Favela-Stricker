@@ -309,11 +309,43 @@ void genFavela(Engine* e, Rng& r, glm::vec3& spawn, float& spawnYaw) {
             float forest = smooth01(1.62f, 1.72f, s) * (1.f - road);
             return glm::vec3(std::max(town, road), forest, 0.f);
         };
-        terrainMesh(v, idx, -half, -half, 2 * half, res, H, &c.heights, &hint);
-        c.mesh = e->renderer.createMesh(v.data(), uint32_t(v.size()), idx.data(), uint32_t(idx.size()), false);
-        c.ground = addMeshObject(e, "Morro", c.mesh, e->mats[int(Mat::Terrain)], glm::vec3(0.f), glm::vec3(1.f), glm::vec3(0.f), false);
-        if (GameObject* go = e->scene.get(c.ground)) if (go->meshRenderer) go->meshRenderer->castShadows = false;  // só recebe sombra
+        terrainMesh(v, idx, -half, -half, 2 * half, res, H, &c.heights, &hint);  // (só as alturas da colisão, em 1,2 m)
         addHeightfield(e, c, -half, -half, 2 * half, res);
+        // Desenho: 5x5 pedaços, cada um em 3 versões (completa perto, metade e um quarto dos triângulos longe).
+        // Antes era uma malha só de 97 mil triângulos desenhada inteira (até o que fica atrás da câmera).
+        // A borda de cada pedaço desce 60 cm (saia): onde um pedaço detalhado encosta num simples não abre fresta.
+        const int N = 5, sub = res / N;              // 44 células por pedaço
+        const float csz = 2 * half / N;
+        static const float kLodDist[3] = {115.f, 250.f, 1e30f};  // (o motor multiplica pelo nível: Leve 46 m / 100 m)
+        for (int cj = 0; cj < N; ++cj)
+            for (int ci = 0; ci < N; ++ci)
+                for (int l = 0; l < 3; ++l) {
+                    const int r2 = sub >> l;
+                    terrainMesh(v, idx, -half + ci * csz, -half + cj * csz, csz, r2, H, nullptr, &hint);
+                    // as versões simples ficam um pouco abaixo: com menos pontos, o chão "esticado" subiria por cima
+                    // do cimentado e dos pisos (manchas verdes de longe)
+                    if (l > 0) for (Vertex& x : v) x.pos.y -= l == 1 ? 0.18f : 0.4f;
+                    const uint32_t W = uint32_t(r2 + 1);
+                    auto saia = [&](uint32_t a, uint32_t b) {  // vira para os dois lados (não importa de onde se olha)
+                        const uint32_t base = uint32_t(v.size());
+                        for (uint32_t k : {a, b}) { Vertex x = v[k]; x.pos.y -= 0.6f; v.push_back(x); }
+                        for (uint32_t k : {a, b, base, b, base + 1, base, a, base, b, b, base, base + 1}) idx.push_back(k);
+                    };
+                    for (uint32_t k = 0; k + 1 < W; ++k) {
+                        saia(k, k + 1);                                  // borda de baixo
+                        saia((W - 1) * W + k, (W - 1) * W + k + 1);      // de cima
+                        saia(k * W, (k + 1) * W);                        // esquerda
+                        saia(k * W + W - 1, (k + 1) * W + W - 1);        // direita
+                    }
+                    const MeshId m = e->renderer.createMesh(v.data(), uint32_t(v.size()), idx.data(), uint32_t(idx.size()), false);
+                    const Scene::Handle h = addMeshObject(e, "Morro", m, e->mats[int(Mat::Terrain)], glm::vec3(0.f), glm::vec3(1.f), glm::vec3(0.f), false);
+                    if (GameObject* go = e->scene.get(h); go && go->meshRenderer) {
+                        go->meshRenderer->castShadows = false;  // só recebe sombra
+                        go->meshRenderer->lodNear = l == 0 ? 0.f : kLodDist[l - 1];
+                        go->meshRenderer->lodFar = kLodDist[l];
+                    }
+                    c.objects.push_back(h);
+                }
         c.cx = 1 << 20;  // fora da grade do mundo infinito
     }
     Cells cells(30.f, 2);
@@ -331,10 +363,20 @@ void genFavela(Engine* e, Rng& r, glm::vec3& spawn, float& spawnYaw) {
         return false;
     };
     {
-        Geo& g = cells.at({-1e4f, 0, -1e4f});
-        g.place(glm::vec3(0.f), 0.f);
-        MeshBuilder& c = g[Mat::Concrete];
-        c.color = glm::vec4(1.f); c.uvTile = {1.f, 1.f};
+        // Degraus das escadarias, cada um na célula do mapa onde está (antes era um objeto só com todos os degraus,
+        // sempre desenhado inteiro). Perto: o degrau (sem a face de baixo, enterrada); longe: um degrau grosso a cada
+        // 1,8 m (4 vezes menos triângulos). O que fica atrás da câmera nem é desenhado.
+        std::set<Geo*> stepStarted;
+        auto stepGeo = [&](glm::vec3 p) -> Geo& {
+            Geo& gs = cells.at(p);
+            if (stepStarted.insert(&gs).second) gs.place(glm::vec3(0.f), 0.f);
+            return gs;
+        };
+        auto stepMesh = [](Geo& gs) -> MeshBuilder& {
+            MeshBuilder& m = gs[Mat::Concrete];
+            m.color = glm::vec4(1.f); m.uvTile = {1.f, 1.f};
+            return m;
+        };
         std::set<Geo*> railStarted;
         for (size_t ri = 0; ri < routes.size(); ++ri)
             for (size_t i = 0; i + 1 < routes[ri].size(); ++i) {
@@ -343,8 +385,18 @@ void genFavela(Engine* e, Rng& r, glm::vec3& spawn, float& spawnYaw) {
                 float L = glm::length(b - a), yaw = std::atan2(dir.x, dir.y);
                 for (float s = 0.f; s < L; s += 0.45f) {
                     glm::vec2 q = a + dir * (s + 0.225f);
-                    float h = H(q.x, q.y);
-                    yawBox(c, {q.x, h - 0.35f, q.y}, {2.8f, 0.42f, 0.47f}, yaw);  // degrau seguindo o morro
+                    const glm::vec3 p(q.x, H(q.x, q.y) - 0.35f, q.y);
+                    Geo& gs = stepGeo(p);
+                    DetailScope ds(gs);
+                    yawBox(stepMesh(gs), p, {2.8f, 0.42f, 0.47f}, yaw, 4);  // degrau seguindo o morro (sem o fundo)
+                }
+                for (float s = 0.f; s < L; s += 1.8f) {  // de longe
+                    const float len = std::min(1.8f, L - s);
+                    glm::vec2 q = a + dir * (s + len * 0.5f);
+                    const glm::vec3 p(q.x, H(q.x, q.y) - 0.35f, q.y);
+                    Geo& gs = stepGeo(p);
+                    FarScope fs(gs);
+                    yawBox(stepMesh(gs), p, {2.8f, 0.42f, len + 0.02f}, yaw, 4);
                 }
                 // corrimão de ferro onde a escadaria é íngreme
                 glm::vec2 side(-dir.y, dir.x);
@@ -487,6 +539,9 @@ void genFavela(Engine* e, Rng& r, glm::vec3& spawn, float& spawnYaw) {
             for (auto& [lc, lh] : lots) if (std::abs(cx - lc.x) < lh.x - 0.3f && std::abs(cz - lc.y) < lh.y - 0.3f) return true;
             return false;
         };
+        // células planas: guardadas e desenhadas depois em placas de 2x2 m quando as 4 forem planas (4x menos triângulos)
+        struct Plana { glm::vec4 col; Geo* g; };
+        std::map<std::pair<int, int>, Plana> planas;
         for (float z = -96.f; z < 94.f; z += 1.f)
             for (float x = -98.f; x < 98.f; x += 1.f) {
                 float cx = x + 0.5f, cz = z + 0.5f;
@@ -508,7 +563,7 @@ void genFavela(Engine* e, Rng& r, glm::vec3& spawn, float& spawnYaw) {
                 };
                 float gx = ((h10 - h00) + (h11 - h01)) * 0.5f, gz = ((h01 - h00) + (h11 - h10)) * 0.5f;
                 float slope = std::max(std::abs(gx), std::abs(gz));
-                if (slope < 0.2f) { flat(g[Mat::Cement]); continue; }
+                if (slope < 0.2f) { planas[{int(x), int(z)}] = {col, &g}; continue; }
                 { FarScope fs(g); flat(g[Mat::Cement]); }  // de longe: liso
                 DetailScope ds(g);
                 MeshBuilder& m = g[Mat::Cement];
@@ -542,6 +597,30 @@ void genFavela(Engine* e, Rng& r, glm::vec3& spawn, float& spawnYaw) {
                     if (glm::dot(nrm, want) < 0.f) m.quad(r0, r3, r2, r1, ruv); else m.quad(r0, r1, r2, r3, ruv);
                 }
             }
+        std::set<std::pair<int, int>> feitas;
+        for (auto& [k, pl] : planas) {
+            if (feitas.count(k)) continue;
+            const int x = k.first, z = k.second;
+            int sz = 1;
+            if ((x & 1) == 0 && (z & 1) == 0) {  // canto de um bloco 2x2: as 4 planas, na mesma célula do mapa e livres?
+                bool ok = true;
+                glm::vec4 soma(0.f);
+                for (int dz = 0; dz < 2 && ok; ++dz)
+                    for (int dx = 0; dx < 2 && ok; ++dx) {
+                        auto it = planas.find({x + dx, z + dz});
+                        ok = it != planas.end() && it->second.g == pl.g && !feitas.count({x + dx, z + dz});
+                        if (ok) soma += it->second.col;
+                    }
+                if (ok) { sz = 2; pl.col = soma / 4.f; }
+            }
+            for (int dz = 0; dz < sz; ++dz)
+                for (int dx = 0; dx < sz; ++dx) feitas.insert({x + dx, z + dz});
+            const float X = float(x), Z = float(z), S = float(sz);
+            MeshBuilder& m = (*pl.g)[Mat::Cement];
+            m.color = pl.col;
+            glm::vec2 uv[4] = {{X / 2.f, Z / 2.f}, {X / 2.f, (Z + S) / 2.f}, {(X + S) / 2.f, (Z + S) / 2.f}, {(X + S) / 2.f, Z / 2.f}};
+            m.quad({X, H(X, Z) + 0.04f, Z}, {X, H(X, Z + S) + 0.04f, Z + S}, {X + S, H(X + S, Z + S) + 0.04f, Z + S}, {X + S, H(X + S, Z) + 0.04f, Z}, uv);
+        }
     }
 
     // ---- muros de arrimo dos patamares (grafitados) ----

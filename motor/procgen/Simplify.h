@@ -14,6 +14,6 @@ void simplifyMesh(std::vector<Vertex>& v, std::vector<uint32_t>& idx, float rati
 
 // Versão de longe (bem grosseira): junta os vértices que caem no mesmo cubinho de uma grade com `res` cubos no lado
 // maior da malha (e com a normal para o mesmo lado). Ignora costuras de textura: serve para o que só aparece longe.
-void clusterSimplify(std::vector<Vertex>& v, std::vector<uint32_t>& idx, int res);
+void clusterSimplify(std::vector<Vertex>& v, std::vector<uint32_t>& idx, int res, float cellAbs = 0.f);  // cellAbs > 0: célula fixa (unidade do modelo)
 
 }  // namespace eng

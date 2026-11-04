@@ -1,3 +1,4 @@
+#include <cctype>
 #include "render/Renderer.h"
 #if defined(__EMSCRIPTEN__) || defined(MOTOR_GLSL300)
 #include <regex>
@@ -384,6 +385,13 @@ void Renderer::submit(const GameObject& go, const glm::mat4& model, const glm::m
     }
     if (!mask) return;
     if (mask & 1u) ++stats_.visibleObjects;
+    if ((mask & 1u) && trisPorNome) {
+        std::string n = go.name;
+        if (std::getenv("TRIS_PAI") && go.transform.parent && go.transform.parent->owner) n += std::string(" em ") + go.transform.parent->owner->name;
+        else if (n == "Peça" && go.transform.parent && go.transform.parent->owner) n = std::string("Peça de ") + go.transform.parent->owner->name + (std::getenv("TRIS_ARMA") ? " #" + std::to_string(reinterpret_cast<uintptr_t>(go.transform.parent) % 100000) + "x" : std::string());
+        while (!n.empty() && (std::isdigit((unsigned char)n.back()) || n.back() == ' ' || n.back() == '_')) n.pop_back();
+        (*trisPorNome)[n] += mesh.indexCount / 3;
+    }
     draws_[drawCount_++] = {(uint64_t(mr.material) << 32) | mr.mesh, m, mr.mesh, mr.material, palette, mask};
 }
 

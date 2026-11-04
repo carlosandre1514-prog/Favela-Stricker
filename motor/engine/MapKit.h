@@ -35,7 +35,7 @@ void setBounds(Engine* e, glm::vec2 mn, glm::vec2 mx);                      // p
 void roadStrip(MeshBuilder& b, glm::vec2 a, glm::vec2 c, float w, float y);  // faixa de rua
 void groundBox(Geo& g, Mat m, glm::vec2 mn, glm::vec2 mx, float top, float tile);
 void segBox(MeshBuilder& m, glm::vec3 a, glm::vec3 b, float t, float t2 = -1.f);  // barra de a até b
-void yawBox(MeshBuilder& m, glm::vec3 base, glm::vec3 size, float yaw);
+void yawBox(MeshBuilder& m, glm::vec3 base, glm::vec3 size, float yaw, unsigned skipFaces = 0);  // skipFaces: como em MeshBuilder::box
 void wire(MeshBuilder& m, glm::vec3 a, glm::vec3 b, float sag);             // fio caído entre dois pontos
 void muralQuad(Geo& g, int idx, glm::vec3 c, glm::vec3 n, float w);         // pichação/placa numa parede
 

@@ -1,6 +1,7 @@
 #define TINYGLTF_IMPLEMENTATION
 #define TINYGLTF_NO_STB_IMAGE_WRITE
 #define STB_IMAGE_IMPLEMENTATION
+#include <cstdlib>
 #include <tiny_gltf.h>
 #include <algorithm>
 #include <cstdio>
@@ -271,13 +272,23 @@ bool loadGltf(const char* path, LoadContext& ctx, LoadedModel& out) {
     for (const auto& n : model.nodes)
         if (n.mesh >= 0 && n.mesh < int(model.meshes.size()) && n.skin >= 0 && n.skin < int(model.skins.size())) meshSkin[n.mesh] = n.skin;
     std::vector<std::vector<std::pair<MeshId, MaterialId>>> meshPrims(model.meshes.size());
+    // tamanho do modelo (maior medida das peças): a versão de longe agrupa os vértices numa grade do modelo inteiro
+    // (peça por peça, as pequenas ficavam com todo o detalhe: a arma de longe ainda tinha 4 a 9 mil triângulos)
+    float modelSize = 0.f;
+    for (const auto& m : model.meshes)
+        for (const auto& pr : m.primitives)
+            if (auto it = pr.attributes.find("POSITION"); it != pr.attributes.end() && it->second >= 0 && it->second < int(model.accessors.size())) {
+                const auto& ac = model.accessors[it->second];
+                if (ac.minValues.size() >= 3 && ac.maxValues.size() >= 3)
+                    for (int k = 0; k < 3; ++k) modelSize = std::max(modelSize, float(ac.maxValues[k] - ac.minValues[k]));
+            }
     for (size_t mi = 0; mi < model.meshes.size(); ++mi)
         for (size_t pi = 0; pi < model.meshes[mi].primitives.size(); ++pi) {
             const auto& prim = model.meshes[mi].primitives[pi];
             // personagens: a fração do nível; o resto (armas aparecem de perto) no máximo pela metade; a versão de
             // longe das armas pede a sua (simplifyOverride)
             const float fracao = renderer.simplifyOverride > 0.f ? renderer.simplifyOverride
-                               : personagem ? renderer.simplify : std::max(renderer.simplify, 0.5f);
+                               : personagem ? renderer.simplify : std::max(renderer.simplify, renderer.simplify <= 0.25f ? 0.3f : 0.5f);  // Leve: 30%
             const std::string cacheKey = std::string(path) + "#" + std::to_string(mi) + "#" + std::to_string(pi) + "#" +
                                          std::to_string(int(fracao * 1000.f));
             auto cached = renderer.meshCache.find(cacheKey);
@@ -290,7 +301,10 @@ bool loadGltf(const char* path, LoadContext& ctx, LoadedModel& out) {
                     for (auto& vx : v)
                         for (int k = 0; k < 4; ++k) vx.joints[k] = uint16_t(vx.joints[k] < remap.size() ? remap[vx.joints[k]] : 0);
                 }
-                if (renderer.simplifyOverride > 0.f) clusterSimplify(v, idx, int(24.f + renderer.simplifyOverride * 200.f));
+                if (renderer.simplifyOverride > 0.f) {
+                    const int grid = int(12.f + renderer.simplifyOverride * 200.f);  // Leve 19 células no comprimento da arma
+                    clusterSimplify(v, idx, grid, modelSize > 0.f ? modelSize / float(grid) : 0.f);
+                }
                 else if (fracao < 1.f) simplifyMesh(v, idx, fracao);
                 id = renderer.createMesh(v.data(), uint32_t(v.size()), idx.data(), uint32_t(idx.size()), skinned);
                 if (id == kInvalidId) continue;

@@ -319,6 +319,19 @@ int main(int argc, char** argv) {
         }
         save(out, "40_partida.png");
         stats(e, "partida");
+        if (std::getenv("TRIS")) {  // de onde vêm os triângulos (por nome de objeto)
+            std::map<std::string, long> por;
+            eng::Engine* E = reinterpret_cast<eng::Engine*>(e);
+            E->renderer.trisPorNome = &por;
+            frames(e, 1);
+            E->renderer.trisPorNome = nullptr;
+            std::vector<std::pair<long, std::string>> v;
+            long tot = 0;
+            for (auto& [n, t] : por) { v.push_back({t, n}); tot += t; }
+            std::sort(v.rbegin(), v.rend());
+            std::printf("  triângulos por objeto (total %ld):\n", tot);
+            for (size_t i = 0; i < v.size() && i < 25; ++i) std::printf("    %7ld  %s\n", v[i].first, v[i].second.c_str());
+        }
         {   // de cima, olhando o mapa inteiro (onde a distância de visão e os detalhes contam)
             engine_set_first_person(e, 0);
             engine_set_camera(e, 0.f, 22.f, 45.f, 0.f, 0.35f, 30.f);

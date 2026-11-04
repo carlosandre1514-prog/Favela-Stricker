@@ -146,8 +146,10 @@ class Firebase {
   }
   async tokenValido() { if (this.refresh && Date.now() > this.expira) await this.restaurar(this.refresh); return this.token; }
   async url(caminho) { const t = await this.tokenValido(); return `${this.db}/${caminho}.json` + (t ? '?auth=' + encodeURIComponent(t) : ''); }
-  async pedir(metodo, caminho, corpo) {
+  async pedir(metodo, caminho, corpo, tentou) {
     const r = await fetch(await this.url(caminho), { method: metodo, headers: corpo !== undefined ? { 'Content-Type': 'application/json' } : {}, body: corpo !== undefined ? JSON.stringify(corpo) : undefined });
+    // 401: o login pode ter vencido; renova uma vez e tenta de novo antes de culpar as regras
+    if (r.status === 401 && !tentou && this.refresh && await this.restaurar(this.refresh)) return this.pedir(metodo, caminho, corpo, true);
     const texto = await r.text();
     let dado = null;
     try { dado = JSON.parse(texto); } catch (_) {}
@@ -206,12 +208,18 @@ async function carregarConta() {
 const LETRAS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 class Sala {
   constructor(codigo, host) { this.codigo = codigo; this.host = host; this.jogadores = {}; this.estado = 'espera'; this.fechada = false; this.ouvintes = []; }
+  // 401/403: o banco (Realtime Database) recusou pelas regras; o resto é rede ou endereço do banco
+  static erroBanco(code) {
+    if (code === 401 || code === 403) return 'O banco do Firebase recusou (' + code + '): no Firebase, abra Realtime Database → Regras e cole as regras do README (salas e usuarios para quem está logado).';
+    if (code === 404) return 'Banco não encontrado (404): confira o databaseURL em web/config_jogo.js.';
+    return 'o Firebase recusou (' + code + ')';
+  }
   static novoCodigo() { let s = ''; for (let i = 0; i < 6; i++) s += LETRAS[Math.floor(Math.random() * LETRAS.length)]; return s; }
   static async criar(eu) {
     for (let k = 0; k < 6; k++) {
       const c = Sala.novoCodigo();
       const g = await fb.get('salas/' + c);
-      if (!g.ok) return [null, `o Firebase recusou (${g.code}). Veja as regras do banco.`];
+      if (!g.ok) return [null, Sala.erroBanco(g.code)];
       if (g.dado !== null) continue;
       const r = await fb.put('salas/' + c, { host: fb.uid, estado: 'espera', criada: { '.sv': 'timestamp' }, jogadores: { [fb.uid]: eu } });
       if (!r.ok) return [null, `não consegui criar a sala (${r.code})`];
@@ -222,7 +230,7 @@ class Sala {
   static async entrar(codigo, eu) {
     const c = codigo.trim().toUpperCase();
     const g = await fb.get('salas/' + c);
-    if (!g.ok) return [null, `o Firebase recusou (${g.code})`];
+    if (!g.ok) return [null, Sala.erroBanco(g.code)];
     if (!g.dado) return [null, 'não existe sala com o código ' + c];
     if (g.dado.estado !== 'espera') return [null, 'essa sala já está jogando'];
     const js = g.dado.jogadores || {};

@@ -186,12 +186,12 @@ void simplifyMesh(std::vector<Vertex>& vs, std::vector<uint32_t>& idx, float rat
     idx.swap(outI);
 }
 
-void clusterSimplify(std::vector<Vertex>& v, std::vector<uint32_t>& idx, int res) {
+void clusterSimplify(std::vector<Vertex>& v, std::vector<uint32_t>& idx, int res, float cellAbs) {
     if (v.empty() || idx.size() < 3 || res < 2) return;
     glm::vec3 mn(1e30f), mx(-1e30f);
     for (const Vertex& x : v) { mn = glm::min(mn, x.pos); mx = glm::max(mx, x.pos); }
     const glm::vec3 ext = mx - mn;
-    const float cell = std::max({ext.x, ext.y, ext.z, 1e-6f}) / float(res);
+    const float cell = cellAbs > 0.f ? cellAbs : std::max({ext.x, ext.y, ext.z, 1e-6f}) / float(res);
     std::unordered_map<uint64_t, uint32_t> cluster;
     std::vector<Vertex> out;
     std::vector<uint32_t> count, remap(v.size());
