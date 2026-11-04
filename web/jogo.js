@@ -152,7 +152,7 @@ function telaLado() {
         <span class="texto" style="color:#DBEAFE">Nasce fora da favela, na rua dos prédios. Sobe as escadarias para tomar o morro.</span>
         <span class="cresce"></span>
         <div class="linha" style="gap:6px;flex-wrap:wrap"><span class="tag" style="background:rgba(59,130,246,.22);color:#DBEAFE">M4A1 · M4 Colt com luneta</span>
-          <span class="tag" style="background:rgba(59,130,246,.22);color:#DBEAFE">5 fardas grátis: PM, Civil, Exército, Choque, Especial</span></div>
+          <span class="tag" style="background:rgba(59,130,246,.22);color:#DBEAFE">5 fardas grátis: PM, Civil, Exército, Choque, BOPE</span></div>
         <div class="linha" style="justify-content:space-between"><span style="font-size:12px;color:#BFDBFE">4 robôs + você</span><span class="entrar" style="background:#3B82F6">ENTRAR</span></div>
       </button>
       <button class="lado ban" data-time="1">

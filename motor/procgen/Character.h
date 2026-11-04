@@ -1,5 +1,7 @@
 #pragma once
 #include <glm/glm.hpp>
+#include <string>
+#include <vector>
 #include "assets/GltfLoader.h"
 #include "procgen/MeshBuilder.h"
 
@@ -48,6 +50,7 @@ struct CharacterParams {
     // Skin pintada (imagem no molde de tools/gerar_molde_personagem.py): só os blocos do corpo, com a imagem
     // por cima. molde[parte][face]: (u0, v0, u1, v1) na imagem; partes na ordem de SkinPart, faces na ordem
     // frente, costas, lado esquerdo (+X), lado direito (-X), topo, base.
+    std::string cabeloModelo;  // cabelo de modelo 3D (shaders/kit/personagens/cabelos/<nome>.bin); vazio = cabelo3d
     int cabelo3d = 0;         // cabelo 3D de blocos por cima da cabeça: 0 nenhum, 1 cacheado, 2 black, 3 curto, 4 dreads
     bool texturizado = false;
     glm::vec4 molde[8][6];
@@ -63,7 +66,10 @@ void buildCharacter(const CharacterParams& p, LoadedModel& out, MeshBuilder& mes
 void buildBlockVest(const CharacterParams& p, MeshBuilder& mesh);
 // Cabelo 3D (p.cabelo3d): touca arredondada + espirais (cacheado/curto), bolinhas (black) ou mechas (dreads), no espaço do
 // personagem; vai preso no osso da cabeça. Com skin pintada, usa o desenho do cabelo do TOPO da cabeça; sem, a cor p.hair.
-void buildBlockHair(const CharacterParams& p, Geo& g, uint32_t seed);  // a base fica sempre; cachos/mechas só de perto
+void buildBlockHair(const CharacterParams& p, Geo& g, uint32_t seed);
+// Cabelo de modelo 3D (arquivo .bin feito por tools/converter_cabelo.py): a touca arredondada na cor do modelo (sempre)
+// e as peças do modelo (cachos, twists, mechas) na camada de detalhe. false = arquivo inválido.
+bool buildModelHair(const CharacterParams& p, Geo& g, const std::vector<uint8_t>& data);  // a base fica sempre; cachos/mechas só de perto
 
 // Armas: origem no ponto de empunhadura, cano para +Z, topo para +Y
 enum WeaponKind { WK_Pistol, WK_Rifle, WK_Shotgun, WK_Sniper, WK_Knife, WK_Bat, WK_Count };

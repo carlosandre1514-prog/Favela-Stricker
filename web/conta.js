@@ -18,7 +18,7 @@ const ROUPAS = [
   { key: 'civil', nome: 'Polícia Civil', time: 0, i: 1, preco: 0, raridade: 'comum' },
   { key: 'exercito', nome: 'Exército', time: 0, i: 2, preco: 0, raridade: 'comum' },
   { key: 'choque', nome: 'Choque', time: 0, i: 3, preco: 0, raridade: 'comum' },
-  { key: 'especial', nome: 'Especial', time: 0, i: 4, preco: 0, raridade: 'comum' },
+  { key: 'especial', nome: 'BOPE', time: 0, i: 4, preco: 0, raridade: 'comum' },
   { key: 'rubro', nome: 'Rubro', time: 1, i: 0, preco: 0, raridade: 'comum' },
   { key: 'alvinegro', nome: 'Alvinegro', time: 1, i: 1, preco: 0, raridade: 'comum' },
   { key: 'tricolor', nome: 'Tricolor', time: 1, i: 2, preco: 0, raridade: 'comum' },

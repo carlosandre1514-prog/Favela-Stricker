@@ -1,3 +1,4 @@
+#include <cstring>
 #include "procgen/Character.h"
 #include "procgen/Mocap.h"
 #include <cmath>
@@ -756,6 +757,51 @@ void buildBlockHair(const CharacterParams& p, Geo& g, uint32_t seed) {
         }
     }
     base.color = glm::vec4(1.f);
+}
+
+// Cabelo de modelo 3D. Unidade do arquivo: 0,1 × altura, origem no centro da cabeça (0,915H); eixos do jogo.
+bool buildModelHair(const CharacterParams& p, Geo& g, const std::vector<uint8_t>& data) {
+    if (data.size() < 16 || std::memcmp(data.data(), "CAB2", 4) != 0) return false;
+    uint32_t nv = 0, ni = 0;
+    std::memcpy(&nv, data.data() + 8, 4);
+    std::memcpy(&ni, data.data() + 12, 4);
+    const size_t vb = 28;  // 6 floats + 4 bytes
+    if (data.size() != 16 + size_t(nv) * vb + size_t(ni) * 4) return false;
+    auto lin = [](uint8_t c) { return std::pow(c / 255.f, 2.2f); };
+    const float H = p.height, s = 0.1f * H;
+    const glm::vec3 o(0.f, 0.915f * H, 0.f);
+    // touca (sempre): a mesma de buildBlockHair, na cor do domo do modelo
+    MeshBuilder& base = g[Mat::Painted];
+    base.joint = -1; base.xf = glm::mat4(1.f); base.uvTile = glm::vec2(0.f);
+    base.color = glm::vec4(lin(data[4]), lin(data[5]), lin(data[6]), 1.f);
+    HairMesh hb{base};
+    // meia touca (TOUCA_C / TOUCA_R de tools/converter_cabelo.py, em 0,1H)
+    hb.cap(o + glm::vec3(0.f, 0.3f, 0.f) * s, glm::vec3(0.93f, 0.78f, 0.95f) * s, 1.5708f, 1.5708f, 16, 6, glm::vec4(0.f, 0.f, 1.f, 1.f));
+    base.color = glm::vec4(1.f);
+    // peças (só de perto)
+    DetailScope ds(g);
+    MeshBuilder& det = g[Mat::Painted];
+    det.joint = -1; det.xf = glm::mat4(1.f); det.uvTile = glm::vec2(0.f);
+    const uint32_t v0 = uint32_t(det.v.size());
+    const uint8_t* q = data.data() + 16;
+    det.v.reserve(det.v.size() + nv);
+    for (uint32_t i = 0; i < nv; ++i, q += vb) {
+        float f[6];
+        std::memcpy(f, q, sizeof f);
+        det.color = glm::vec4(lin(q[24]), lin(q[25]), lin(q[26]), 1.f);
+        const glm::vec3 n(f[3], f[4], f[5]);
+        const glm::vec3 t = std::abs(n.y) < 0.9f ? glm::normalize(glm::cross(glm::vec3(0, 1, 0), n)) : glm::vec3(1, 0, 0);
+        det.pushVertex(o + glm::vec3(f[0], f[1], f[2]) * s, n, glm::vec2(0.5f), t);
+    }
+    det.idx.reserve(det.idx.size() + ni);
+    for (uint32_t i = 0; i < ni; ++i, q += 4) {
+        uint32_t k;
+        std::memcpy(&k, q, 4);
+        if (k >= nv) return false;
+        det.idx.push_back(v0 + k);
+    }
+    det.color = glm::vec4(1.f);
+    return true;
 }
 
 void buildCharacter(const CharacterParams& p, LoadedModel& out, MeshBuilder& b) {

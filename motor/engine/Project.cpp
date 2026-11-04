@@ -301,6 +301,7 @@ CharacterParams characterParams(const json& spec, uint32_t seed) {
     if (auto k = a.find("cor3"); k != a.end() && colorOf(*k, c)) p.cor3 = linear(c);
     p.bermuda = flag(a, "bermuda", false);
     if (auto k = a.find("luvas"); k != a.end() && colorOf(*k, c)) p.luvas = linear(c);
+    if (auto k = a.find("cabelo_modelo"); k != a.end() && k->is_string()) p.cabeloModelo = k->get<std::string>();
     if (auto k = a.find("cabelo_3d"); k != a.end() && k->is_string())
         p.cabelo3d = lookup(k->get<std::string>(), {{"nenhum", 0}, {"cacheado", 1}, {"black", 2}, {"afro", 2}, {"curto", 3}, {"dreads", 4}}, 0);
     if (p.bloco) { p.height = 1.75f; p.build = 1; }  // todos do mesmo tamanho
@@ -942,7 +943,32 @@ int createFromSpecJson(Engine* e, const std::string& specJson, std::string* err)
             buildBlockVest(p, vest[Mat::Painted]);
             if (attachGearMesh(e, ci, CJ_Chest, vest, "Colete") < 0) e->lastError.clear();
         }
-        if (p.bloco && p.cabelo3d > 0 && (p.chapeu == 0 || p.texturizado)) {  // cabelo 3D (por cima da cabeça)
+        // cabelo de modelo 3D (cor própria, sem a textura da skin); se o arquivo faltar, cai no cabelo 3D gerado
+        bool modelHair = false;
+        if (p.bloco && !p.cabeloModelo.empty()) {
+            static std::map<std::string, std::vector<uint8_t>> cache;  // cada arquivo é lido uma vez só
+            auto it = cache.find(p.cabeloModelo);
+            if (it == cache.end()) {
+                std::vector<uint8_t> d;
+                if (FILE* f = std::fopen(kitPath(e, "personagens/cabelos/" + p.cabeloModelo + ".bin").c_str(), "rb")) {
+                    std::fseek(f, 0, SEEK_END);
+                    long n = std::ftell(f);
+                    std::fseek(f, 0, SEEK_SET);
+                    if (n > 0) { d.resize(size_t(n)); if (std::fread(d.data(), 1, d.size(), f) != d.size()) d.clear(); }
+                    std::fclose(f);
+                }
+                it = cache.emplace(p.cabeloModelo, std::move(d)).first;
+            }
+            Geo hair;
+            hair.place(glm::vec3(0.f), 0.f);
+            if (buildModelHair(p, hair, it->second)) {
+                modelHair = true;
+                const int hid = attachGearMesh(e, ci, CJ_Head, hair, "Cabelo");
+                if (hid < 0) e->lastError.clear();
+                else e->characters[ci].hair = e->objects[hid];
+            }
+        }
+        if (!modelHair && p.bloco && p.cabelo3d > 0 && (p.chapeu == 0 || p.texturizado)) {  // cabelo 3D (por cima da cabeça)
             Geo hair;
             hair.place(glm::vec3(0.f), 0.f);
             buildBlockHair(p, hair, seed);

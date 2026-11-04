@@ -1,0 +1,3 @@
+Cabelos de modelo 3D dos bandidos (cacheado = Faixa, twists = Alvinegro, ondulado = Tricolor, branco = Rubro).
+Cada .bin sai de um .obj com tools/converter_cabelo.py (veja a explicação no começo do script).
+Na roupa: "cabelo_modelo": "<nome do arquivo sem .bin>".
