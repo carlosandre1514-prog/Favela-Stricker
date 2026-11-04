@@ -141,7 +141,7 @@ function telaInicio() {
     <button class="destaque" data-ir="mercado">
       <div class="linha" style="gap:8px"><span class="etiqueta fundo-${d.raridade}">${RARIDADES[d.raridade].toUpperCase()}</span><span class="dica" style="color:#D1D5DB">Destaque do mercado</span></div>
       <img src="armas/${d.arma}_${d.key}.png" alt="${esc(d.nome)}">
-      <div class="linha" style="justify-content:space-between"><span class="bebas" style="font-size:28px">${esc(d.nome.toUpperCase().replace(' ', ' · '))}</span>
+      <div class="linha" style="justify-content:space-between"><span class="bebas" style="font-size:21px">${esc(d.nome.toUpperCase().replace(' ', ' · '))}</span>
         <span class="linha" style="gap:6px;font-size:15px;font-weight:800;color:#FCD34D">${ICONE.moeda(14)} ${fmt(d.preco)}</span></div>
     </button>
   </div>`), 'inicio');
