@@ -57,6 +57,8 @@ CharacterParams randomCharacter(uint32_t seed);
 
 // Gera esqueleto + animações em `out` (skeletons[0], clips) e a malha com skinning em `mesh`
 void buildCharacter(const CharacterParams& p, LoadedModel& out, MeshBuilder& mesh);
+// Colete do boneco em blocos como peça separada (malha no espaço do personagem; vai preso no osso do peito)
+void buildBlockVest(const CharacterParams& p, MeshBuilder& mesh);
 
 // Armas: origem no ponto de empunhadura, cano para +Z, topo para +Y
 enum WeaponKind { WK_Pistol, WK_Rifle, WK_Shotgun, WK_Sniper, WK_Knife, WK_Bat, WK_Count };

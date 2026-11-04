@@ -934,6 +934,12 @@ int createFromSpecJson(Engine* e, const std::string& specJson, std::string* err)
         int id = createCharacter(e, p, pos, yaw, controllable);
         if (id < 0) return fail(e->lastError.empty() ? "não consegui criar o personagem" : e->lastError);
         int ci = int(e->characters.size()) - 1;
+        if (p.bloco && p.colete) {  // colete: peça separada, por cima da roupa (preso no peito)
+            Geo vest;
+            vest.place(glm::vec3(0.f), 0.f);
+            buildBlockVest(p, vest[Mat::Painted]);
+            if (attachGearMesh(e, ci, CJ_Chest, vest, "Colete") < 0) e->lastError.clear();
+        }
         if (!skinFile.empty())  // skin pintada: a imagem por cima dos blocos (cada imagem vai uma vez só para a memória)
             if (GameObject* g = e->scene.get(e->objects[id]))
                 applyMaterialTo(e, *g, true, json{{"textura", skinFile}, {"metal", 0.f}, {"rugosidade", 0.85f}});

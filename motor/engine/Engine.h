@@ -350,6 +350,7 @@ struct WeaponLook {
 };
 int createWeapon(Engine* e, int kind, int character, const WeaponLook& look = {});
 int holsterWeapon(Engine* e, int ch, int kind, const WeaponLook& look);  // guarda a arma no corpo (-1 tira)
+int attachGearMesh(Engine* e, int ch, int charJoint, Geo& g, const char* name);  // peça montada no espaço do personagem, presa ao osso
 std::string accessoriesList(uint32_t accessories);  // ["mira","coronha",...] em JSON   // character < 0: solto no chão
 void setPlayer(Engine* e, int character);
 void updatePlayer(Engine* e, float dt);

@@ -418,12 +418,7 @@ static void buildBlockBody(const CharacterParams& p, MeshBuilder& b, float H, fl
     } else if (p.estampa == 5) {  // gola
         part(CJ_Chest, p.cor2, {0, chestTop - 0.012f * H, 0}, {0.1f * H, 0.024f * H, td + 2.f * e});
     }
-    if (p.colete) {  // colete por cima da camisa, com bolsos
-        part(CJ_Chest, p.coleteCor, {0, 0.745f * H, 0}, {tw + 4.f * e, 0.15f * H, td + 4.f * e});
-        part(CJ_Spine, p.coleteCor, {0, 0.655f * H, 0}, {tw + 4.f * e, 0.04f * H, td + 4.f * e});
-        for (float x : {-0.06f, 0.f, 0.06f})
-            part(CJ_Spine, p.coleteCor * 0.8f, {x * H, 0.66f * H, td / 2 + 3.f * e}, {0.04f * H, 0.05f * H, 0.02f * H});
-    }
+    // (o colete é uma peça separada, que veste o boneco por cima: buildBlockVest)
     // ---- cabeça: bloco com rostinho
     const float hs = 0.15f * H, hy = 0.915f * H, hf = 0.07f * H;  // tamanho, centro e frente
     const bool touca = p.chapeu == 3;
@@ -467,6 +462,37 @@ static void buildBlockBody(const CharacterParams& p, MeshBuilder& b, float H, fl
         part(sh, p.bermuda ? p.skin : p.pants, {x, (kneeY + ankleY) * 0.5f + 0.01f * H, 0}, {lw * 0.94f, kneeY - ankleY + 0.01f * H, td * 0.9f});
         part(ft, p.shoes, {x, 0.03f * H, 0.018f * H}, {lw * 0.98f, 0.06f * H, td * 1.15f});
     }
+}
+
+// Colete tático do boneco em blocos, como peça separada do corpo (veste por cima da roupa ou da skin pintada).
+// Malha no espaço do personagem (pés na origem, frente +Z); quem usa prende no osso do peito (attachGearMesh).
+// Placas da frente e de trás, faixa da cintura, alças nos ombros e porta-carregadores na frente.
+void buildBlockVest(const CharacterParams& p, MeshBuilder& b) {
+    const float H = p.height;
+    const float hw = 0.125f * H, hd = 0.066f * H;            // por fora do tronco (0,12H x 0,06H)
+    const float y0 = 0.6f * H, y1 = 0.83f * H;               // da barriga até perto dos ombros
+    glm::vec4 cor = p.coleteCor.a > 0.f ? p.coleteCor : srgb(32, 34, 38);
+    cor.a = 1.f;
+    const glm::vec4 escuro(cor.r * 0.7f, cor.g * 0.7f, cor.b * 0.7f, 1.f), alca(cor.r * 0.85f, cor.g * 0.85f, cor.b * 0.85f, 1.f);
+    b.joint = -1;
+    b.xf = glm::mat4(1.f);
+    b.uvTile = glm::vec2(0.f);
+    auto bx = [&](glm::vec4 c, glm::vec3 mn, glm::vec3 mx) { b.color = c; b.box(mn, mx - mn); };
+    // placas e laterais (a lateral é mais baixa: o braço passa por cima)
+    bx(cor, {-hw, y0, hd - 0.012f * H}, {hw, y1, hd});                       // frente
+    bx(cor, {-hw, y0, -hd}, {hw, y1, -hd + 0.012f * H});                     // costas
+    for (float s : {-1.f, 1.f}) bx(escuro, {s > 0 ? hw - 0.01f * H : -hw, y0, -hd}, {s > 0 ? hw : -hw + 0.01f * H, 0.72f * H, hd});
+    bx(escuro, {-hw - 0.003f * H, y0, -hd - 0.003f * H}, {hw + 0.003f * H, y0 + 0.04f * H, hd + 0.003f * H});  // faixa da cintura
+    // alças: por cima dos ombros, da frente até as costas
+    for (float s : {-1.f, 1.f}) {
+        const float xa = s * 0.055f * H - 0.022f * H, xb = s * 0.055f * H + 0.022f * H;
+        bx(alca, {xa, y1 - 0.004f * H, -hd}, {xb, y1 + 0.008f * H, hd});
+    }
+    // porta-carregadores na frente (3) e um painel nas costas
+    for (float x : {-0.07f, 0.f, 0.07f})
+        bx(escuro, {(x - 0.028f) * H, 0.625f * H, hd}, {(x + 0.028f) * H, 0.69f * H, hd + 0.018f * H});
+    bx(escuro, {-0.08f * H, 0.7f * H, -hd - 0.01f * H}, {0.08f * H, 0.79f * H, -hd});
+    b.color = glm::vec4(1.f);
 }
 
 void buildCharacter(const CharacterParams& p, LoadedModel& out, MeshBuilder& b) {

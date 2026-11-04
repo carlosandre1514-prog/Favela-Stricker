@@ -686,6 +686,25 @@ int createWeapon(Engine* e, int kind, int ch, const WeaponLook& look) {
 // Arma guardada no corpo (a que não está na mão), como no Free Fire: fuzil nas costas, na diagonal com o cano
 // subindo pelo ombro direito; pistola na coxa direita. Presa ao osso do peito/quadril, acompanha a animação.
 // kind < 0: só tira a que estava guardada.
+// Peça (malha montada no espaço do personagem, na pose de origem) presa a um osso: acompanha as animações.
+// Sai junto quando o personagem é apagado. Devolve o id do objeto ou -1.
+int attachGearMesh(Engine* e, int ch, int charJoint, Geo& g, const char* name) {
+    if (ch < 0 || ch >= int(e->characters.size())) return -1;
+    CharacterInfo& c = e->characters[ch];
+    Animator* a = c.anim;
+    if (!a || !a->skeleton) return -1;
+    const int joint = a->retarget ? a->retarget->targetOf[charJoint] : (a->skeleton->jointCount == CJ_Total ? charJoint : -1);
+    if (joint < 0) return -1;
+    Scene::Handle h = spawnGeo(e, g, name, true);
+    GameObject* o = e->scene.get(h);
+    if (!o) return -1;
+    Scene::forEachInSubtree(*o, [](GameObject& x) { if (x.meshRenderer) x.meshRenderer->castShadows = true; });
+    e->attachments.push_back({h, a, joint, a->skeleton->inverseBind[joint]});
+    c.gear.push_back(h);
+    updateAttachments(e);
+    return o->id;
+}
+
 int holsterWeapon(Engine* e, int ch, int kind, const WeaponLook& look) {
     if (ch < 0 || ch >= int(e->characters.size())) return -1;
     CharacterInfo& c = e->characters[ch];

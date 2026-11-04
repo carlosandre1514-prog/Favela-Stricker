@@ -399,6 +399,7 @@ int main(int argc, char** argv) {
         for (int t = 0; t < 2; ++t)
             for (int k = 0; k < 5; ++k) {
                 json look = json::parse(jogo_aparencia_roupa(t, k));
+                if (std::getenv("COLETE")) { look["colete"] = true; look["cor_colete"] = "#2A2D33"; }  // colete em todas (conferir)
                 int id = engine_add_spec(e, json{{"tipo", "personagem"}, {"aparencia", look}, {"semente", 7}, {"pos", {0, 0, 0}}}.dump().c_str());
                 if (id < 0) { std::printf("  [ERRO] roupa %d %d: %s\n", t, k, engine_last_error(e)); ++g_fail; continue; }
                 engine_set_camera(e, 0.f, 0.95f, 0.f, 0.35f, 0.08f, 3.2f);
