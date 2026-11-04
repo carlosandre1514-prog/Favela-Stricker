@@ -141,8 +141,10 @@ const config = Object.assign({}, CONFIG_PADRAO, guardado.get('config', {}));
 function salvarConfig() { guardado.set('config', config); }
 
 // ---------------- moedas e itens ----------------
+// Jogador novo começa com 500 moedas (dá para a skin mais barata da loja, de 199)
+const MOEDAS_INICIAIS = 500;
 const conta = {
-  get moedas() { return guardado.get('moedas', 1000); },
+  get moedas() { return guardado.get('moedas', MOEDAS_INICIAIS); },
   set moedas(v) { guardado.set('moedas', Math.max(0, Math.round(v))); salvarConta(); },
   itens() { return new Set(guardado.get('itens', [])); },
   tem(id, preco) { return preco === 0 || this.itens().has(id); },
@@ -258,7 +260,13 @@ async function carregarConta() {
   try {
     const r = await fb.get('usuarios/' + fb.uid);
     if (!r.ok) return;
-    if (!r.dado) { await fb.put('usuarios/' + fb.uid, contaJson()); return; }
+    if (!r.dado) {  // conta nova: começa do zero (500 moedas, sem itens, sem XP), mesmo num aparelho que já tinha outra conta
+      guardado.set('moedas', MOEDAS_INICIAIS);
+      guardado.set('itens', []);
+      guardado.set('xp', 0);
+      await fb.put('usuarios/' + fb.uid, contaJson());
+      return;
+    }
     guardado.set('moedas', r.dado.moedas ?? conta.moedas);
     guardado.set('xp', Math.max(conta.xp, r.dado.xp | 0));  // XP só sobe (não perde o que foi feito sem internet)
     guardado.set('itens', Object.keys(r.dado.itens || {}).map((k) => k.replace(/\|/g, ':')));
