@@ -499,13 +499,14 @@ int main(int argc, char** argv) {
         const int ch = engine_player_id(e);
         int travadas = 0, quadros = 0;
         double perda = 0.0;
-        const size_t nRotas = std::getenv("ROTAS") ? size_t(std::atoi(std::getenv("ROTAS"))) : eng::favelaRotas().size();
+        const size_t nRotas = std::getenv("ROTA") ? eng::favelaRotas().size() : std::getenv("ROTAS") ? size_t(std::atoi(std::getenv("ROTAS"))) : eng::favelaRotas().size();
         const int soCorre = std::getenv("CORRE") ? std::atoi(std::getenv("CORRE")) : -1;    // 0 andando, 1 correndo
         const int soSentido = std::getenv("SENTIDO") ? std::atoi(std::getenv("SENTIDO")) : -1;  // 0 subindo, 1 descendo
         for (int corre = 0; corre < 2; ++corre)
         for (size_t ri = 0; ri < std::min(nRotas, eng::favelaRotas().size()); ++ri) {
             const auto& rt = eng::favelaRotas()[ri];
             if (soCorre >= 0 && corre != soCorre) continue;
+            if (std::getenv("ROTA") && int(ri) != std::atoi(std::getenv("ROTA"))) continue;  // uma rota só
             for (int sentido = 0; sentido < 2; ++sentido) {
                 if (soSentido >= 0 && sentido != soSentido) continue;
                 std::vector<glm::vec2> pts(rt.begin(), rt.end());

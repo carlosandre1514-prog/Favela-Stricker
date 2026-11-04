@@ -105,6 +105,27 @@ const std::vector<PadEntry>& favelaEntries(uint32_t seed) {
             for (int k = 0; k < FP_Count; ++k)
                 if (padDist(pads[k], e.x, e.y) < 4.f) list.push_back({k, e, e + glm::normalize(prev - e) * 8.f});
         }
+    // escadaria que atravessa um patamar (entra por um lado e sai pelo outro): passagem também onde ela cruza a
+    // borda, senão o muro de arrimo fica fechado no meio do caminho
+    for (const auto& rt : favelaRoutes())
+        for (size_t i = 0; i + 1 < rt.size(); ++i)
+            for (int k = 0; k < FP_Count; ++k) {
+                const glm::vec2 a = rt[i], b = rt[i + 1];
+                const int passos = std::max(2, int(glm::length(b - a) / 0.5f));
+                auto dentro = [&](float t) { glm::vec2 q = glm::mix(a, b, t); return padDist(pads[k], q.x, q.y) < 0.f; };
+                for (int sI = 0; sI < passos; ++sI) {  // procura ao longo do trecho cada vez que ele cruza a borda
+                    float lo = float(sI) / passos, hi = float(sI + 1) / passos;
+                    const bool dLo = dentro(lo);
+                    if (dLo == dentro(hi)) continue;
+                    for (int it = 0; it < 20; ++it) { float m = (lo + hi) * 0.5f; if (dentro(m) == dLo) lo = m; else hi = m; }
+                    const glm::vec2 c = glm::mix(a, b, (lo + hi) * 0.5f);
+                    bool perto = false;
+                    for (const PadEntry& en : list) if (en.pad == k && glm::length(en.a - c) < 4.f) perto = true;
+                    if (perto) continue;  // já é a ponta da escadaria
+                    const glm::vec2 fora = glm::normalize(dLo ? b - a : a - b);  // saindo do patamar
+                    list.push_back({k, c, c + fora * 8.f});
+                }
+            }
     return list;
 }
 
