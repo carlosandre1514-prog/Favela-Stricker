@@ -458,6 +458,33 @@ int main(int argc, char** argv) {
         std::printf(g_fail ? "FALHOU\n" : "OK\n");
         return g_fail ? 1 : 0;
     }
+    // Céu ao longo do dia (SO_CEU=1): o mapa da partida de várias horas e com chuva (fotos ceu_<hora>.png, chuva_<hora>.png)
+    if (std::getenv("SO_CEU")) {
+        const char* proj = "app/src/main/assets/exemplos/5_policia_x_bandidos.json";
+        if (!engine_import_project(e, lerProjeto(proj).dump().c_str())) { std::printf("  projeto não abriu\n"); ++g_fail; }
+        engine_set_quality(e, 1);
+        for (float h : {5.6f, 7.f, 12.f, 17.f, 17.8f, 18.3f, 19.f, 21.f, 1.f}) {
+            engine_set_time_of_day(e, h);
+            engine_set_camera(e, 0.f, 8.f, 20.f, 3.6f, 0.3f, 115.f);
+            frames(e, 3);
+            char n[32]; std::snprintf(n, sizeof n, "ceu_%04.1f.png", h);
+            save(out, n);
+        }
+        engine_set_play(e, 1);
+        eng::Engine* E = reinterpret_cast<eng::Engine*>(e);  // (o Engine da API é o eng::Engine)
+        E->rainMode = 2;
+        for (float h : {14.f, 21.f}) {
+            engine_set_time_of_day(e, h);
+            E->rain = E->rainTarget = 1.f;
+            engine_set_camera(e, 0.f, 8.f, 20.f, 3.6f, 0.15f, 18.f);
+            frames(e, 40);
+            char n[32]; std::snprintf(n, sizeof n, "chuva_%04.1f.png", h);
+            save(out, n);
+        }
+        engine_destroy(e);
+        std::printf(g_fail ? "FALHOU\n" : "OK\n");
+        return g_fail ? 1 : 0;
+    }
     // Movimento no chão plano: a mesma velocidade para frente, para o lado e para trás; pulo rápido (sobe e desce)
     if (std::getenv("SO_PULO")) {
         engine_new_scene(e);
@@ -490,6 +517,7 @@ int main(int argc, char** argv) {
             topo = std::max(topo, p[1]);
             if (p[1] > y0 + 0.06f) noAr = k + 1;  // (parado, o boneco assenta uns 3 cm acima de onde estava)
             if (std::getenv("DEPURAR") && k % 6 == 0) std::printf("    %3d y=%.3f\n", k, p[1] - y0);
+            if (std::getenv("FOTOS") && k % 5 == 0 && k <= 50) save(out, ("pulo_" + std::to_string(k) + ".png").c_str());
         }
         std::printf("  pulo: altura %.2f m · no ar %.2f s\n", topo - y0, noAr / 60.f);
         if (topo - y0 < 0.5f || topo - y0 > 1.f || noAr / 60.f > 0.75f) { std::printf("  [ERRO] pulo fora do esperado (0,5 a 1 m, até 0,75 s)\n"); ++g_fail; }

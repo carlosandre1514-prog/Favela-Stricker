@@ -45,7 +45,10 @@ void weatherStart(Engine* e) {
 void weatherUpdate(Engine* e, float dt) {
     // dia e noite: um dia inteiro em dayCycleMin minutos (o céu é recalculado a cada ~0,02 h)
     if (e->dayCycleMin > 0.f) {
-        e->cycleAccum += dt * 24.f / (e->dayCycleMin * 60.f);
+        // a noite passa mais rápido (escura para jogar): o dia todo dura dayCycleMin, com a noite em ~1/4 dele
+        const float h = e->timeOfDay;
+        const float pressa = (h >= 19.6f || h < 5.2f) ? 2.4f : 1.f;
+        e->cycleAccum += dt * 24.f / (e->dayCycleMin * 60.f) * pressa;
         if (e->cycleAccum >= 0.02f) { setTimeOfDay(e, e->timeOfDay + e->cycleAccum); e->cycleAccum = 0.f; }
     }
     // quando chove e quanto tempo dura
@@ -80,9 +83,14 @@ void weatherUpdate(Engine* e, float dt) {
         e->rainCoverTimer = 0.4f;
         e->rainCoverCenter = glm::vec2(c.x, c.z);
     }
-    const glm::vec3 wind(1.2f, 0.f, 0.6f);
-    const float speed = 16.f;
-    int n = int(e->rain * (e->quality == 0 ? 600.f : 1500.f) * dt + e->fxRng.f());
+    // vento em rajadas: a chuva inclina mais e menos (mais forte quando chove mais)
+    e->windClock += dt;
+    const float rajada = 1.f + 0.55f * std::sin(e->windClock * 0.7f) + 0.3f * std::sin(e->windClock * 2.3f + 1.f);
+    const glm::vec3 wind = glm::vec3(1.6f, 0.f, 0.8f) * rajada * (0.5f + 0.5f * e->rain);
+    const float speed = 17.f;
+    int n = int(e->rain * (e->quality == 0 ? 500.f : 1400.f) * dt + e->fxRng.f());
+    // gota mais clara de dia, mais apagada à noite (só reflete o pouco de luz)
+    const float luz = 1.f - 0.55f * e->night;
     for (int k = 0; k < n; ++k) {
         float a = e->fxRng.range(0.f, 6.2831853f), r = std::sqrt(e->fxRng.f()) * 14.f;
         glm::vec3 p(c.x + std::cos(a) * r, c.y + e->fxRng.range(4.f, 9.f), c.z + std::sin(a) * r);
@@ -91,15 +99,15 @@ void weatherUpdate(Engine* e, float dt) {
         float fall = p.y - std::max(cover, c.y - 12.f);
         ParticleSpawn d;
         d.pos = p; d.vel = glm::vec3(wind.x, -speed, wind.z); d.life = fall / speed;
-        d.size0 = d.size1 = 0.016f; d.stretch = 0.04f;
-        d.color0 = d.color1 = glm::vec4(0.78f, 0.82f, 0.92f, 0.55f);
+        d.size0 = d.size1 = e->fxRng.range(0.013f, 0.02f); d.stretch = 0.055f;
+        d.color0 = d.color1 = glm::vec4(0.78f * luz, 0.82f * luz, 0.92f * luz, 0.5f);
         d.shape = PS_Spark; d.additive = false;
         e->particles.emit(d);
         if (cover > -1e8f && e->fxRng.chance(0.35f)) {  // respingo onde a gota cai
             ParticleSpawn s;
             s.pos = glm::vec3(p.x + wind.x * d.life, cover + 0.03f, p.z + wind.z * d.life);
             s.life = 0.22f; s.size0 = 0.02f; s.size1 = 0.13f;
-            s.color0 = glm::vec4(0.85f, 0.88f, 0.95f, 0.35f); s.color1 = glm::vec4(0.85f, 0.88f, 0.95f, 0.f);
+            s.color0 = glm::vec4(0.85f * luz, 0.88f * luz, 0.95f * luz, 0.35f); s.color1 = glm::vec4(0.85f * luz, 0.88f * luz, 0.95f * luz, 0.f);
             s.shape = PS_Ring; s.additive = false;
             e->particles.emit(s);
         }
@@ -112,10 +120,11 @@ void weatherLook(const Engine* e, Environment& env, DirectionalLight& sun, float
     glm::vec3 grey(0.42f, 0.45f, 0.5f);
     float lum = glm::dot(env.horizon, glm::vec3(0.3f, 0.5f, 0.2f));
     env.zenith = glm::mix(env.zenith, grey * lum * 1.1f, r * 0.85f);
-    env.horizon = glm::mix(env.horizon, grey * lum * 1.3f, r * 0.8f);
+    env.horizon = glm::mix(env.horizon, grey * lum * 1.1f, r * 0.8f);
     env.skyIntensity *= 1.f - 0.35f * r;
     sun.intensity *= 1.f - 0.8f * e->rain;
-    fog += e->rain * 0.012f;
+    sun.color = glm::mix(sun.color, glm::vec3(0.8f, 0.85f, 0.95f), 0.5f * e->rain);  // luz fria de céu fechado
+    fog += e->rain * 0.007f;
     if (e->lightning > 0.f) {  // clarão do raio
         float f = e->lightning * (0.6f + 0.4f * std::sin(e->lightning * 40.f));
         sun.intensity += f * 6.f;

@@ -97,7 +97,20 @@ struct Animator {
         return clipIndex < clipCount ? &clips[clipIndex] : nullptr;
     }
 
-    void setClip(int i) { if (clipCount > 0) { clipIndex = ((i % clipCount) + clipCount) % clipCount; time = 0.f; } }
+    // fade > 0: mistura suave da pose atual com o novo clip durante `fade` segundos (sem troca seca)
+    void setClip(int i, float fade = 0.f) {
+        if (clipCount <= 0) return;
+        if (fade > 0.f && hasLast) {
+            for (int k = 0; k < kMaxJoints; ++k) { fadeT[k] = lastT[k]; fadeR[k] = lastR[k]; fadeS[k] = lastS[k]; }
+            fadeDur = fadeLeft = fade;
+        } else fadeLeft = 0.f;
+        clipIndex = ((i % clipCount) + clipCount) % clipCount;
+        time = 0.f;
+    }
+    float fadeDur = 0.f, fadeLeft = 0.f;
+    bool hasLast = false;
+    glm::vec3 lastT[kMaxJoints], lastS[kMaxJoints], fadeT[kMaxJoints], fadeS[kMaxJoints];
+    glm::quat lastR[kMaxJoints], fadeR[kMaxJoints];
 
     // advance = false: só reavalia a pose no tempo atual (modo edição)
     void update(float dt, bool advance) {
@@ -116,6 +129,18 @@ struct Animator {
 
         if (posing) for (int i = 0; i < n; ++i) r[i] = poseR[i];
         else if (c) for (int k = 0; k < c->channelCount; ++k) sample(c->channels[k], t, r, s);
+        if (fadeLeft > 0.f && !posing && !preview) {  // transição: sai da pose antiga e entra na nova
+            if (advance) fadeLeft = std::max(0.f, fadeLeft - dt);
+            float w = 1.f - fadeLeft / fadeDur;
+            w = w * w * (3.f - 2.f * w);
+            for (int i = 0; i < n; ++i) {
+                t[i] = glm::mix(fadeT[i], t[i], w);
+                s[i] = glm::mix(fadeS[i], s[i], w);
+                r[i] = glm::slerp(fadeR[i], r[i], w);
+            }
+        }
+        for (int i = 0; i < n; ++i) { lastT[i] = t[i]; lastR[i] = r[i]; lastS[i] = s[i]; }
+        hasLast = true;
 
         for (int k = 0; k < n; ++k) {
             int i = skeleton->order[k];

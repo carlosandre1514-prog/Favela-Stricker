@@ -942,8 +942,8 @@ void genFavela(Engine* e, Rng& r, glm::vec3& spawn, float& spawnYaw) {
     spawnYaw = 3.14159265f;  // olhando para dentro da favela (norte)
     e->renderer.fogDensity = 0.0018f;
     setTimeOfDay(e, 16.9f);   // fim de tarde, luz dourada
-    e->dayCycleMin = 10.f;    // no Play: dia e noite em 10 minutos
-    e->rainMode = 0;          // sem chuva (o chão molhado e os reflexos pesam no celular)
+    e->dayCycleMin = 24.f;    // no Play: um dia por partida (~20 min: a noite passa mais rápido)
+    e->rainMode = 1;          // chuva às vezes (só gotas e céu fechado: leve no celular)
 }
 
 }  // namespace

@@ -74,6 +74,8 @@ struct CharacterInfo {
     float gunDmg = 0.f, gunInterval = 0.1f, gunSpread = 0.f, gunFalloff = 1e9f;
     int gunPellets = 1, magSize = 30, reserve = -1;
     int shots = 0;             // tiros dados (online: os outros celulares mostram o tiro quando o número sobe)
+    bool wasAir = false, landing = false;  // pulo: estava no ar no quadro anterior / tocando a aterrissagem
+    float jumpHold = 0.f;      // > 0: acabou de pular (conta como no ar mesmo com o chão ainda perto do pé)
     bool airborne = false;     // no ar (pulando/caindo): online, os outros veem o pulo
 };
 // Animação de morte (não repete); sem ela, congela parado
@@ -257,6 +259,7 @@ struct Engine {
     int rainMode = 0;                    // 0 nunca, 1 automática (em algum momento do ciclo), 2 sempre
     float rain = 0.f, rainTarget = 0.f, rainClock = 0.f, cycleAccum = 0.f;
     float lightning = 0.f, lightningNext = 0.f, thunderIn = -1.f;
+    float windClock = 0.f;               // rajadas de vento na chuva
     static constexpr int kRainGrid = 25;
     std::vector<float> rainCover;
     glm::vec2 rainCoverOrigin{0.f}, rainCoverCenter{1e9f};

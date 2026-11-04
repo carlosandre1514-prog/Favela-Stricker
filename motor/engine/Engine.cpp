@@ -1341,10 +1341,37 @@ void animateCharacter(CharacterInfo& c, const glm::quat& rot, glm::vec3 v, bool 
             if (c.reloadTimer > 0.f && hs < 4.f) clip = CC_Reload;
             if (c.crouch && c.reloadTimer <= 0.f) clip = CC_CrouchWalk;  // agachado: parado, andando e mirando
         }
-        if (airborne) clip = CC_Jump;
+        // Pulo (clip de 0,9 s): 0 a 0,1 s impulso, 0,1 a 0,53 s no ar, depois a aterrissagem. No ar a pose segura no fim
+        // do trecho do ar; ao tocar o chão toca a aterrissagem rápida (só parado ou andando) e volta misturando.
+        constexpr float kJumpAirEnd = 0.52f, kLandFrom = 0.56f, kLandTo = 0.78f;
+        const int jumpClip = c.clipMap[CC_Jump];
+        if (airborne && jumpClip >= 0) {
+            if (!c.wasAir || c.anim->clipIndex != jumpClip) {
+                c.anim->setClip(jumpClip, 0.08f);
+                c.anim->time = c.jumpHold > 0.f ? 0.08f : 0.3f;  // pulando: desde o impulso; caindo de um degrau: já no ar
+            }
+            c.anim->loop = false;
+            c.anim->speed = 1.25f;
+            if (c.anim->time > kJumpAirEnd) c.anim->time = kJumpAirEnd;
+            c.wasAir = true;
+            c.landing = false;
+            return;
+        }
+        if (c.wasAir && jumpClip >= 0 && c.anim->clipIndex == jumpClip && hs < 4.f) {  // acabou de tocar o chão
+            c.landing = true;
+            c.anim->time = std::max(c.anim->time, kLandFrom);
+        }
+        c.wasAir = false;
+        if (c.landing && c.anim->clipIndex == jumpClip && c.anim->time < kLandTo && hs < 4.f) {
+            c.anim->loop = false;
+            c.anim->speed = 2.2f;
+            return;
+        }
+        c.landing = false;
         int mapped = c.clipMap[clip];
         if (mapped < 0 && clip >= CC_Death) mapped = c.clipMap[base >= 0 ? base + AP_Aim : CC_Idle];  // modelo sem essa animação
-        if ((grounded || airborne) && mapped >= 0 && c.anim->clipIndex != mapped) c.anim->setClip(mapped);
+        if (mapped >= 0 && c.anim->clipIndex != mapped)
+            c.anim->setClip(mapped, c.anim->clipIndex == jumpClip ? 0.16f : 0.2f);  // troca misturada (sem estalo)
         c.anim->loop = true;
         c.anim->speed = clip == CC_CrouchWalk ? (hs < 0.3f ? 0.f : std::clamp(hs / 1.6f, 0.6f, 1.4f))
                       : clip == CC_Reload ? 1.4f : clip == CC_Jump || clip == CC_RifleFire ? 1.f
@@ -1364,7 +1391,8 @@ bool driveCharacter(Engine* e, CharacterInfo& c, glm::vec3 move, float speed, bo
     glm::vec3 hit; GameObject* obj = nullptr; float frac;
     bool grounded = e->physics.raycastIgnoring(center, center - glm::vec3(0, c.height * 0.5f + 0.25f, 0), b, hit, obj, frac);
     btVector3 nv(move.x * speed * mag, vel.y(), move.z * speed * mag);
-    if (jump && grounded) nv.setY(5.6f);  // ~80 cm de altura, ~0,57 s no ar (com a gravidade dobrada abaixo)
+    if (jump && grounded) { nv.setY(6.f); c.jumpHold = 0.18f; }  // ~85 cm de altura, ~0,52 s no ar (gravidade abaixo)
+    c.jumpHold = std::max(0.f, c.jumpHold - dt);
     // Degrau, batente ou quina no caminho: quando o boneco trava, olha o chão um pouco à frente dos pés; se estiver até
     // 45 cm mais alto (e não for parede na altura do joelho), sobe junto. Assim anda liso nas escadarias e becos.
     const float hvAgora = std::sqrt(float(vel.x() * vel.x() + vel.z() * vel.z()));
@@ -1387,8 +1415,9 @@ bool driveCharacter(Engine* e, CharacterInfo& c, glm::vec3 move, float speed, bo
     b->setFriction(mag > 0.05f ? 0.f : 0.4f);
     // parado no chão (rampa, escada): sem gravidade, senão escorrega para baixo
     const bool anchor = grounded && !jump && mag < 0.05f && vel.y() < 0.5f && frac * (c.height * 0.5f + 0.25f) < c.height * 0.5f + 0.08f;
-    // no ar, gravidade dobrada: pulo e queda rápidos como de verdade (com a normal o boneco parecia flutuar)
-    b->setGravity(anchor ? btVector3(0, 0, 0) : btVector3(0, grounded ? -9.81f : -19.6f, 0));
+    // no ar, gravidade forte (com a normal o boneco parecia flutuar); descendo, mais forte ainda: chega rápido no chão
+    const float gAr = vel.y() > 0.f ? -21.f : -32.f;
+    b->setGravity(anchor ? btVector3(0, 0, 0) : btVector3(0, grounded && c.jumpHold <= 0.f ? -9.81f : gAr, 0));
     if (anchor) nv.setY(0.f);
     b->setLinearVelocity(nv);
     b->activate(true);
@@ -1404,7 +1433,8 @@ bool driveCharacter(Engine* e, CharacterInfo& c, glm::vec3 move, float speed, bo
     }
     c.fireAnim = std::max(0.f, c.fireAnim - dt);
     c.reloadTimer = std::max(0.f, c.reloadTimer - dt);
-    c.airborne = !grounded && std::abs(float(vel.y())) > 1.5f;
+    // no ar: logo depois de pular (o chão ainda está perto do pé) ou longe do chão; caindo de degrau pequeno não conta
+    c.airborne = c.jumpHold > 0.f || (!grounded && (c.wasAir || std::abs(float(vel.y())) > 1.5f));
     animateCharacter(c, go->transform.rotation, glm::vec3(nv.x(), nv.y(), nv.z()), grounded, c.airborne);
     return grounded;
 }

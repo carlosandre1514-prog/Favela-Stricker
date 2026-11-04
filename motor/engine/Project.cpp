@@ -1174,19 +1174,28 @@ void setTimeOfDay(Engine* e, float hour) {
         float ce = std::cos(std::max(el, 0.03f)), se = std::sin(std::max(el, 0.03f));
         sunDir = -glm::vec3(hz.x * ce, se, hz.y * ce);
         e->sun.color = glm::mix(glm::vec3(1.f, 0.95f, 0.88f), glm::vec3(1.f, 0.55f, 0.3f), warm);
-        e->sun.intensity = 0.3f + 2.9f * day;
-    } else {  // noite: luar azulado
-        sunDir = glm::normalize(glm::vec3(-0.3f, -1.f, 0.2f));
-        e->sun.color = {0.55f, 0.65f, 1.f};
-        e->sun.intensity = 0.45f;
+        e->sun.intensity = (0.3f + 2.9f * day) * glm::smoothstep(-0.02f, 0.05f, el);  // some no horizonte (a lua entra)
+    } else {  // noite: luar azulado; a lua anda pelo céu (nasce de um lado, se põe do outro) e aparece no céu
+        const float lh = std::fmod(hour - 18.f + 24.f, 24.f) / 12.f;            // 0 ao anoitecer, 1 ao amanhecer
+        const float lel = glm::radians(18.f) + glm::radians(32.f) * std::sin(std::clamp(lh, 0.f, 1.f) * 3.14159265f);
+        const float laz = glm::radians(-70.f + 140.f * std::clamp(lh, 0.f, 1.f));
+        sunDir = -glm::normalize(glm::vec3(std::sin(laz) * std::cos(lel), std::sin(lel), -std::cos(laz) * std::cos(lel)));
+        e->sun.color = {0.6f, 0.7f, 1.f};
+        e->sun.intensity = 0.6f * glm::smoothstep(-0.02f, -0.12f, el) + 0.15f;  // entra devagar depois do pôr do sol
     }
     Environment& target = e->env;
     Environment env = target;
     env.ground = Environment{}.ground;
     glm::vec3 nightZ(0.015f, 0.02f, 0.06f), nightH(0.06f, 0.07f, 0.13f);
-    env.zenith = glm::mix(nightZ, glm::mix(glm::vec3(0.18f, 0.36f, 0.75f), glm::vec3(0.25f, 0.3f, 0.6f), warm), day);
-    env.horizon = glm::mix(nightH, glm::mix(glm::vec3(0.70f, 0.78f, 0.88f), glm::vec3(0.95f, 0.6f, 0.4f), warm), day);
-    env.skyIntensity = 0.12f + 0.43f * day;
+    // crepúsculo: lilás no alto e laranja/rosa no horizonte quando o sol está baixo (antes e depois de sumir)
+    const float dusk = std::exp(-std::pow((el - 0.02f) / 0.14f, 2.f));
+    glm::vec3 zen = glm::mix(nightZ, glm::mix(glm::vec3(0.18f, 0.36f, 0.75f), glm::vec3(0.25f, 0.3f, 0.6f), warm), day);
+    glm::vec3 hor = glm::mix(nightH, glm::mix(glm::vec3(0.70f, 0.78f, 0.88f), glm::vec3(0.95f, 0.6f, 0.4f), warm), day);
+    zen = glm::mix(zen, glm::vec3(0.2f, 0.16f, 0.38f), 0.55f * dusk);
+    hor = glm::mix(hor, glm::vec3(1.f, 0.48f, 0.36f), 0.6f * dusk);
+    env.zenith = zen;
+    env.horizon = hor;
+    env.skyIntensity = 0.14f + 0.41f * day + 0.1f * dusk;
     target = env;
     ++e->revision;
 }
