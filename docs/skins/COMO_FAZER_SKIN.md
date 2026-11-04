@@ -34,9 +34,9 @@ Cada parte é uma caixa aberta em cruz:
 | Parte | Frente / Costas (largura x altura) | Lados | Topo / Base | Divisões (de cima para baixo) |
 |---|---|---|---|---|
 | Cabeça | 131 x 131 | 122 x 131 | 131 x 123 | — |
-| Tronco | 168 x 238 | 84 x 238 | 168 x 84 | peito (47%), barriga (24%), cintura (29%) |
-| Braço (cada um) | 57 x 266 | 57 x 266 | 57 x 57 | ombro/braço (45%), antebraço (37%), mão (18%) |
-| Perna (cada uma) | 63 x 251 | 63 x 251 | 63 x 63 | coxa (53%), canela (47%) |
+| Tronco | 143 x 250 | 71 x 250 | 143 x 71 | peito (38%), barriga (29%), cintura (33%) |
+| Braço (cada um) | 54 x 265 | 54 x 265 | 54 x 54 | ombro/braço (45%), antebraço (38%), mão (17%) |
+| Perna (cada uma) | 63 x 207 | 63 x 207 | 63 x 63 | coxa (53%), canela (47%) |
 | Pé (cada um) | 59 x 32 | 72 x 32 | 59 x 72 | — |
 
 ## O que pintar em cada parte
@@ -74,8 +74,8 @@ Mande o `molde_personagem.png` junto e escreva:
 > Use the attached image as an exact UV layout template. Keep every rectangle in exactly the same position and size, on a square 1024x1024 canvas, and fill each rectangle with flat, game-ready texture art. This is a blocky low-poly game character (Roblox style) skin. Character: **[DESCREVA A ROUPA, ex.: Brazilian military police officer, light blue long-sleeve shirt, black tactical vest with white "POLÍCIA" text on chest and back, dark navy trousers, black boots, navy cap]**.
 > Each part is an unfolded box: the middle row is [RIGHT SIDE][FRONT][LEFT SIDE][BACK], with TOP above the FRONT and BOTTOM below it.
 > - HEAD: face on FRONT (simple cartoon eyes and mouth), hair or cap on TOP, SIDES and BACK.
-> - TORSO: shirt and vest. The top 47% is the chest, then 24% belly, and the bottom 29% is the waist with belt and trousers.
-> - ARMS: top 45% is the sleeve, next 37% the forearm, last 18% the hand (skin or glove).
+> - TORSO: shirt and vest. The top 38% is the chest, then 29% belly, and the bottom 33% is the waist with belt and trousers.
+> - ARMS: top 45% is the sleeve, next 38% the forearm, last 17% the hand (skin or glove).
 > - LEGS: top 53% is the thigh, bottom 47% the shin.
 > - FEET: shoes or boots.
 >
@@ -152,15 +152,15 @@ Gere cada pedaço separado, no tamanho da tabela, e cole no `molde_limpo.png` co
    > Square flat texture of the side/back of a blocky character head, [skin tone] skin with [short black hair / navy cap], no face, no shadows, fills the whole image.
 3. **Topo da cabeça (131x123)**
    > Flat top-down texture of [hair / cap / helmet], fills the whole image, no shadows.
-4. **Peito, barriga e cintura (FRENTE do tronco, 168x238)**
-   > Flat front texture of a [shirt description] for a blocky game character, top 47% chest, middle 24% belly, bottom 29% belt and [trousers]. Front orthographic view, no arms, no head, no shadows, fills the whole image.
-5. **Costas do tronco (168x238)**
-   > The same shirt seen from the back, [name/number/text on back], bottom 29% belt and trousers, flat, no shadows, fills the whole image.
-6. **Laterais do tronco (84x238)**
+4. **Peito, barriga e cintura (FRENTE do tronco, 143x250)**
+   > Flat front texture of a [shirt description] for a blocky game character, top 38% chest, middle 29% belly, bottom 33% belt and [trousers]. Front orthographic view, no arms, no head, no shadows, fills the whole image.
+5. **Costas do tronco (143x250)**
+   > The same shirt seen from the back, [name/number/text on back], bottom 33% belt and trousers, flat, no shadows, fills the whole image.
+6. **Laterais do tronco (71x250)**
    > Narrow flat side texture of the same shirt and trousers, same split heights, no shadows.
-7. **Braço (cada lado: 57x266)**
-   > Tall narrow flat texture of an arm: top 45% [sleeve], next 37% [forearm: sleeve or skin], bottom 18% [hand: skin or glove]. No shadows, fills the whole image.
-8. **Perna (cada lado: 63x251)**
+7. **Braço (cada lado: 54x265)**
+   > Tall narrow flat texture of an arm: top 45% [sleeve], next 38% [forearm: sleeve or skin], bottom 17% [hand: skin or glove]. No shadows, fills the whole image.
+8. **Perna (cada lado: 63x207)**
    > Tall narrow flat texture of a leg: top 53% [trousers/shorts], bottom 47% [trousers / bare skin / sock]. No shadows, fills the whole image.
 9. **Pé (59x32 na frente, 72x32 nos lados, 59x72 em cima)**
    > Small flat texture of a [sneaker/boot], side view, no shadows, fills the whole image.
