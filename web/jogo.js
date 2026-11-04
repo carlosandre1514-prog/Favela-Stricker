@@ -67,6 +67,7 @@ function telaLogin() {
     fb = f;
     guardado.set('login_refresh', f.refresh || '');
     await carregarConta();
+    if (typeof lojaAoEntrar === 'function') lojaAoEntrar();  // loja do site: compras pagas entram sozinhas
     telaInicio();
   };
   $('#l-ir', t).onclick = () => {
@@ -95,7 +96,7 @@ async function comecarLogin() {
   const f = novoFirebase();
   if (!salvo || !f) { telaLogin(); return; }
   mostrar(html('<div class="tela sobre-mapa" style="align-items:center;justify-content:center"><span class="bebas" style="font-size:30px">ENTRANDO…</span></div>'), 'entrando');
-  if (await f.restaurar(salvo)) { fb = f; await carregarConta(); telaInicio(); } else telaLogin();
+  if (await f.restaurar(salvo)) { fb = f; await carregarConta(); if (typeof lojaAoEntrar === 'function') lojaAoEntrar(); telaInicio(); } else telaLogin();
 }
 
 // ---------------- tela inicial ----------------
@@ -299,11 +300,10 @@ function telaMoedas() {
       <div class="moedas-desenho">${desenhoMoedas([1, 2, 3, 4, 5, 7][i])}</div>
       <span class="qtd">${fmt(p.moedas)}</span><span class="bonus">${p.bonus ? '+' + fmt(p.bonus) + ' de bônus' : ''}</span>
       <button class="preco" data-i="${i}">${p.preco}</button></div>`).join('')}</div>
-    <span class="dica" style="font-size:11px">Pagamento pelo Google Play. Os preços são sugestão, no padrão de jogos de tiro para celular, e podem mudar até o lançamento.</span>
+    <span class="dica" style="font-size:11px">Pagamento por Pix no site oficial. As moedas entram sozinhas no jogo (precisa entrar com e-mail e senha).</span>
   </div>`), 'moedas');
   t.prepend(topo('LOJA DE MOEDAS', telaInicio, '<span class="dica">moedas compram skins de arma e de roupa</span>', `<span class="chip-moedas sem-mais">${ICONE.moeda(16)} ${fmt(conta.moedas)}</span>`));
-  for (const b of $$('[data-i]', t)) b.onclick = () => janela('Em breve',
-    'A compra de moedas com dinheiro de verdade vai funcionar quando o jogo estiver na Play Store (Google Play Faturamento).\n\nPor enquanto, ganhe moedas jogando: cada abate dá 25 e a vitória dá 150.');
+  for (const b of $$('[data-i]', t)) b.onclick = () => comprarNoSite(Number(b.dataset.i));  // Pix no site (loja_nexus.js)
 }
 
 // ---------------- armas e dano ----------------

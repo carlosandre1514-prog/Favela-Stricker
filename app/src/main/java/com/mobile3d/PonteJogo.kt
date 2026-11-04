@@ -40,6 +40,11 @@ class PonteJogo(private val jogo: JogoActivity) {
 
     @JavascriptInterface fun config(): String = jogo.configJogo()
     @JavascriptInterface fun versao(): String = jogo.versao()
+    // abre a página de pagamento da loja no navegador (só o site da loja: nada de links arbitrários vindos da página)
+    @JavascriptInterface fun abrirLink(url: String) {
+        if (!url.startsWith("https://nexus-p70i.onrender.com/")) return
+        jogo.runOnUiThread { jogo.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))) }
+    }
     @JavascriptInterface fun fase(texto: String) { jogo.diag.fase = texto }
     @JavascriptInterface fun pronto(): Boolean = pronto
     // o mapa só carrega quando a partida vai começar (a tela inicial fica leve); a página espera mapaPronto()

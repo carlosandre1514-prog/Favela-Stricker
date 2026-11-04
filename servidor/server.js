@@ -12,6 +12,7 @@ const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
 const { WebSocketServer } = require('ws');
+const loja = require('./loja-nexus');  // loja de moedas/skins do site NEXUS (Pix): /api/loja/...
 
 const PORT = process.env.PORT || 10000;
 const WEB = path.join(__dirname, '..', 'web');
@@ -24,8 +25,9 @@ const TIPOS = {
 };
 
 // ---------------- site ----------------
-const servidor = http.createServer((req, res) => {
+const servidor = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x');
+  if (await loja.tratar(req, res, url)) return;  // rotas da loja (o token do jogador é conferido lá)
   if (url.pathname === '/saude') { res.writeHead(200, { 'Content-Type': 'text/plain' }); res.end('ok'); return; }
   let arq = path.normalize(decodeURIComponent(url.pathname)).replace(/^([/\\])+/, '');
   if (!arq || arq.endsWith('/')) arq += 'index.html';
