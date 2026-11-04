@@ -69,6 +69,64 @@ const NIVEIS = [
   { nome: 'Ultra', info: 'Celulares top e computadores. Tudo liberado: texturas e modelos originais, sombras nítidas e longas, antisserrilhado, reflexos, visão longe, 60 quadros.' },
 ];
 
+// ---------------- nível, XP e patente (como no Call of Duty: o XP da partida sobe o nível; a cada 5 níveis, patente nova) ----------------
+const NIVEL_MAX = 55;
+// XP para ir do nível n ao n+1: começa em 1.000 e cresce 250 por nível
+const xpDoNivel = (n) => 1000 + 250 * (n - 1);
+// XP da partida: cada abate, o resultado e ter jogado até o fim
+const XP_ABATE = 100, XP_VITORIA = 600, XP_EMPATE = 350, XP_DERROTA = 200;
+// Patentes (5 níveis cada; a última no nível máximo). Divisão: I, II, III, IV, V dentro da patente
+const PATENTES = [
+  { nome: 'Recruta', de: 1, cor: '#B08D57', tipo: 'barra', n: 1 },
+  { nome: 'Soldado', de: 5, cor: '#B08D57', tipo: 'divisa', n: 1 },
+  { nome: 'Cabo', de: 10, cor: '#B08D57', tipo: 'divisa', n: 2 },
+  { nome: '3º Sargento', de: 15, cor: '#C9CED6', tipo: 'divisa', n: 3 },
+  { nome: '2º Sargento', de: 20, cor: '#C9CED6', tipo: 'divisa', n: 3, arcos: 1 },
+  { nome: '1º Sargento', de: 25, cor: '#C9CED6', tipo: 'divisa', n: 3, arcos: 2 },
+  { nome: 'Subtenente', de: 30, cor: '#C9CED6', tipo: 'losango', n: 1 },
+  { nome: 'Aspirante', de: 35, cor: '#FBBF24', tipo: 'estrela', n: 1, vazada: true },
+  { nome: '2º Tenente', de: 40, cor: '#FBBF24', tipo: 'estrela', n: 1 },
+  { nome: '1º Tenente', de: 45, cor: '#FBBF24', tipo: 'estrela', n: 2 },
+  { nome: 'Capitão', de: 50, cor: '#FBBF24', tipo: 'estrela', n: 3 },
+  { nome: 'Comandante', de: 55, cor: '#FDE68A', tipo: 'estrela', n: 3, louros: true },
+];
+// Nível a partir do XP total: { nivel, noNivel (XP já feito no nível), precisa (XP do nível), patente, divisao }
+function nivelDe(xp) {
+  let n = 1, resto = Math.max(0, Math.floor(xp || 0));
+  while (n < NIVEL_MAX && resto >= xpDoNivel(n)) { resto -= xpDoNivel(n); n++; }
+  const pat = PATENTES.filter((p) => p.de <= n).pop();
+  const divisao = n >= NIVEL_MAX ? '' : ['I', 'II', 'III', 'IV', 'V'][n - pat.de] || '';
+  return { nivel: n, noNivel: n >= NIVEL_MAX ? 0 : resto, precisa: n >= NIVEL_MAX ? 0 : xpDoNivel(n), patente: pat, divisao };
+}
+// Insígnia da patente (SVG): barra, divisas (com arcos), losango ou estrelas (com louros no máximo)
+function insignia(pat, tam = 28) {
+  const c = pat.cor, sombra = 'rgba(0,0,0,.45)';
+  let corpo = '';
+  if (pat.tipo === 'barra') corpo = `<rect x="7" y="13" width="18" height="6" rx="1.5" fill="${c}" stroke="${sombra}" stroke-width="1"/>`;
+  if (pat.tipo === 'divisa') {
+    for (let i = 0; i < pat.n; i++) {
+      const y = 9 + i * 6;
+      corpo += `<path d="M6 ${y + 6} L16 ${y} L26 ${y + 6} L26 ${y + 9.5} L16 ${y + 3.5} L6 ${y + 9.5} Z" fill="${c}" stroke="${sombra}" stroke-width=".8"/>`;
+    }
+    for (let i = 0; i < (pat.arcos || 0); i++) {
+      const y = 9 + pat.n * 6 + 1 + i * 4.5;
+      corpo += `<path d="M7 ${y} Q16 ${y + 6} 25 ${y} L25 ${y + 2.6} Q16 ${y + 8.6} 7 ${y + 2.6} Z" fill="${c}" stroke="${sombra}" stroke-width=".8"/>`;
+    }
+  }
+  if (pat.tipo === 'losango') corpo = `<path d="M16 5 L26 16 L16 27 L6 16 Z" fill="${c}" stroke="${sombra}" stroke-width="1"/><path d="M16 10 L21 16 L16 22 L11 16 Z" fill="${sombra}"/>`;
+  if (pat.tipo === 'estrela') {
+    const estrela = (cx, cy, r) => {
+      let d = '';
+      for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, rr = i % 2 ? r * 0.45 : r; d += (i ? 'L' : 'M') + (cx + rr * Math.cos(a)).toFixed(2) + ' ' + (cy + rr * Math.sin(a)).toFixed(2); }
+      return `<path d="${d}Z" fill="${pat.vazada ? 'none' : c}" stroke="${pat.vazada ? c : sombra}" stroke-width="${pat.vazada ? 1.8 : .8}"/>`;
+    };
+    const pos = pat.n === 1 ? [[16, 15, 9]] : pat.n === 2 ? [[10, 15, 6.5], [22, 15, 6.5]] : [[16, 10, 5.6], [9.5, 20, 5.6], [22.5, 20, 5.6]];
+    corpo = pos.map(([x, y, r]) => estrela(x, y, r)).join('');
+    if (pat.louros) corpo += `<path d="M5 12 Q4 24 15 28 M27 12 Q28 24 17 28" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round"/>`;
+  }
+  return `<svg width="${tam}" height="${tam}" viewBox="0 0 32 32" aria-hidden="true">${corpo}</svg>`;
+}
+
 // ---------------- configurações do jogador ----------------
 const CONFIG_PADRAO = {
   sens: 1.0,          // câmera (arrastar a tela / mouse)
@@ -92,6 +150,9 @@ const conta = {
   temRoupa(r) { return this.tem('skin:' + r.key, r.preco); },
   temSkinArma(s) { return this.tem(`skin_arma:${s.arma}:${s.key}`, s.preco); },
   nome() { return guardado.get('nome', 'Jogador'); },
+  get xp() { return guardado.get('xp', 0); },
+  // soma XP e devolve como estava e como ficou (para a tela do fim da partida mostrar o nível novo)
+  ganharXp(q) { const antes = nivelDe(this.xp); guardado.set('xp', this.xp + Math.max(0, Math.round(q))); salvarConta(); return { antes, depois: nivelDe(this.xp) }; },
   skinArma(arma) { return guardado.get('skin_arma_' + arma, ''); },
   usarSkinArma(arma, key) { guardado.set('skin_arma_' + arma, key || ''); },
   roupa(time) {
@@ -183,7 +244,7 @@ const novoFirebase = () => (CONFIG.firebase && CONFIG.firebase.apiKey ? new Fire
 function contaJson() {
   const itens = {};
   for (const i of conta.itens()) itens[i.replace(/:/g, '|')] = true;  // ':' não pode em chave do Firebase
-  return { nome: conta.nome(), moedas: conta.moedas, itens, atualizado: { '.sv': 'timestamp' } };
+  return { nome: conta.nome(), moedas: conta.moedas, xp: conta.xp, itens, atualizado: { '.sv': 'timestamp' } };
 }
 let salvando = null;
 function salvarConta() {
@@ -199,6 +260,7 @@ async function carregarConta() {
     if (!r.ok) return;
     if (!r.dado) { await fb.put('usuarios/' + fb.uid, contaJson()); return; }
     guardado.set('moedas', r.dado.moedas ?? conta.moedas);
+    guardado.set('xp', Math.max(conta.xp, r.dado.xp | 0));  // XP só sobe (não perde o que foi feito sem internet)
     guardado.set('itens', Object.keys(r.dado.itens || {}).map((k) => k.replace(/\|/g, ':')));
     if (r.dado.nome) guardado.set('nome', r.dado.nome);
   } catch (_) {}

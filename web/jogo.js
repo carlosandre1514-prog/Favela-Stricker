@@ -30,10 +30,10 @@ function telaLogin() {
   motor.girarMenu(true);
   let criando = false;
   const t = mostrar(html(`<div class="tela sobre-mapa" style="flex-direction:row;align-items:center;justify-content:space-between;padding:22px 30px">
-    <div class="coluna" style="gap:2px">
-      <span class="bebas azul" style="font-size:56px;line-height:.9">POLÍCIA</span>
-      <div class="linha" style="align-items:baseline"><span class="bebas" style="font-size:32px">x</span><span class="bebas ouro" style="font-size:56px;line-height:.9">BANDIDOS</span></div>
-      <span style="font-size:12px;color:#D1D5DB;margin-top:6px;letter-spacing:2px;font-weight:600">FAVELA STRICKER · 5 CONTRA 5 · PRIMEIRA PESSOA</span>
+    <div class="coluna" style="gap:6px">
+      <div class="logo-fs"><svg class="coroa" viewBox="0 0 40 26" aria-hidden="true"><path d="M3 23 L6 6 L14 15 L20 3 L26 15 L34 6 L37 23 Z" fill="none" stroke="#FBBF24" stroke-width="3" stroke-linejoin="round"/></svg>
+        <span class="bebas favela">FAVELA</span><span class="bebas strike">STRIKE</span></div>
+      <span style="font-size:12px;color:#D1D5DB;letter-spacing:2px;font-weight:600">POLÍCIA x BANDIDOS · 5 CONTRA 5 · PRIMEIRA PESSOA</span>
     </div>
     <div class="cartao coluna" style="width:360px;background:rgba(11,15,23,.85)">
       <span class="bebas" id="l-titulo" style="font-size:30px">ENTRAR</span>
@@ -45,7 +45,7 @@ function telaLogin() {
         <button class="dica" id="l-esqueci">Esqueci a senha</button></div>
       <button class="btn btn-fraco" id="l-convidado">Jogar como convidado</button>
       <div class="status" id="l-status"></div>
-    </div><span class="versao">Favela Stricker ${esc(VERSAO)}</span></div>`), 'login');
+    </div><span class="versao">Favela Strike ${esc(VERSAO)}</span></div>`), 'login');
   $('#l-nome', t).value = guardado.get('nome', '');
   $('#l-email', t).value = guardado.get('email', '');
   const st = $('#l-status', t);
@@ -103,32 +103,41 @@ function destaqueDoMercado() {
   const naoTem = SKINS_ARMA.filter((s) => !conta.temSkinArma(s));
   return naoTem.sort((a, b) => b.preco - a.preco)[0] || SKINS_ARMA[0];
 }
+// Cartão da conta (tela inicial): insígnia da patente, nome, nível, patente e barra de XP
+function cartaoConta() {
+  const n = nivelDe(conta.xp);
+  const pct = n.precisa ? Math.round(100 * n.noNivel / n.precisa) : 100;
+  return `<button class="cartao-conta" id="i-conta" aria-label="Sua conta: nível ${n.nivel}, ${esc(n.patente.nome)}">
+    <span class="insignia">${insignia(n.patente, 30)}</span>
+    <span class="dados"><span class="linha1"><b>${esc(conta.nome())}</b><span class="nv">NV ${n.nivel}</span></span>
+      <span class="pat">${esc(n.patente.nome)}${n.divisao ? ' ' + n.divisao : ''}</span>
+      <span class="barra-xp"><i style="width:${pct}%"></i></span>
+      <span class="xp">${n.precisa ? `${fmt(n.noNivel)} / ${fmt(n.precisa)} XP` : 'NÍVEL MÁXIMO'}</span></span>
+  </button>`;
+}
 function telaInicio() {
   motor.girarMenu(true);
   const d = destaqueDoMercado();
   const t = mostrar(html(`<div class="tela sobre-mapa" id="inicio" style="padding:0">
     <div class="esquerda">
-      <div class="coluna" style="gap:0">
-        <span class="bebas" style="font-size:56px;line-height:.9;color:#60A5FA">POLÍCIA</span>
-        <div class="linha" style="align-items:baseline"><span class="bebas" style="font-size:32px">x</span><span class="bebas ouro" style="font-size:56px;line-height:.9">BANDIDOS</span></div>
-        <span style="font-size:12px;color:#D1D5DB;margin-top:4px;letter-spacing:2px;font-weight:600">FAVELA · 5 CONTRA 5 · PRIMEIRA PESSOA</span>
+      <div class="coluna" style="gap:4px">
+        <div class="logo-fs"><svg class="coroa" viewBox="0 0 40 26" aria-hidden="true"><path d="M3 23 L6 6 L14 15 L20 3 L26 15 L34 6 L37 23 Z" fill="none" stroke="#FBBF24" stroke-width="3" stroke-linejoin="round"/></svg>
+        <span class="bebas favela">FAVELA</span><span class="bebas strike">STRIKE</span></div>
+        <span style="font-size:11px;color:#D1D5DB;letter-spacing:2px;font-weight:700">POLÍCIA x BANDIDOS · 5 CONTRA 5</span>
       </div>
-      <span class="cresce"></span>
       <button class="btn btn-ouro btn-grande" id="i-jogar" style="width:260px">${ICONE.play} JOGAR</button>
+      <button class="btn btn-ouro btn-medio" data-ir="multi" style="width:260px">${ICONE.grupo} MULTIPLAYER</button>
       <div class="grade">
         <button class="btn btn-fraco" data-ir="mercado">${ICONE.skins} Skins</button>
-        <button class="btn btn-fraco" data-ir="moedas">${ICONE.moedas} Moedas</button>
-        <button class="btn btn-fraco" data-ir="armas">${ICONE.armas} Armas</button>
-        <button class="btn btn-fraco" data-ir="multi">${ICONE.grupo} Multiplayer</button>
+        <button class="btn btn-fraco" data-ir="armas">${ICONE.armas} Arsenal</button>
       </div>
     </div>
     <div class="direita-topo">
       ${chipMoedas()}
-      <button class="chip" id="i-graficos">Gráficos: ${esc(nomeNivel())}</button>
-      <button class="chip" data-ir="config" aria-label="Configurações">${ICONE.engrenagem}</button>
-      <button class="chip" id="i-conta">${ICONE.pessoa}<span>${esc(conta.nome())}</span></button>
+      <button class="chip engrenagem" data-ir="config" aria-label="Configurações">${ICONE.engrenagem}</button>
+      ${cartaoConta()}
     </div>
-    <span class="versao">Favela Stricker ${esc(VERSAO)} · gráficos ${esc(nomeNivel())}</span>
+    <span class="versao">Favela Strike ${esc(VERSAO)}</span>
     <button class="destaque" data-ir="mercado">
       <div class="linha" style="gap:8px"><span class="etiqueta fundo-${d.raridade}">${RARIDADES[d.raridade].toUpperCase()}</span><span class="dica" style="color:#D1D5DB">Destaque do mercado</span></div>
       <img src="armas/${d.arma}_${d.key}.png" alt="${esc(d.nome)}">
@@ -138,7 +147,6 @@ function telaInicio() {
   </div>`), 'inicio');
   ligarAtalhos(t);
   $('#i-jogar', t).onclick = telaLado;
-  $('#i-graficos', t).onclick = () => telaConfig('graficos');
   $('#i-conta', t).onclick = () => telaConfig('conta');
 }
 
@@ -319,7 +327,7 @@ function telaArmas() {
         <span class="linha" style="gap:6px;font-size:12px"><i style="width:10px;height:10px;border-radius:2px;background:#F59E0B"></i>4 a 8 m: 100 até 20 de dano</span>
         <span class="dica" style="font-size:11px">Explode 3 s depois de jogar. Parede entre você e a granada protege. $ 300 cada, máx. 2.</span>
       </div></div></div>`), 'armas');
-  t.prepend(topo('ARMAS E DANO', telaInicio, '<span class="dica">vida 100 · cabeça = corpo × 2,5 · de longe o dano cai até 30%</span>', ''));
+  t.prepend(topo('ARSENAL', telaInicio, '<span class="dica">vida 100 · cabeça = corpo × 2,5 · de longe o dano cai até 30%</span>', ''));
 }
 
 // ---------------- configurações ----------------
@@ -369,6 +377,8 @@ function telaConfig(aba = 'sens') {
     c.innerHTML = `<div class="ajuste"><span class="nome">Nome no jogo</span><input type="text" id="c-nome" maxlength="16" value="${esc(conta.nome())}"><button class="btn btn-fraco" id="c-salvar-nome">Salvar</button></div>
       <div class="ajuste"><span class="nome">Conta</span><span class="cresce" style="font-size:13px">${esc(quem)}</span></div>
       <div class="ajuste"><span class="nome">Moedas</span><span class="cresce amarelo" style="font-weight:800">${fmt(conta.moedas)}</span></div>
+      <div class="ajuste"><span class="nome">Nível</span>${insignia(nivelDe(conta.xp).patente, 26)}<span class="cresce" style="font-size:13px"><b>${nivelDe(conta.xp).nivel}</b> · ${esc(nivelDe(conta.xp).patente.nome)} ${nivelDe(conta.xp).divisao} · ${fmt(conta.xp)} XP no total</span></div>
+      <div class="ajuste" style="flex-wrap:wrap;gap:8px"><span class="nome">Patentes</span>${PATENTES.map((p) => `<span class="linha" style="gap:4px;font-size:11px;color:#C3C8D2">${insignia(p, 20)}${esc(p.nome)} <span class="apagado">(nv ${p.de})</span></span>`).join('')}</div>
       <button class="btn btn-fraco" id="c-sair" style="align-self:flex-start">Sair da conta</button>`;
     $('#c-salvar-nome', c).onclick = () => { const n = $('#c-nome', c).value.trim().slice(0, 16); if (!n) return; guardado.set('nome', n); salvarConta(); aviso('Nome salvo'); };
     $('#c-sair', c).onclick = async () => {
@@ -474,6 +484,10 @@ function fimDePartida(j) {
   const s = partida && partida.sala;
   pararPartida();
   conta.moedas = conta.moedas + ganho;
+  const xpAbates = (j.abates | 0) * XP_ABATE, xpResultado = venceu === time ? XP_VITORIA : venceu < 0 ? XP_EMPATE : XP_DERROTA;
+  const xp = conta.ganharXp(xpAbates + xpResultado);
+  const subiu = xp.depois.nivel > xp.antes.nivel;
+  const pctXp = xp.depois.precisa ? Math.round(100 * xp.depois.noNivel / xp.depois.precisa) : 100;
   const tabela = (tm) => {
     const l = (j.jogadores || []).filter((p) => p.time === tm).sort((a, b) => b.abates - a.abates);
     return `<div class="cartao coluna cresce" style="background:${tm ? '#2A1C08' : '#0F1D36'};gap:2px;padding:12px 12px">
@@ -489,6 +503,19 @@ function fimDePartida(j) {
         <span class="bebas" style="font-size:46px;line-height:.92;color:${corV}">${venceu < 0 ? 'EMPATE' : venceu === 0 ? 'POLÍCIA' : 'BANDIDOS'}</span></div>
       <div class="coluna" style="align-items:flex-end;gap:4px"><div class="cartao linha" style="padding:8px 18px;gap:14px"><span class="bebas" style="font-size:46px;color:#60A5FA">${sc[0]}</span><span class="dica">x</span><span class="bebas ouro" style="font-size:46px">${sc[1]}</span></div>
         <span class="linha" style="gap:6px;font-size:13px;font-weight:800;color:#FCD34D">${ICONE.moeda(13)} +${fmt(ganho)} moedas</span></div>
+    </div>
+    <div class="cartao linha fim-xp">
+      <span class="insignia">${insignia(xp.depois.patente, 34)}</span>
+      <div class="coluna cresce" style="gap:4px">
+        <div class="linha" style="gap:8px;flex-wrap:wrap"><b>${subiu ? 'SUBIU PARA O NÍVEL ' + xp.depois.nivel : 'NÍVEL ' + xp.depois.nivel}</b>
+          <span class="apagado">${esc(xp.depois.patente.nome)}${xp.depois.divisao ? ' ' + xp.depois.divisao : ''}</span>
+          ${xp.depois.patente !== xp.antes.patente ? '<span class="etiqueta fundo-lendaria">PATENTE NOVA</span>' : ''}</div>
+        <span class="barra-xp"><i style="width:${pctXp}%"></i></span>
+      </div>
+      <div class="coluna" style="gap:2px;align-items:flex-end;font-size:12px">
+        <b class="ouro" style="font-size:15px">+${fmt(xpAbates + xpResultado)} XP</b>
+        <span class="apagado">${j.abates | 0} abates: +${fmt(xpAbates)} · ${venceu === time ? 'vitória' : venceu < 0 ? 'empate' : 'derrota'}: +${fmt(xpResultado)}</span>
+      </div>
     </div>
     <div class="linha cresce" style="align-items:flex-start;gap:12px;overflow:auto">${tabela(0)}${tabela(1)}</div>
     <div class="linha" style="justify-content:flex-end">${s
