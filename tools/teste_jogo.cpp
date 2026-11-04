@@ -28,7 +28,7 @@
 #include "jogo/Partida.h"
 #include "jogo/MapaFavela.h"
 
-static const int W = 960, H = 540;
+static const int W = std::getenv("LARGURA") ? std::atoi(std::getenv("LARGURA")) : 960, H = std::getenv("ALTURA") ? std::atoi(std::getenv("ALTURA")) : 540;  // (fotos maiores: LARGURA=1920 ALTURA=1080)
 static GLuint g_fbo = 0;
 static int g_fail = 0;
 
@@ -588,6 +588,28 @@ int main(int argc, char** argv) {
             frames(e, 240);
             std::printf("  vida: 40 -> %.0f (3 s) -> %.0f (7 s)\n", v3, E->game.playerHp);
             if (v3 > 41.f || E->game.playerHp < 60.f) { std::printf("  [ERRO] a vida não voltou como esperado\n"); ++g_fail; }
+        }
+        engine_destroy(e);
+        std::printf(g_fail ? "FALHOU\n" : "OK\n");
+        return g_fail ? 1 : 0;
+    }
+    // Foto do mapa (SO_FOTO="x,y,z,yaw,pitch,dist;..."; HORA=17): fotos foto_<n>.png (tamanho: LARGURA/ALTURA)
+    if (const char* lista = std::getenv("SO_FOTO")) {
+        const char* proj = "app/src/main/assets/exemplos/5_policia_x_bandidos.json";
+        if (!engine_import_project(e, lerProjeto(proj).dump().c_str())) { std::printf("  projeto não abriu\n"); ++g_fail; }
+        engine_set_time_of_day(e, std::getenv("HORA") ? std::atof(std::getenv("HORA")) : 17.f);
+        std::string l = lista;
+        int n = 0;
+        size_t a = 0;
+        while (a < l.size()) {
+            size_t b = l.find(';', a); if (b == std::string::npos) b = l.size();
+            float v[6] = {0, 8, 20, 3.6f, 0.42f, 115};
+            std::sscanf(l.substr(a, b - a).c_str(), "%f,%f,%f,%f,%f,%f", &v[0], &v[1], &v[2], &v[3], &v[4], &v[5]);
+            a = b + 1;
+            engine_set_camera(e, v[0], v[1], v[2], v[3], v[4], v[5]);
+            frames(e, 4);
+            char fn[32]; std::snprintf(fn, sizeof fn, "foto_%d.png", n++);
+            save(out, fn);
         }
         engine_destroy(e);
         std::printf(g_fail ? "FALHOU\n" : "OK\n");
