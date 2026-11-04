@@ -351,6 +351,7 @@ class JogoActivity : Activity() {
             .setPositiveButton("Copiar") { _, _ ->
                 (getSystemService(CLIPBOARD_SERVICE) as android.content.ClipboardManager)
                     .setPrimaryClip(android.content.ClipData.newPlainText("erro", info))
+                android.widget.Toast.makeText(this, "Copiado. Cole na conversa com o desenvolvedor.", android.widget.Toast.LENGTH_SHORT).show()
             }
             .setNegativeButton("Fechar", null)
             .show()

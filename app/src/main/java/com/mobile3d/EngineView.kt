@@ -34,9 +34,27 @@ class EngineView(activity: Activity, private val shaderDir: String, private val 
             private var last = 0L
             private var frame = 0
 
+            // Criar o motor demora (no Galaxy A14, mais de 10 s). Enquanto isso a tela principal do Android fica
+            // esperando o 1º desenho (o GLSurfaceView segura a thread da tela no resize até um quadro terminar) e
+            // o Android mostra "o app não está respondendo" e fecha o jogo. Por isso: o 1º quadro só limpa a tela
+            // e volta na hora (libera a tela principal); o motor é criado num quadro seguinte, com o tamanho da tela já estável.
+            private var criar = 0          // 0 = motor pronto; 1 = falta criar (próximo quadro); 2 = 1º quadro (vazio)
+            private var w0 = 0; private var h0 = 0
+            private var mudou = 0L          // quando a tela mudou de tamanho pela última vez
+
             override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
-                // Contexto novo (1ª vez ou contexto perdido): recria o motor e a cena
+                // Contexto novo (1ª vez ou contexto perdido): o motor e a cena serão recriados
+                criar = 2
+                last = System.nanoTime()
+            }
+            override fun onSurfaceChanged(gl: GL10?, w: Int, h: Int) {
+                w0 = w; h0 = h
+                mudou = System.nanoTime()
+                if (criar == 0) NativeBridge.nativeResize(w, h)
+            }
+            private fun criarMotor() {
                 if (NativeBridge.nativeCreate(shaderDir)) {
+                    if (w0 > 0 && h0 > 0) NativeBridge.nativeResize(w0, h0)
                     NativeBridge.nativeSetQuality(quality)
                     onReady?.invoke()
                 } else {
@@ -44,8 +62,18 @@ class EngineView(activity: Activity, private val shaderDir: String, private val 
                 }
                 last = System.nanoTime()
             }
-            override fun onSurfaceChanged(gl: GL10?, w: Int, h: Int) = NativeBridge.nativeResize(w, h)
             override fun onDrawFrame(gl: GL10?) {
+                // 1º quadro, e enquanto a tela ainda está mudando de tamanho (o app ajusta a resolução logo ao abrir,
+                // e cada ajuste também espera um quadro): só limpa e volta rápido
+                if (criar == 2 || (criar == 1 && System.nanoTime() - mudou < 400_000_000L)) {
+                    android.opengl.GLES20.glClearColor(0.043f, 0.059f, 0.09f, 1f)
+                    android.opengl.GLES20.glClear(android.opengl.GLES20.GL_COLOR_BUFFER_BIT)
+                    criar = 1
+                    Thread.sleep(16)  // (sem girar à toa enquanto espera)
+                    requestRender()
+                    return
+                }
+                if (criar == 1) { criar = 0; criarMotor(); requestRender(); return }
                 if (maxFps < 60) {  // limite de quadros: espera o resto do intervalo
                     val wait = 1_000_000_000L / maxFps - (System.nanoTime() - last)
                     if (wait > 1_000_000L) Thread.sleep(wait / 1_000_000L)
