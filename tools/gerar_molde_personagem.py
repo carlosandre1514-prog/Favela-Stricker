@@ -25,20 +25,17 @@ H = 1.75  # altura do boneco (m)
 # Partes: largura (x), altura (y), profundidade (z) em metros, escala (px por metro no molde de 1024) e canto.
 # Partes com mais de um bloco têm divisões (frações da altura, de cima para baixo) que o motor usa.
 PARTES = {
-    # tronco: do quadril (0,42H) até o ombro (0,84H): peito 0,68..0,84 · barriga 0,56..0,68 · cintura 0,42..0,56
-    'tronco':    dict(w=0.24 * H, h=0.42 * H, d=0.12 * H, s=340, o=(4, 4), nome='TRONCO',
-                      div=[('peito', 0.16 / 0.42), ('barriga', 0.28 / 0.42), ('cintura', 1.0)]),
+    'tronco':    dict(w=0.24 * H, h=0.34 * H, d=0.12 * H, s=400, o=(4, 4), nome='TRONCO',
+                      div=[('peito', 0.16 / 0.34), ('barriga', 0.24 / 0.34), ('cintura', 1.0)]),
     'cabeca':    dict(w=0.15 * H, h=0.15 * H, d=0.14 * H, s=500, o=(514, 4), nome='CABEÇA', div=[]),
-    # braço: do ombro (0,84H) até a ponta da mão (0,42H): ombro 0,84..0,65 · antebraço 0,65..0,49 · mão 0,49..0,42
-    'braco_dir': dict(w=0.085 * H, h=0.42 * H, d=0.085 * H, s=360, o=(4, 418), nome='BRAÇO DIREITO',
-                      div=[('ombro', 0.19 / 0.42), ('antebraço', 0.35 / 0.42), ('mão', 1.0)]),
-    'braco_esq': dict(w=0.085 * H, h=0.42 * H, d=0.085 * H, s=360, o=(236, 418), nome='BRAÇO ESQUERDO',
-                      div=[('ombro', 0.19 / 0.42), ('antebraço', 0.35 / 0.42), ('mão', 1.0)]),
-    # perna: do quadril (0,425H) até o tornozelo (0,05H): coxa 0,425..0,225 · canela 0,225..0,05
-    'perna_dir': dict(w=0.115 * H, h=0.375 * H, d=0.114 * H, s=315, o=(514, 390), nome='PERNA DIREITA',
-                      div=[('coxa', 0.2 / 0.375), ('canela', 1.0)]),
-    'perna_esq': dict(w=0.115 * H, h=0.375 * H, d=0.114 * H, s=315, o=(768, 390), nome='PERNA ESQUERDA',
-                      div=[('coxa', 0.2 / 0.375), ('canela', 1.0)]),
+    'braco_dir': dict(w=0.085 * H, h=0.4 * H, d=0.085 * H, s=380, o=(4, 418), nome='BRAÇO DIREITO',
+                      div=[('ombro', 0.18 / 0.4), ('antebraço', 0.33 / 0.4), ('mão', 1.0)]),
+    'braco_esq': dict(w=0.085 * H, h=0.4 * H, d=0.085 * H, s=380, o=(236, 418), nome='BRAÇO ESQUERDO',
+                      div=[('ombro', 0.18 / 0.4), ('antebraço', 0.33 / 0.4), ('mão', 1.0)]),
+    'perna_dir': dict(w=0.115 * H, h=0.455 * H, d=0.114 * H, s=315, o=(514, 390), nome='PERNA DIREITA',
+                      div=[('coxa', 0.24 / 0.455), ('canela', 1.0)]),
+    'perna_esq': dict(w=0.115 * H, h=0.455 * H, d=0.114 * H, s=315, o=(768, 390), nome='PERNA ESQUERDA',
+                      div=[('coxa', 0.24 / 0.455), ('canela', 1.0)]),
     'pe_dir':    dict(w=0.1127 * H, h=0.06 * H, d=0.138 * H, s=300, o=(4, 806), nome='PÉ DIREITO', div=[]),
     'pe_esq':    dict(w=0.1127 * H, h=0.06 * H, d=0.138 * H, s=300, o=(270, 806), nome='PÉ ESQUERDO', div=[]),
 }

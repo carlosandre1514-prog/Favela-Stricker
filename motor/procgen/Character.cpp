@@ -314,9 +314,6 @@ void wave(ClipWriter& w, const Joints& J) {
 }  // namespace
 
 
-// Boneco em blocos: onde a barriga (camisa) começa; abaixo é a cintura (calça), até o quadril (0,42H)
-constexpr float kBarriga = 0.56f;
-
 // Corpo em blocos com skin pintada: cada parte do molde é uma caixa; partes com mais de um bloco (tronco, braço,
 // perna) dividem as laterais da imagem pela altura de cada bloco. Topo e base só nos blocos das pontas; entre
 // dois blocos a tampa usa a linha da divisão (fica da cor da roupa ali quando a junta dobra).
@@ -342,7 +339,7 @@ static void buildTexturedBlockBody(const CharacterParams& p, MeshBuilder& b, flo
     };
     const float tw = (sx - 0.05f * H) * 2.f, td = 0.12f * H;
     // tronco: peito, barriga, cintura (0.84H .. 0.5H)
-    const float t0 = 0.84f * H, t1 = 0.68f * H, t2 = kBarriga * H, t3 = thighY, tl = t0 - t3;
+    const float t0 = 0.84f * H, t1 = 0.68f * H, t2 = 0.6f * H, t3 = thighY, tl = t0 - t3;
     seg(SP_Tronco, CJ_Chest, 0, 0, tw, td, t0, t1, 0.f, (t0 - t1) / tl);
     seg(SP_Tronco, CJ_Spine, 0, 0, tw, td, t1, t2, (t0 - t1) / tl, (t0 - t2) / tl);
     seg(SP_Tronco, CJ_Hips, 0, 0, tw, td, t2, t3, (t0 - t2) / tl, 1.f);
@@ -390,11 +387,11 @@ static void buildBlockBody(const CharacterParams& p, MeshBuilder& b, float H, fl
     const float tw = (sx - 0.05f * H) * 2.f, td = 0.12f * H;    // tronco: largura e profundidade
     const float waist = thighY, chestTop = 0.84f * H;
     // ---- tronco: cintura (calça), barriga e peito (camisa)
-    part(CJ_Hips, p.pants, {0, (waist + kBarriga * H) * 0.5f, 0}, {tw, kBarriga * H - waist + 0.002f * H, td});
-    part(CJ_Spine, p.shirt, {0, (kBarriga + 0.68f) * 0.5f * H, 0}, {tw, (0.68f - kBarriga) * H, td});
+    part(CJ_Hips, p.pants, {0, (waist + 0.6f * H) * 0.5f, 0}, {tw, 0.6f * H - waist + 0.002f * H, td});
+    part(CJ_Spine, p.shirt, {0, 0.64f * H, 0}, {tw, 0.08f * H, td});
     part(CJ_Chest, p.shirt, {0, (0.68f * H + chestTop) * 0.5f, 0}, {tw, chestTop - 0.68f * H, td});
     // estampas da camisa (um pouco por fora do tronco, para não piscar)
-    const float e = 0.004f * H, y0 = kBarriga * H, y1 = chestTop;
+    const float e = 0.004f * H, y0 = 0.6f * H, y1 = chestTop;
     auto faixa = [&](int joint, glm::vec4 col, float ya, float yb, float xa, float xb, bool todaVolta) {
         part(joint, col, {(xa + xb) * 0.5f, (ya + yb) * 0.5f, 0}, {xb - xa + (todaVolta ? 2.f * e : 0.f), yb - ya, td + 2.f * e});
     };
@@ -473,7 +470,7 @@ static void buildBlockBody(const CharacterParams& p, MeshBuilder& b, float H, fl
 void buildBlockVest(const CharacterParams& p, MeshBuilder& b) {
     const float H = p.height;
     const float hw = 0.125f * H, hd = 0.066f * H;            // por fora do tronco (0,12H x 0,06H)
-    const float y0 = (kBarriga + 0.01f) * H, y1 = 0.83f * H;  // da barriga até perto dos ombros
+    const float y0 = 0.6f * H, y1 = 0.83f * H;               // da barriga até perto dos ombros
     glm::vec4 cor = p.coleteCor.a > 0.f ? p.coleteCor : srgb(32, 34, 38);
     cor.a = 1.f;
     const glm::vec4 escuro(cor.r * 0.7f, cor.g * 0.7f, cor.b * 0.7f, 1.f), alca(cor.r * 0.85f, cor.g * 0.85f, cor.b * 0.85f, 1.f);
@@ -505,11 +502,10 @@ void buildCharacter(const CharacterParams& p, LoadedModel& out, MeshBuilder& b) 
     // bloco (tipo Roblox): tronco largo e quadrado, braços e pernas grossos
     const float chestHalf = p.bloco ? 0.12f * H : 0.115f * H * s, armHalf = p.bloco ? 0.05f * H : 0.034f * H * (0.9f + 0.1f * s);
     const float sx = chestHalf + armHalf + (p.bloco ? 0.f : 0.004f * H), tx = p.bloco ? 0.06f * H : 0.055f * H * s;
-    // bloco: proporção de boneco de blocos (pernas e tronco do mesmo tamanho; braço do ombro até o quadril)
-    const float shoulderY = 0.825f * H, elbowY = shoulderY - 0.175f * H, wristY = elbowY - (p.bloco ? 0.16f : 0.155f) * H;
-    const float thighY = (p.bloco ? 0.42f : 0.52f) * H, kneeY = (p.bloco ? 0.23f : 0.285f) * H, ankleY = 0.045f * H;
+    const float shoulderY = 0.825f * H, elbowY = shoulderY - (p.bloco ? 0.165f : 0.175f) * H, wristY = elbowY - (p.bloco ? 0.15f : 0.155f) * H;
+    const float thighY = (p.bloco ? 0.5f : 0.52f) * H, kneeY = (p.bloco ? 0.27f : 0.285f) * H, ankleY = 0.045f * H;
     glm::vec3 pos[CJ_Total] = {
-        {0, (p.bloco ? 0.47f : 0.53f) * H, 0}, {0, 0.62f * H, 0}, {0, 0.72f * H, 0}, {0, 0.865f * H, 0},
+        {0, 0.53f * H, 0}, {0, 0.62f * H, 0}, {0, 0.72f * H, 0}, {0, 0.865f * H, 0},
         {sx, shoulderY, 0}, {sx, elbowY, 0}, {sx, wristY, 0}, {-sx, shoulderY, 0}, {-sx, elbowY, 0}, {-sx, wristY, 0},
         {tx, thighY, 0}, {tx, kneeY, 0}, {tx, ankleY, 0}, {-tx, thighY, 0}, {-tx, kneeY, 0}, {-tx, ankleY, 0}};
     int parent[CJ_Total] = {-1, CJ_Hips, CJ_Spine, CJ_Neck, CJ_Chest, CJ_LUpper, CJ_LFore, CJ_Chest, CJ_RUpper, CJ_RFore,
