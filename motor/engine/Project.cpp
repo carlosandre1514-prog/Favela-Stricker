@@ -945,7 +945,7 @@ int createFromSpecJson(Engine* e, const std::string& specJson, std::string* err)
         if (p.bloco && p.cabelo3d > 0 && (p.chapeu == 0 || p.texturizado)) {  // cabelo 3D (por cima da cabeça)
             Geo hair;
             hair.place(glm::vec3(0.f), 0.f);
-            buildBlockHair(p, hair[Mat::Painted], seed);
+            buildBlockHair(p, hair, seed);
             const int hid = attachGearMesh(e, ci, CJ_Head, hair, "Cabelo");
             if (hid < 0) e->lastError.clear();
             else {

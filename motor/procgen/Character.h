@@ -4,6 +4,7 @@
 #include "procgen/MeshBuilder.h"
 
 namespace eng {
+struct Geo;
 
 // Ossos do humanoide procedural (pais sempre antes dos filhos)
 enum CharJoint { CJ_Hips, CJ_Spine, CJ_Chest, CJ_Head, CJ_LUpper, CJ_LFore, CJ_LHand, CJ_RUpper, CJ_RFore, CJ_RHand,
@@ -60,9 +61,9 @@ CharacterParams randomCharacter(uint32_t seed);
 void buildCharacter(const CharacterParams& p, LoadedModel& out, MeshBuilder& mesh);
 // Colete do boneco em blocos como peça separada (malha no espaço do personagem; vai preso no osso do peito)
 void buildBlockVest(const CharacterParams& p, MeshBuilder& mesh);
-// Cabelo 3D de blocos (p.cabelo3d), no espaço do personagem; vai preso no osso da cabeça. Com skin pintada
-// (p.texturizado), os blocos usam o desenho do cabelo do TOPO e das COSTAS da cabeça da skin; sem, a cor p.hair.
-void buildBlockHair(const CharacterParams& p, MeshBuilder& mesh, uint32_t seed);
+// Cabelo 3D (p.cabelo3d): touca arredondada + espirais (cacheado/curto), bolinhas (black) ou mechas (dreads), no espaço do
+// personagem; vai preso no osso da cabeça. Com skin pintada, usa o desenho do cabelo do TOPO da cabeça; sem, a cor p.hair.
+void buildBlockHair(const CharacterParams& p, Geo& g, uint32_t seed);  // a base fica sempre; cachos/mechas só de perto
 
 // Armas: origem no ponto de empunhadura, cano para +Z, topo para +Y
 enum WeaponKind { WK_Pistol, WK_Rifle, WK_Shotgun, WK_Sniper, WK_Knife, WK_Bat, WK_Count };

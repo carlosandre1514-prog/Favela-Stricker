@@ -505,94 +505,208 @@ void buildBlockVest(const CharacterParams& p, MeshBuilder& b) {
     b.color = glm::vec4(1.f);
 }
 
-// Cabelo 3D de blocos (ver Character.h). Cabeça: cubo de 0,15H centrado em 0,915H (frente em +0,07H).
-void buildBlockHair(const CharacterParams& p, MeshBuilder& b, uint32_t seed) {
-    if (p.cabelo3d <= 0) return;
-    const float H = p.height, hy = 0.915f * H, top = hy + 0.075f * H, hx = 0.075f * H, hzF = 0.07f * H, hzB = -0.07f * H;
-    Rng r(seed * 2654435761u + 17u);
-    b.joint = -1;
-    b.xf = glm::mat4(1.f);
-    b.uvTile = glm::vec2(0.f);
-    // pedaço da skin para cada bloco: um quadradinho do TOPO da cabeça (ou do alto das COSTAS)
-    glm::vec4 rects[6];
-    auto escolheUV = [&](bool costas) {
-        if (!p.texturizado) { b.faceRects = nullptr; return; }
-        const glm::vec4 q = costas ? p.molde[SP_Cabeca][1] : p.molde[SP_Cabeca][4];
-        const float w = q.z - q.x, h = (q.w - q.y) * (costas ? 0.45f : 1.f);
-        const float fw = w * 0.3f, fh = h * 0.3f;
-        const float u0 = q.x + r.range(0.f, w - fw), v0 = q.y + r.range(0.f, h - fh);
-        for (glm::vec4& x : rects) x = {u0, v0, u0 + fw, v0 + fh};
-        b.faceRects = rects;
-    };
-    auto cor = [&]() {
-        if (p.texturizado) return glm::vec4(1.f);
-        const float k = r.range(0.85f, 1.12f);
-        return glm::vec4(glm::min(glm::vec3(p.hair) * k, glm::vec3(1.f)), 1.f);
-    };
-    auto bloco = [&](glm::vec3 c, glm::vec3 s, bool costas = false) {
-        escolheUV(costas);
-        b.color = cor();
-        b.boxC(c, s);
-    };
-    const float u = H;  // medidas em fração da altura
-    const int tipo = p.cabelo3d;
-    // base: touca colada na cabeça (alto, laterais de cima e nuca)
-    const float folga = 0.006f * u;
-    const float capY = tipo == 3 ? 0.012f * u : 0.02f * u;
-    bloco({0.f, top + capY * 0.5f - 0.004f * u, -0.004f * u}, {2.f * (hx + folga), capY + 0.008f * u, hzF - hzB + 0.006f * u});
-    if (tipo != 3) {  // curto: lados raspados (degradê); os outros cobrem lados e nuca
-        for (float s : {-1.f, 1.f})
-            bloco({s * (hx + folga * 0.5f), top - 0.025f * u, -0.01f * u}, {folga, 0.05f * u, hzF - hzB - 0.02f * u});
-        bloco({0.f, top - 0.04f * u, hzB - folga * 0.5f}, {2.f * (hx + folga), 0.08f * u, folga}, true);
+// ---------------- cabelo 3D ----------------
+// Formas do cabelo: tubos ao longo de uma curva (espirais dos cachos, mechas dos dreads), touca arredondada
+// (superelipsoide, abraça a cabeça quadrada) e bolinhas. Cada triângulo sai virado para fora (confere a normal).
+namespace {
+struct HairMesh {
+    MeshBuilder& b;
+    void tri(glm::vec3 p0, glm::vec3 p1, glm::vec3 p2, glm::vec3 n0, glm::vec3 n1, glm::vec3 n2, glm::vec2 t0, glm::vec2 t1, glm::vec2 t2) {
+        if (glm::dot(glm::cross(p1 - p0, p2 - p0), n0 + n1 + n2) < 0.f) { std::swap(p1, p2); std::swap(n1, n2); std::swap(t1, t2); }
+        const glm::vec3 tg = glm::length(p1 - p0) > 1e-7f ? glm::normalize(p1 - p0) : glm::vec3(1, 0, 0);
+        const uint32_t i = uint32_t(b.v.size());
+        b.pushVertex(p0, n0, t0, tg); b.pushVertex(p1, n1, t1, tg); b.pushVertex(p2, n2, t2, tg);
+        b.idx.push_back(i); b.idx.push_back(i + 1); b.idx.push_back(i + 2);
     }
-    auto noAlto = [&](float rx, float rz, float lift) {  // ponto no alto da cabeça (rx, rz de -1 a 1)
-        return glm::vec3(rx * hx, top + capY + lift, hzB + (rz * 0.5f + 0.5f) * (hzF - hzB));
-    };
-    if (tipo == 1 || tipo == 2) {  // cacheado / black: cachos (blocos) por cima, dos lados e atrás
-        const int n = tipo == 2 ? 70 : 46;
-        const float esc = tipo == 2 ? 1.35f : 1.f;
-        for (int i = 0; i < n; ++i) {
-            const float s = r.range(0.022f, 0.036f) * esc * u;
-            const int lado = i % 5;
-            glm::vec3 c;
-            if (lado < 3) c = noAlto(r.range(-1.f, 1.f), r.range(-1.f, 0.85f), r.range(-0.004f, 0.012f) * esc * u);
-            else if (lado == 3) {
-                const float sx = r.chance(0.5f) ? 1.f : -1.f;
-                c = {sx * (hx + folga + s * 0.25f), top - r.range(0.f, 0.035f) * u, r.range(hzB, hzF - 0.02f * u)};
-            } else c = {r.range(-hx, hx), top - r.range(0.f, 0.06f) * u, hzB - folga - s * 0.25f};
-            bloco(c, glm::vec3(s, s * r.range(0.8f, 1.1f), s), lado == 4);
+    static glm::vec2 uvIn(glm::vec4 r, float u, float v) { return {r.x + (r.z - r.x) * u, r.y + (r.w - r.y) * v}; }
+    // Tubo pela curva P com raio R em cada ponto (n lados); a ponta de cima é tampada
+    void tube(const std::vector<glm::vec3>& P, const std::vector<float>& R, int n, glm::vec4 uvr) {
+        const size_t N = P.size();
+        if (N < 2) return;
+        std::vector<glm::vec3> T(N), Nn(N), B(N);
+        for (size_t i = 0; i < N; ++i) T[i] = glm::normalize(P[std::min(i + 1, N - 1)] - P[i > 0 ? i - 1 : 0]);
+        glm::vec3 ref = std::abs(T[0].y) < 0.9f ? glm::vec3(0, 1, 0) : glm::vec3(1, 0, 0);
+        Nn[0] = glm::normalize(glm::cross(ref, T[0]));
+        for (size_t i = 1; i < N; ++i) {  // transporte paralelo (o tubo não torce)
+            glm::vec3 q = Nn[i - 1] - T[i] * glm::dot(Nn[i - 1], T[i]);
+            Nn[i] = glm::length(q) > 1e-6f ? glm::normalize(q) : Nn[i - 1];
         }
-        // franja: cachos na beira da testa
-        for (int i = 0; i < 7; ++i) {
-            const float s = r.range(0.02f, 0.03f) * esc * u;
-            bloco({-hx + (i + 0.5f) * (2.f * hx / 7.f), top - 0.004f * u, hzF - 0.006f * u}, glm::vec3(s, s * 0.9f, s * 0.8f));
-        }
-        if (tipo == 2)  // black: o volume arredondado por baixo dos cachos
-            bloco({0.f, top + 0.035f * u, -0.01f * u}, {2.f * hx + 0.04f * u, 0.05f * u, hzF - hzB + 0.03f * u});
-    } else if (tipo == 3) {  // curto: cachinhos só no alto
-        for (int i = 0; i < 32; ++i) {
-            const float s = r.range(0.016f, 0.024f) * u;
-            bloco(noAlto(r.range(-0.95f, 0.95f), r.range(-0.95f, 0.9f), r.range(-0.006f, 0.004f) * u), glm::vec3(s));
-        }
-    } else if (tipo == 4) {  // dreads: mechas finas caindo pela testa, lados e nuca + bolinhas no alto
-        for (int i = 0; i < 26; ++i) {
-            const float s = r.range(0.018f, 0.024f) * u;
-            bloco(noAlto(r.range(-0.95f, 0.95f), r.range(-0.95f, 0.9f), 0.f), glm::vec3(s));
-        }
-        auto mecha = [&](glm::vec3 alto, float len, bool costas) {
-            const float g = r.range(0.013f, 0.017f) * u;
-            bloco(alto - glm::vec3(0, len * 0.5f, 0), {g, len, g}, costas);
+        for (size_t i = 0; i < N; ++i) B[i] = glm::cross(T[i], Nn[i]);
+        auto ring = [&](size_t i, int k, glm::vec3& pos, glm::vec3& nor) {
+            const float a = 6.2831853f * float(k) / float(n);
+            nor = Nn[i] * std::cos(a) + B[i] * std::sin(a);
+            pos = P[i] + nor * R[i];
         };
-        for (int i = 0; i < 8; ++i)  // franja
-            mecha({-hx + (i + 0.5f) * (2.f * hx / 8.f), top + 0.004f * u, hzF + 0.004f * u}, r.range(0.03f, 0.05f) * u, false);
-        for (float sx : {-1.f, 1.f})
-            for (int i = 0; i < 5; ++i)
-                mecha({sx * (hx + 0.008f * u), top + 0.004f * u, hzB + (i + 0.5f) * ((hzF - hzB) * 0.75f / 5.f)}, r.range(0.05f, 0.08f) * u, false);
-        for (int i = 0; i < 8; ++i)
-            mecha({-hx + (i + 0.5f) * (2.f * hx / 8.f), top + 0.004f * u, hzB - 0.008f * u}, r.range(0.07f, 0.1f) * u, true);
+        for (size_t i = 0; i + 1 < N; ++i)
+            for (int k = 0; k < n; ++k) {
+                glm::vec3 a0, a1, b0, b1, na0, na1, nb0, nb1;
+                ring(i, k, a0, na0); ring(i, k + 1, a1, na1); ring(i + 1, k, b0, nb0); ring(i + 1, k + 1, b1, nb1);
+                const float u0 = float(k) / n, u1 = float(k + 1) / n, v0 = float(i) / (N - 1), v1 = float(i + 1) / (N - 1);
+                tri(a0, a1, b0, na0, na1, nb0, uvIn(uvr, u0, v0), uvIn(uvr, u1, v0), uvIn(uvr, u0, v1));
+                tri(a1, b1, b0, na1, nb1, nb0, uvIn(uvr, u1, v0), uvIn(uvr, u1, v1), uvIn(uvr, u0, v1));
+            }
+        for (int k = 0; k < n; ++k) {  // tampa da ponta
+            glm::vec3 a0, a1, na0, na1;
+            ring(N - 1, k, a0, na0); ring(N - 1, k + 1, a1, na1);
+            tri(P[N - 1], a0, a1, T[N - 1], T[N - 1], T[N - 1], uvIn(uvr, 0.5f, 1.f), uvIn(uvr, 0.f, 1.f), uvIn(uvr, 1.f, 1.f));
+        }
     }
-    b.faceRects = nullptr;
-    b.color = glm::vec4(1.f);
+    // Touca: superelipsoide (cantos suaves que cobrem a cabeça quadrada) centrada em c, raios rad; do alto até o
+    // ângulo phiMax(theta) (theta 0 = frente): desce pouco na frente (testa livre) e bastante atrás (nuca)
+    static glm::vec3 superDir(float th, float ph, glm::vec3 rad, glm::vec3& nor) {
+        const glm::vec3 d(std::sin(ph) * std::sin(th), std::cos(ph), std::sin(ph) * std::cos(th));
+        auto f = [](float x) { return (x < 0.f ? -1.f : 1.f) * std::sqrt(std::abs(x)); };  // expoente 1/2: formato de caixa redonda
+        const glm::vec3 p(rad.x * f(d.x), rad.y * f(d.y), rad.z * f(d.z));
+        auto g = [](float x, float r) { float t = x / r; return t * t * t / r; };  // gradiente de (x/r)^4 (já tem o sinal)
+        glm::vec3 n(g(p.x, rad.x), g(p.y, rad.y), g(p.z, rad.z));
+        nor = glm::length(n) > 1e-9f ? glm::normalize(n) : d;
+        return p;
+    }
+    void cap(glm::vec3 c, glm::vec3 rad, float phiFrente, float phiAtras, int fat, int pil, glm::vec4 uvr) {
+        auto phiMax = [&](float th) { float t = 0.5f - 0.5f * std::cos(th); return phiFrente + (phiAtras - phiFrente) * t * t; };
+        for (int i = 0; i < fat; ++i)
+            for (int j = 0; j < pil; ++j) {
+                const float th0 = 6.2831853f * i / fat, th1 = 6.2831853f * (i + 1) / fat;
+                const float v0 = float(j) / pil, v1 = float(j + 1) / pil;
+                glm::vec3 n00, n10, n01, n11;
+                glm::vec3 p00 = c + superDir(th0, v0 * phiMax(th0), rad, n00), p10 = c + superDir(th1, v0 * phiMax(th1), rad, n10);
+                glm::vec3 p01 = c + superDir(th0, v1 * phiMax(th0), rad, n01), p11 = c + superDir(th1, v1 * phiMax(th1), rad, n11);
+                const float u0 = float(i) / fat, u1 = float(i + 1) / fat;
+                if (j > 0) tri(p00, p10, p01, n00, n10, n01, uvIn(uvr, u0, v0), uvIn(uvr, u1, v0), uvIn(uvr, u0, v1));
+                tri(p10, p11, p01, n10, n11, n01, uvIn(uvr, u1, v0), uvIn(uvr, u1, v1), uvIn(uvr, u0, v1));
+            }
+    }
+    // ponto da touca (para plantar cachos e mechas): posição e normal
+    glm::vec3 onCap(glm::vec3 c, glm::vec3 rad, float th, float ph, glm::vec3& nor) { return c + superDir(th, ph, rad, nor); }
+    // bolinha (esfera baixa)
+    void ball(glm::vec3 c, float r, glm::vec4 uvr) {
+        const int fat = 6, pil = 4;
+        for (int i = 0; i < fat; ++i)
+            for (int j = 0; j < pil; ++j) {
+                auto P = [&](int a, int bb, glm::vec3& n) {
+                    const float th = 6.2831853f * a / fat, ph = 3.14159265f * bb / pil;
+                    n = {std::sin(ph) * std::sin(th), std::cos(ph), std::sin(ph) * std::cos(th)};
+                    return c + n * r;
+                };
+                glm::vec3 n00, n10, n01, n11;
+                glm::vec3 p00 = P(i, j, n00), p10 = P(i + 1, j, n10), p01 = P(i, j + 1, n01), p11 = P(i + 1, j + 1, n11);
+                const glm::vec2 t(uvIn(uvr, float(i) / fat, float(j) / pil));
+                if (j > 0) tri(p00, p10, p01, n00, n10, n01, t, t, t);
+                if (j + 1 < pil) tri(p10, p11, p01, n10, n11, n01, t, t, t);
+            }
+    }
+};
+}  // namespace
+
+// Cabelo 3D (ver Character.h). Cabeça: cubo de 0,15H centrado em 0,915H (frente em +0,07H).
+void buildBlockHair(const CharacterParams& p, Geo& g, uint32_t seed) {
+    if (p.cabelo3d <= 0) return;
+    const float H = p.height, top = 0.99f * H;
+    const int tipo = p.cabelo3d;
+    Rng r(seed * 2654435761u + 17u);
+    // textura: com skin, um pedaço do desenho do cabelo do TOPO da cabeça; sem skin, branco (a cor vai no vértice)
+    const glm::vec4 topo = p.texturizado ? p.molde[SP_Cabeca][4] : glm::vec4(0.f, 0.f, 1.f, 1.f);
+    auto pedaco = [&](float tam) {
+        const float w = (topo.z - topo.x) * tam, h = (topo.w - topo.y) * tam;
+        const float u0 = topo.x + r.range(0.f, topo.z - topo.x - w), v0 = topo.y + r.range(0.f, topo.w - topo.y - h);
+        return glm::vec4(u0, v0, u0 + w, v0 + h);
+    };
+    auto cor = [&](MeshBuilder& m) {
+        const float k = p.texturizado ? 1.f : r.range(0.85f, 1.12f);
+        m.color = p.texturizado ? glm::vec4(1.f) : glm::vec4(glm::min(glm::vec3(p.hair) * k, glm::vec3(1.f)), 1.f);
+    };
+    MeshBuilder& base = g[Mat::Painted];
+    base.joint = -1; base.xf = glm::mat4(1.f); base.uvTile = glm::vec2(0.f);
+    HairMesh hb{base};
+    // touca de cada estilo (centro, raios, quanto desce na frente e atrás)
+    glm::vec3 c(0.f, 0.935f * H, -0.004f * H), rad(0.097f * H, 0.088f * H, 0.096f * H);
+    float phiF = 1.32f, phiA = 2.45f;
+    if (tipo == 2) { c.y = 0.96f * H; rad = glm::vec3(0.128f, 0.118f, 0.128f) * H; phiF = 1.18f; phiA = 2.2f; }   // black: volume grande
+    if (tipo == 3) { rad = glm::vec3(0.091f, 0.08f, 0.09f) * H; phiF = 1.25f; phiA = 1.7f; }                      // curto: lados raspados
+    if (tipo == 4) { rad = glm::vec3(0.093f, 0.083f, 0.092f) * H; phiF = 1.3f; phiA = 2.0f; }
+    cor(base);
+    hb.cap(c, rad, phiF, phiA, 16, 7, topo);
+    // detalhe (só de perto): cachos, mechas, bolinhas
+    DetailScope ds(g);
+    MeshBuilder& det = g[Mat::Painted];
+    det.joint = -1; det.xf = glm::mat4(1.f); det.uvTile = glm::vec2(0.f);
+    HairMesh hd{det};
+    auto plantar = [&](float th, float vFrac, float phiFr, float phiAt, glm::vec3& n) {
+        float t = 0.5f - 0.5f * std::cos(th);
+        float ph = vFrac * (phiFr + (phiAt - phiFr) * t * t);
+        return hd.onCap(c, rad, th, ph, n);
+    };
+    auto espiral = [&](glm::vec3 base0, glm::vec3 eixo, float comp, float raioVolta, float raioTubo, float voltas, int lados) {
+        eixo = glm::normalize(eixo);
+        glm::vec3 ref = std::abs(eixo.y) < 0.9f ? glm::vec3(0, 1, 0) : glm::vec3(1, 0, 0);
+        const glm::vec3 a1 = glm::normalize(glm::cross(ref, eixo)), a2 = glm::cross(eixo, a1);
+        const int seg = std::max(6, int(voltas * 6.f));
+        const float fase = r.range(0.f, 6.2831853f);
+        std::vector<glm::vec3> P; std::vector<float> R;
+        for (int i = 0; i <= seg; ++i) {
+            const float t = float(i) / seg, ang = fase + t * voltas * 6.2831853f;
+            const float rv = raioVolta * (1.f - 0.25f * t);  // a ponta do cacho afina
+            P.push_back(base0 + eixo * (comp * t) + (a1 * std::cos(ang) + a2 * std::sin(ang)) * rv);
+            R.push_back(raioTubo * (1.f - 0.35f * t));
+        }
+        cor(det);
+        hd.tube(P, R, lados, pedaco(0.25f));
+    };
+    const glm::vec3 up(0.f, 1.f, 0.f), frente(0.f, 0.f, 1.f);
+    if (tipo == 1) {  // cacheado: espirais por toda a touca + franja de cachos caindo na testa
+        for (int i = 0; i < 64; ++i) {
+            glm::vec3 n;
+            const float th = r.range(0.f, 6.2831853f), vf = std::sqrt(r.range(0.02f, 0.92f));
+            glm::vec3 pt = plantar(th, vf, phiF, phiA, n);
+            glm::vec3 eixo = n + up * 0.35f + glm::vec3(r.range(-0.3f, 0.3f), 0.f, r.range(-0.3f, 0.3f));
+            espiral(pt - n * 0.006f * H, eixo, r.range(0.026f, 0.04f) * H, 0.0095f * H, 0.0068f * H, r.range(1.1f, 1.6f), 4);
+        }
+        for (int i = 0; i < 8; ++i) {  // franja
+            glm::vec3 n;
+            const float th = -0.75f + 1.5f * (i + 0.5f) / 8.f;
+            glm::vec3 pt = plantar(th, 0.97f, phiF, phiA, n);
+            espiral(pt, frente * 0.6f - up + glm::vec3(r.range(-0.2f, 0.2f), 0.f, 0.f), r.range(0.022f, 0.032f) * H, 0.007f * H, 0.005f * H, 1.2f, 4);
+        }
+    } else if (tipo == 2) {  // black: bolinhas por toda a superfície do volume
+        for (int i = 0; i < 70; ++i) {
+            glm::vec3 n;
+            const float th = r.range(0.f, 6.2831853f), vf = std::sqrt(r.range(0.f, 0.95f));
+            glm::vec3 pt = plantar(th, vf, phiF, phiA, n);
+            cor(det);
+            hd.ball(pt + n * 0.004f * H, r.range(0.012f, 0.02f) * H, pedaco(0.2f));
+        }
+    } else if (tipo == 3) {  // curto: espirais pequenas só no alto
+        for (int i = 0; i < 36; ++i) {
+            glm::vec3 n;
+            const float th = r.range(0.f, 6.2831853f), vf = std::sqrt(r.range(0.f, 0.7f));
+            glm::vec3 pt = plantar(th, vf, phiF, phiA, n);
+            espiral(pt - n * 0.003f * H, n + up * 0.5f, r.range(0.014f, 0.022f) * H, 0.006f * H, 0.004f * H, 1.1f, 4);
+        }
+    } else if (tipo == 4) {  // dreads: mechas torcidas que saem da cabeça e caem com o peso
+        for (int i = 0; i < 34; ++i) {
+            glm::vec3 n;
+            const float th = 6.2831853f * (i + r.range(0.f, 0.8f)) / 34.f, vf = r.range(0.55f, 0.85f);
+            glm::vec3 pt = plantar(th, vf, phiF, phiA, n);
+            const float tt = 0.5f - 0.5f * std::cos(th);                 // 0 frente, 1 atrás
+            const float comp = (0.035f + 0.085f * tt) * H * r.range(0.85f, 1.15f);
+            glm::vec3 sai = glm::normalize(glm::vec3(n.x, 0.f, n.z) + glm::vec3(0.f, 0.001f, 0.f));
+            std::vector<glm::vec3> P; std::vector<float> R;
+            const int K = 6;
+            for (int k = 0; k <= K; ++k) {
+                const float t = float(k) / K;
+                P.push_back(pt - n * 0.003f * H + sai * (0.016f * H * std::sqrt(t)) - up * (comp * std::pow(t, 1.4f)));
+                R.push_back((0.0085f - 0.0025f * t) * H * (k % 2 ? 0.85f : 1.f));  // torção: grosso, fino, grosso...
+            }
+            cor(det);
+            hd.tube(P, R, 5, pedaco(0.3f));
+        }
+        for (int i = 0; i < 18; ++i) {  // pontas curtas no alto
+            glm::vec3 n;
+            glm::vec3 pt = plantar(r.range(0.f, 6.2831853f), std::sqrt(r.range(0.f, 0.5f)), phiF, phiA, n);
+            espiral(pt - n * 0.003f * H, n + up * 0.6f, r.range(0.014f, 0.02f) * H, 0.003f * H, 0.0065f * H, 0.6f, 5);
+        }
+    }
+    base.color = glm::vec4(1.f);
 }
 
 void buildCharacter(const CharacterParams& p, LoadedModel& out, MeshBuilder& b) {
