@@ -294,3 +294,14 @@ body.ultra .lado.ban:hover { box-shadow: 0 0 28px rgba(245, 158, 11, 0.35); }
 /* tela inicial leve: imagem fixa da favela no fundo dos menus (o motor 3D fica parado) */
 body.menu-fundo, html.android body.menu-fundo { background: #0B0F17 url(img/fundo_menu.jpg) center / cover no-repeat; }
 body.menu-fundo canvas#tela { visibility: hidden; }
+
+/* tela inicial: a foto da favela vista de cima (fim de tarde, renderizada no motor) no lugar do mapa girando,
+   escurecida à esquerda (logo e botões) e embaixo; a foto se aproxima bem devagar */
+#inicio.tela.sobre-mapa { isolation: isolate; overflow: hidden; backdrop-filter: none; -webkit-backdrop-filter: none; background: transparent; }
+#inicio.tela.sobre-mapa::after { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  background: linear-gradient(90deg, rgba(8,11,18,.88) 0%, rgba(8,11,18,.62) 30%, rgba(8,11,18,.12) 58%, rgba(8,11,18,0) 75%),
+              linear-gradient(0deg, rgba(8,11,18,.7) 0%, rgba(8,11,18,0) 32%), linear-gradient(180deg, rgba(8,11,18,.45) 0%, rgba(8,11,18,0) 22%); }
+#inicio.tela.sobre-mapa::before { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; background: #0B0F17 url(img/fundo_inicio.jpg) center 55% / cover no-repeat;
+  transform: scale(1.06); animation: inicio-deriva 28s ease-in-out infinite alternate; }
+@keyframes inicio-deriva { from { transform: scale(1.06) translate(0, 0); } to { transform: scale(1.12) translate(-14px, 6px); } }
+@media (prefers-reduced-motion: reduce) { #inicio.tela.sobre-mapa::before { animation: none; } }
