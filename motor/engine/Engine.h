@@ -247,6 +247,7 @@ struct Engine {
     int player = -1;                 // índice em characters
     glm::vec2 moveInput{0.f};
     bool runInput = false, jumpRequest = false, fireRequest = false, aimInput = false, crouchInput = false, reloadRequest = false;
+    int scopeZoom = 0;                   // luneta: 0 zoom pequeno, 1 médio, 2 grande (botões + e -)
     float fireCooldown = 0.f;
     Tracer tracers[16];
     struct CamState { glm::vec3 target; float yaw, pitch, distance; } savedCam{};

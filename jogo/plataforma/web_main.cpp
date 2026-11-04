@@ -66,6 +66,7 @@ EMSCRIPTEN_KEEPALIVE void web_pular() { if (g) engine_player_jump(g); }
 EMSCRIPTEN_KEEPALIVE void web_agachar(int on) { if (g) engine_player_crouch(g, on); }
 EMSCRIPTEN_KEEPALIVE void web_atirar() { if (g) engine_player_fire(g); }
 EMSCRIPTEN_KEEPALIVE void web_mirar(int on) { if (g) engine_player_aim(g, on); }
+EMSCRIPTEN_KEEPALIVE int web_zoom(int d) { return g ? engine_scope_zoom(g, d) : 0; }
 EMSCRIPTEN_KEEPALIVE int web_trocar_arma() { return g ? jogo_trocar_arma(g) : 0; }
 EMSCRIPTEN_KEEPALIVE int web_granada() { return g ? jogo_granada(g) : 0; }
 EMSCRIPTEN_KEEPALIVE void web_recarregar() { if (g) engine_player_reload(g); }

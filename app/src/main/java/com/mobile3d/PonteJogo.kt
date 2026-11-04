@@ -68,6 +68,7 @@ class PonteJogo(private val jogo: JogoActivity) {
     @JavascriptInterface fun agachar(on: Boolean) = gl { NativeBridge.nativePlayerCrouch(on) }
     @JavascriptInterface fun atirar(on: Boolean) { atirando = on }
     @JavascriptInterface fun mirar(on: Boolean) = gl { NativeBridge.nativePlayerAim(on) }
+    @JavascriptInterface fun zoom(d: Int) = gl { NativeBridge.nativeScopeZoom(d) }
     @JavascriptInterface fun trocar(): Boolean = glEspera(false) { NativeBridge.nativePlayerSwap() }
     @JavascriptInterface fun granada(): Boolean = glEspera(false) { NativeBridge.nativePlayerGrenade() }
     @JavascriptInterface fun recarregar() = gl { NativeBridge.nativePlayerReload() }

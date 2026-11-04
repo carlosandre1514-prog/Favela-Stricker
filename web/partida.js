@@ -13,6 +13,8 @@ const PECAS = {
   agachar: { nome: 'Agachar', x: 0.873, y: 0.603 },
   granada: { nome: 'Granada', x: 0.797, y: 0.628 },
   recarregar: { nome: 'Recarregar', x: 0.751, y: 0.795 },
+  correr: { nome: 'Correr', x: 0.215, y: 0.615 },
+  zoom: { nome: 'Zoom da luneta', x: 0.700, y: 0.640 },
   armas: { nome: 'Armas', x: 0.444, y: 0.895 },
   minimapa: { nome: 'Minimapa', x: 0.066, y: 0.308 },
   falar: { nome: 'Falar (voz)', x: 0.949, y: 0.385, online: true },
@@ -44,6 +46,8 @@ function pecaHtml(id) {
     case 'pular': return `<button class="peca so-toque redondo" data-peca="pular" id="b-pular" style="width:54px;height:54px">${ICONE.cima}<span class="r">PULAR</span></button>`;
     case 'agachar': return `<button class="peca so-toque redondo" data-peca="agachar" id="b-agachar" style="width:54px;height:54px">${ICONE.baixo}<span class="r">AGACHAR</span></button>`;
     case 'granada': return `<button class="peca so-toque redondo" data-peca="granada" id="b-granada" style="width:54px;height:54px;border-color:rgba(252,211,77,.8)">${ICONE.granada}<span class="contador" id="n-granadas">2</span></button>`;
+    case 'correr': return `<button class="peca so-toque redondo" data-peca="correr" id="b-correr" style="width:54px;height:54px"><span style="font-size:20px;font-weight:900;line-height:1">»</span><span class="r">CORRER</span></button>`;
+    case 'zoom': return '<div class="peca so-toque" data-peca="zoom" id="zoom-luneta" style="display:flex;flex-direction:column;align-items:center;gap:6px"><button class="redondo" id="b-zoom-mais" style="width:44px;height:44px;font-size:24px;font-weight:800">+</button><span id="zoom-nivel" style="font-size:11px;font-weight:800;text-shadow:0 1px 2px #000">1,7x</span><button class="redondo" id="b-zoom-menos" style="width:44px;height:44px;font-size:24px;font-weight:800">−</button></div>';
     case 'recarregar': return `<button class="peca so-toque redondo" data-peca="recarregar" id="b-recarregar" style="width:48px;height:48px">${ICONE.recarregar}</button>`;
     case 'armas': return `<div class="peca" data-peca="armas" id="armas"><button class="slot ativa" data-slot="0"><img alt=""><span>–</span></button><button class="slot" data-slot="1"><img alt=""><span>–</span></button><button class="troca" id="b-trocar" aria-label="Troca rápida de arma">${ICONE.trocar}</button></div>`;
     case 'minimapa': return '<canvas class="peca" data-peca="minimapa" id="minimapa" width="168" height="168" style="width:84px;height:84px"></canvas>';
@@ -178,8 +182,11 @@ function montarHud(online) {
     else motor.interagir();
   };
   ligarControlesToque(t);
-  for (const s of $$('.slot', t)) s.onclick = () => { if (Number(s.dataset.slot) !== ultimoHud.slot) motor.trocar(); };
-  $('#b-trocar', t).onclick = () => motor.trocar();
+  // trocar arma no toque (pointerdown): funciona com outros dedos na tela (andando, mirando, atirando);
+  // o "click" só vinha com um dedo só
+  const toque = (el, f) => { if (el) el.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); f(); }); };
+  for (const s of $$('.slot', t)) toque(s, () => { if (Number(s.dataset.slot) !== ultimoHud.slot) motor.trocar(); });
+  toque($('#b-trocar', t), () => motor.trocar());
   if (online) {
     const fala = $('#b-falar', t);
     const on = (e) => { e.preventDefault(); falar(true); fala.classList.add('ligado'); };
@@ -299,6 +306,12 @@ function atualizarHud(j) {
   // mira e luneta
   const luneta = j.mirando && j.luneta;
   $('#luneta', t).style.display = luneta ? 'block' : 'none';
+  const zl = $('#zoom-luneta', t);  // botões + e - da luneta: só mirando com ela
+  if (zl) {
+    zl.style.display = luneta ? 'flex' : 'none';
+    $('#zoom-nivel', t).textContent = ['1,7x', '2,4x', '3,6x'][j.zoom | 0] || '1,7x';
+  }
+  if (j.morto && partida.correAuto) pararCorrida(t);
   const mira = $('#mira', t);
   mira.style.visibility = luneta ? 'hidden' : 'visible';
   desenharMira(mira, j.mirando, j.acerto, j.cabeca);
@@ -341,6 +354,7 @@ function ligarControlesToque(t) {
   };
   const inicioAndar = (e) => {
     if (dedoAndar !== null) return;
+    if (partida.correAuto) pararCorrida(t);  // mexeu no analógico: para de correr sozinho
     ctxAudio();
     dedoAndar = e.pointerId;
     [ox, oy] = pontoPalco(e);
@@ -360,9 +374,23 @@ function ligarControlesToque(t) {
     // bolinha fica na borda, apontando para o lado do dedo
     if (len > 1) { dx /= len; dy /= len; }
     bola.style.transform = `translate(${dx * R * 0.55 / layout.analogico.s}px, ${dy * R * 0.55 / layout.analogico.s}px)`;
+    partida.dedoXY = [dx, dy];
+    if (partida.correAuto) {  // apertou correr com o dedo no analógico: mexendo o dedo, volta ao normal
+      if (Math.hypot(dx - partida.correAuto.dx, dy - partida.correAuto.dy) < 0.25) return;
+      pararCorrida(t);
+    }
     motor.andar(dx, -dy, Math.hypot(dx, dy) > 0.93);  // empurrando até a borda (para qualquer lado): corre
   };
-  const fimAndar = (e) => { if (e.pointerId === dedoAndar) soltarAnalogico(); };
+  const fimAndar = (e) => {
+    if (e.pointerId !== dedoAndar) return;
+    if (partida.correAuto) {  // correndo sozinho: soltar o dedo não para
+      dedoAndar = null;
+      if (bola) bola.style.transform = '';
+      if (analog) posicionarPeca(analog, 'analogico');
+      return;
+    }
+    soltarAnalogico();
+  };
   for (const alvo of [zonaA, analog]) {
     if (!alvo) continue;
     alvo.addEventListener('pointerdown', inicioAndar);
@@ -405,6 +433,24 @@ function ligarControlesToque(t) {
   botao('#b-agachar', (b) => { partida.agachado = !partida.agachado; motor.agachar(partida.agachado); b.classList.toggle('ligado', partida.agachado); });
   botao('#b-granada', () => { if (!motor.granada() && (ultimoHud.granadas | 0) === 0) aviso('Sem granadas: compre na loja da base ($ 300)'); });
   botao('#b-recarregar', () => motor.recarregar());
+  // correr: um toque e o boneco corre para a frente sozinho (para onde se olha); mexer no analógico ou tocar de novo, para
+  botao('#b-correr', (b) => {
+    if (partida.correAuto) { pararCorrida(t); return; }
+    const [dx, dy] = dedoAndar !== null && partida.dedoXY ? partida.dedoXY : [0, 0];
+    partida.correAuto = { dx, dy };
+    b.classList.add('ligado');
+    motor.andar(0, 1, true);
+  });
+  botao('#b-zoom-mais', () => motor.zoom(1));
+  botao('#b-zoom-menos', () => motor.zoom(-1));
+}
+
+function pararCorrida(t) {
+  if (!partida || !partida.correAuto) return;
+  partida.correAuto = null;
+  const b = t && $('#b-correr', t);
+  if (b) b.classList.remove('ligado');
+  motor.andar(0, 0, false);
 }
 
 // ---------------- teclado e mouse (computador) ----------------

@@ -242,6 +242,7 @@ void engine_set_play(Engine* e, int playing) {
         e->runInput = e->jumpRequest = e->fireRequest = e->crouchInput = false;
         e->playing = true;  // a lógica de jogo só cria/danifica com o Play ligado
         e->playStartHour = e->timeOfDay;
+        e->scopeZoom = 0;  // luneta começa no zoom pequeno
         eng::weatherStart(e);
         e->sounds.clear();
         eng::gameStart(e);
@@ -355,6 +356,7 @@ static void animatorsOfSelection(Engine* e, std::vector<Animator*>& out) {
 }
 
 void engine_player_aim(Engine* e, int on) { if (e) e->aimInput = on != 0; }
+int engine_scope_zoom(Engine* e, int delta) { if (!e) return 0; e->scopeZoom = std::clamp(e->scopeZoom + delta, 0, 2); return e->scopeZoom; }
 const char* engine_interact_label(Engine* e) { if (!e) return ""; e->toolResult = eng::interactLabel(e); return e->toolResult.c_str(); }
 int engine_interact(Engine* e) { return e && eng::interact(e); }
 

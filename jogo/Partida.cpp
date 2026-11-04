@@ -1046,6 +1046,7 @@ std::string hudJson(Engine* e) {
             j["recarregando"] = c.reloadTimer > 0.f;
             j["mirando"] = c.adsW > 0.5f;
             j["luneta"] = c.scope;
+            j["zoom"] = e->scopeZoom;
         }
     }
     json feed = json::array();

@@ -668,6 +668,17 @@ int createWeapon(Engine* e, int kind, int ch, const WeaponLook& look) {
                 c.support = glm::vec3(0.f, wb.min.y + hgt * 0.55f, wb.min.z + len * 0.64f);
             // alça de mira: no alto da arma, um terço do comprimento a partir da coronha
             c.sight = glm::vec3(0.f, wb.max.y - hgt * 0.06f, wb.min.z + len * 0.36f);
+            // AK (alça de mira aberta): o olho passa rente por cima da alça traseira e a ponta da massa de mira
+            // (lá na frente) fica bem no centro da tela, onde está o ponto vermelho (antes a alça tampava o centro)
+            if (look.file.find("ak") != std::string::npos) c.sight.y = wb.max.y - 0.011f;  // (o olho fica 1,2 cm acima da alça)
+            // linha da mira de cada modelo do kit: o centro da caixa da arma fica de lado (alavanca, ejetor), a alça
+            // e a massa ficam alguns milímetros para +X (medido nos arquivos: tools/medir_mira_armas.py)
+            {
+                const std::string& fl = look.file;
+                c.sight.x = fl.find("ak74_tatica") != std::string::npos ? 0.0088f : fl.find("ak74") != std::string::npos ? 0.0107f
+                          : fl.find("ak47") != std::string::npos ? 0.0138f : fl.find("m4a1") != std::string::npos ? 0.0055f : 0.f;
+                if (look.flip) c.sight.x = -c.sight.x;
+            }
             c.butt = glm::vec3(0.f, wb.min.y + hgt * 0.62f, wb.min.z + 0.01f);
             c.gripPt = glm::vec3(0.f, wb.min.y + hgt * 0.4f, wb.min.z + len * 0.315f);
             c.guardPt = glm::vec3(0.f, wb.min.y + hgt * 0.68f, wb.min.z + len * 0.63f);
@@ -1129,7 +1140,9 @@ void applyFirstPerson(Engine* e) {
     }
     e->camera.lookAt(e->fpEye, e->fpEye + view);
     e->camera.nearZ = 0.035f;
-    const float zoom = c.scope ? 0.36f : 0.72f;
+    // luneta: mirou, um zoom pequeno; os botões + e - aproximam (3 níveis). Sem luneta: o zoom leve da mira
+    static const float kScope[3] = {0.6f, 0.42f, 0.28f};
+    const float zoom = c.scope ? kScope[std::clamp(e->scopeZoom, 0, 2)] : 0.72f;
     e->camera.fovYDeg = e->baseFov * glm::mix(1.f, zoom, c.adsW);
     e->editorCam.turnSpeed = 0.0042f * e->camera.fovYDeg / e->baseFov;  // com zoom, o dedo gira menos
     // a cabeça (com capacete/boné) some para não tapar a vista; na luneta, os braços também
@@ -1597,6 +1610,7 @@ void updatePlayer(Engine* e, float dt) {
         if (c.reserve > 0) c.reserve -= n;
         const AnimationClip* rc = c.anim && c.clipMap[CC_Reload] >= 0 ? c.anim->clipAt(c.clipMap[CC_Reload]) : nullptr;
         c.reloadTimer = c.weaponKind == WK_Pistol ? 1.3f : rc ? rc->duration / 1.4f : 2.f;
+        e->aimInput = false;  // recarregando sai da mira e não volta sozinho depois
         playSound(e, "recarga", go->transform.position, 0.8f);
         if (c.anim && c.clipMap[CC_Reload] >= 0 && c.weaponKind != WK_Pistol) c.anim->setClip(c.clipMap[CC_Reload]);
     };
@@ -1621,6 +1635,7 @@ void updatePlayer(Engine* e, float dt) {
                 c.ammo = 30;
                 const AnimationClip* rc = c.anim && c.clipMap[CC_Reload] >= 0 ? c.anim->clipAt(c.clipMap[CC_Reload]) : nullptr;
                 c.reloadTimer = rc ? rc->duration / 1.4f : 2.f;
+                e->aimInput = false;
                 playSound(e, "recarga", go->transform.position, 0.8f);
                 if (c.anim && c.clipMap[CC_Reload] >= 0) c.anim->setClip(c.clipMap[CC_Reload]);
                 e->game.message = "Recarregando...";

@@ -32,6 +32,7 @@ float   engine_get_exposure(Engine*);
 void    engine_set_sun_intensity(Engine*, float intensity);
 float   engine_get_sun_intensity(Engine*);
 
+int     engine_scope_zoom(Engine*, int delta);                 // luneta: +1 aproxima, -1 afasta (0..2); devolve o nível
 void    engine_player_aim(Engine*, int on);                     // jogador mirando (botão segurado)
 const char* engine_interact_label(Engine*);                     // texto do botão de ação perto do jogador ("" = nada)
 int     engine_interact(Engine*);                               // usa (ex.: elevador para o terraço)

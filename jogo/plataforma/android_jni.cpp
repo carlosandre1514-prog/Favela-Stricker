@@ -142,6 +142,7 @@ JNI_FN(jbyteArray, nativeShopJson)(JNIEnv* env, jclass) { return toBytes(env, g_
 JNI_FN(jbyteArray, nativeShopBuy)(JNIEnv* env, jclass, jint item) { return toBytes(env, g_engine ? jogo_loja_comprar(g_engine, item) : ""); }
 JNI_FN(void, nativeShopClose)(JNIEnv*, jclass) { if (g_engine) jogo_loja_fechar(g_engine); }
 JNI_FN(void, nativePlayerAim)(JNIEnv*, jclass, jboolean on) { if (g_engine) engine_player_aim(g_engine, on ? 1 : 0); }
+JNI_FN(jint, nativeScopeZoom)(JNIEnv*, jclass, jint d) { return g_engine ? engine_scope_zoom(g_engine, d) : 0; }
 JNI_FN(void, nativeSetFirstPerson)(JNIEnv*, jclass, jboolean on) { if (g_engine) engine_set_first_person(g_engine, on ? 1 : 0); }
 JNI_FN(void, nativeTeamLoadout)(JNIEnv* env, jclass, jint team, jint skin, jstring primary, jstring secondary) {
     if (!g_engine) return;

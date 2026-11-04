@@ -502,6 +502,42 @@ int main(int argc, char** argv) {
         std::printf(g_fail ? "FALHOU\n" : "OK\n");
         return g_fail ? 1 : 0;
     }
+    // Mirando com cada arma (SO_MIRA=1): foto da primeira pessoa mirando (mira_<arma>.png); o centro da tela é
+    // onde a bala vai e onde fica o ponto vermelho do HUD
+    if (std::getenv("SO_MIRA")) {
+        const char* armas[] = {"m4a1", "m4colt", "ak47", "ak74", "ak74_tatica"};
+        for (const char* a : armas) {
+            abrirPartida();
+            const int time = a[0] == 'a' ? 1 : 0;
+            jogo_rede_sala(e, 1, "eu", (std::string(R"([{"id":"eu","nome":"Eu","time":)") + std::to_string(time) + R"(,"skin":0,"arma":")" + a + R"("}])").c_str());
+            jogo_escolhas(e, time, 0, a, "tt33");
+            engine_set_first_person(e, 1);
+            engine_set_play(e, 1);
+            engine_set_camera(e, 0.f, 0.f, 0.f, 0.f, 0.05f, 3.f);
+            frames(e, 60);
+            engine_player_aim(e, 1);
+            frames(e, 40);
+            save(out, (std::string("mira_") + a + ".png").c_str());
+            {   // onde a alça de mira está em relação ao olho (deve ficar na linha do olhar)
+                eng::Engine* E = reinterpret_cast<eng::Engine*>(e);
+                auto& c = E->characters[E->player];
+                if (auto* w = E->scene.get(c.weapon)) {
+                    glm::vec3 sw = glm::vec3(w->transform.world() * glm::vec4(c.sight, 1.f));
+                    glm::vec3 v = glm::normalize(E->camera.rotation * glm::vec3(0, 0, -1)), d = sw - E->fpEye;
+                    glm::vec3 up = glm::normalize(E->camera.rotation * glm::vec3(0, 1, 0));
+                    glm::vec3 rt = glm::normalize(glm::cross(v, up));
+                    std::printf("  %s: adsW %.2f supportW %.2f · alça %.3f m à frente, %.3f m acima, %.3f m à direita da linha do olhar\n", a, c.adsW, c.supportW,
+                                glm::dot(d, v), glm::dot(d, up), glm::dot(d, rt));
+                }
+            }
+            if (const char* z = std::getenv("ZOOM")) { engine_scope_zoom(e, std::atoi(z)); frames(e, 30); save(out, (std::string("mira_") + a + "_zoom.png").c_str()); }
+            engine_player_aim(e, 0);
+            engine_set_play(e, 0);
+        }
+        engine_destroy(e);
+        std::printf(g_fail ? "FALHOU\n" : "OK\n");
+        return g_fail ? 1 : 0;
+    }
     // Céu ao longo do dia (SO_CEU=1): o mapa da partida de várias horas e com chuva (fotos ceu_<hora>.png, chuva_<hora>.png)
     if (std::getenv("SO_CEU")) {
         const char* proj = "app/src/main/assets/exemplos/5_policia_x_bandidos.json";

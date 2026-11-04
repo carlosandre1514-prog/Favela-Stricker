@@ -25,6 +25,7 @@ object NativeBridge {
     @JvmStatic external fun nativePlayerJump()
     @JvmStatic external fun nativePlayerCrouch(on: Boolean)
     @JvmStatic external fun nativePlayerAim(on: Boolean)
+    @JvmStatic external fun nativeScopeZoom(d: Int): Int
     @JvmStatic external fun nativePlayerFire()
     @JvmStatic external fun nativePlayerReload()
     @JvmStatic external fun nativePlayerSwap(): Boolean
