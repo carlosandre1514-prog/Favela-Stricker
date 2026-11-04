@@ -1060,7 +1060,31 @@ void updateFirstPersonEye(Engine* e, float dt) {
     } else {
         eye = body->transform.position + glm::vec3(0.f, c.height * (c.crouch ? 0.62f : 0.93f), 0.f) + fwd * 0.1f;
     }
+    if (c.vaultT >= 0.f) {  // pulando janela: o olho passa pelo meio do vão (abaixa junto com o corpo encolhido)
+        const float t = c.vaultT, bump = std::sin(3.14159265f * std::clamp(t, 0.f, 1.f));
+        eye = body->transform.position + glm::vec3(0.f, glm::mix(1.62f, 0.95f, bump) * scale, 0.f) + c.vaultDir * 0.05f;
+        e->fpEye = eye;
+        e->fpEyeValid = true;
+        return;
+    }
     if (e->fpEyeValid) eye.y = glm::mix(e->fpEye.y, eye.y, 1.f - std::exp(-14.f * dt));
+    // O olho nunca encosta em parede, teto ou chão: com a tela (plano de perto) dentro da parede dava para ver
+    // dentro das casas e por baixo da terra (e achar quem está lá dentro no online). Folga de 12 cm em volta.
+    if (body->rigidBody && body->rigidBody->body) {
+        const btRigidBody* self = body->rigidBody->body;
+        const float m = 0.12f;
+        glm::vec3 hit; GameObject* o = nullptr; float fr = 1.f;
+        const glm::vec3 axis(body->transform.position.x, eye.y, body->transform.position.z);
+        const glm::vec3 d = eye - axis;
+        const float L = glm::length(d);
+        if (L > 1e-3f && e->physics.raycastIgnoring(axis, axis + d / L * (L + m), self, hit, o, fr))
+            eye = axis + d / L * std::max(0.f, fr * (L + m) - m);  // do eixo do corpo até o olho: para antes da parede
+        glm::vec3 view = e->editorCam.forward();
+        glm::vec3 hv = glm::length(glm::vec2(view.x, view.z)) > 1e-3f ? glm::normalize(glm::vec3(view.x, 0.f, view.z)) : fwd;
+        const glm::vec3 side = glm::normalize(glm::cross(hv, glm::vec3(0.f, 1.f, 0.f)));
+        for (glm::vec3 dir : {view, hv, -hv, side, -side, glm::vec3(0.f, 1.f, 0.f), glm::vec3(0.f, -1.f, 0.f)})
+            if (e->physics.raycastIgnoring(eye, eye + dir * m, self, hit, o, fr)) eye -= dir * (m - fr * m);
+    }
     e->fpEye = eye;
     e->fpEyeValid = true;
 }
@@ -1131,12 +1155,18 @@ void applyFirstPerson(Engine* e) {
         }
         // boneco em bloco (esqueleto do motor): a parte de cima do braço, grossa e colada na câmera, também some;
         // ficam o antebraço, a mão e a arma (como nos jogos de tiro)
-        if (!a->retarget && S.jointCount == CJ_Total)
-            for (int up : {int(CJ_LUpper), int(CJ_RUpper)}) {
-                glm::vec3 hp = glm::vec3(a->global[up][3]);
+        if (!a->retarget && S.jointCount == CJ_Total) {
+            auto hide = [&](int j) {
+                glm::vec3 hp = glm::vec3(a->global[j][3]);
                 glm::mat4 M = glm::translate(glm::mat4(1.f), hp) * glm::scale(glm::mat4(1.f), glm::vec3(1e-3f)) * glm::translate(glm::mat4(1.f), -hp);
-                a->palette[up] = M * a->global[up] * S.inverseBind[up];
-            }
+                a->palette[j] = M * a->global[j] * S.inverseBind[j];
+            };
+            for (int up : {int(CJ_LUpper), int(CJ_RUpper)}) hide(up);
+            // no ar (pulo, janela) as pernas encolhem e o tronco abaixa: sairiam na frente da câmera
+            if (c.airborne || c.vaultT >= 0.f)
+                for (int j : {int(CJ_Hips), int(CJ_Spine), int(CJ_Chest), int(CJ_Neck), int(CJ_LThigh), int(CJ_LShin), int(CJ_LFoot),
+                              int(CJ_RThigh), int(CJ_RShin), int(CJ_RFoot)}) hide(j);
+        }
     }
 }
 
@@ -1447,6 +1477,82 @@ void playDeath(CharacterInfo& c) {
     else c.anim->speed = 0.f;
 }
 
+// Pular janela (ou mureta): pulando de frente para uma parede com um vão em cima (peitoril de 45 cm a 1,35 m acima
+// do pé, vão livre por cima) e chão do outro lado, o boneco passa encolhido por cima do peitoril e cai do outro lado.
+// Durante o pulo a cápsula não bate em nada (a janela é mais baixa que o boneco) e o caminho é conduzido aqui.
+static bool tryVault(Engine* e, CharacterInfo& c, GameObject& go, btRigidBody* b, glm::vec3 f) {
+    f.y = 0.f;
+    if (glm::length(f) < 1e-3f) return false;
+    f = glm::normalize(f);
+    const float sc = c.height / 1.75f;
+    const glm::vec3 up(0.f, 1.f, 0.f), feet = go.transform.position;
+    glm::vec3 hit; GameObject* o = nullptr; float fr = 1.f;
+    auto ray = [&](glm::vec3 a, glm::vec3 z) { return e->physics.raycastIgnoring(a, z, b, hit, o, fr); };
+    // 1) parede bem na frente, na altura da cintura
+    const glm::vec3 w0 = feet + up * (0.5f * sc);
+    if (!ray(w0, w0 + f * 0.85f)) return false;
+    const float dWall = 0.85f * fr;
+    // 2) vão livre por cima do peitoril (duas alturas)
+    for (float y : {1.3f, 1.6f}) {
+        const glm::vec3 p = feet + up * (y * sc);
+        if (ray(p, p + f * (dWall + 0.7f))) return false;
+    }
+    // 3) altura do peitoril (de cima para baixo, logo depois da face da parede)
+    const glm::vec3 top = feet + f * (dWall + 0.05f) + up * (1.9f * sc);
+    if (!ray(top, top - up * (1.85f * sc))) return false;
+    const float sillY = hit.y, rel = sillY - feet.y;
+    if (rel < 0.45f * sc || rel > 1.35f * sc) return false;
+    // 4) espessura da parede (raio de volta, do outro lado)
+    float thick = 0.15f;
+    const glm::vec3 far = feet + f * (dWall + 1.2f) + up * (rel - 0.08f);
+    if (ray(far, far - f * 1.2f)) thick = std::clamp(glm::dot(hit - feet, f) - dWall, 0.05f, 0.6f);
+    // 5) chão do outro lado (pode ser mais baixo, até 3,5 m)
+    const glm::vec3 land = feet + f * (dWall + thick + 0.55f);
+    if (!ray(land + up * (rel + 0.4f), land - up * (3.5f - rel))) return false;
+    const float floorY = hit.y;
+    // 6) espaço para ficar em pé onde cai
+    const glm::vec3 chk = glm::vec3(land.x, floorY + 1.f * sc, land.z);
+    if (ray(chk - f * 0.3f, chk + f * 0.3f)) return false;
+    c.vaultA = feet;
+    c.vaultB = glm::vec3(feet + f * (dWall + thick * 0.5f));
+    c.vaultB.y = sillY - 0.3f * sc;  // o corpo encolhido passa com os joelhos por cima do peitoril
+    c.vaultC = glm::vec3(land.x, floorY + 0.02f, land.z);
+    c.vaultDir = f;
+    c.vaultDur = 0.55f + 0.08f * std::max(0.f, sillY - floorY - 1.f);  // queda maior do outro lado: um pouco mais
+    c.vaultT = 0.f;
+    c.jumpHold = 0.18f;
+    b->setCollisionFlags(b->getCollisionFlags() | btCollisionObject::CF_NO_CONTACT_RESPONSE);
+    b->setGravity(btVector3(0, 0, 0));
+    b->setLinearVelocity(btVector3(0, 0, 0));
+    return true;
+}
+
+static void updateVault(Engine* e, CharacterInfo& c, GameObject& go, btRigidBody* b, float dt) {
+    c.vaultT = std::min(1.f, c.vaultT + dt / c.vaultDur);
+    const float t = c.vaultT;
+    glm::vec3 p;
+    if (t < 0.5f) {  // até o vão: sobe e avança
+        const float u = t / 0.5f, s = u * u * (3.f - 2.f * u);
+        p = glm::mix(c.vaultA, c.vaultB, s);
+        p.y = glm::mix(c.vaultA.y, c.vaultB.y, std::sin(u * 1.5707963f));
+    } else {  // do vão até o chão do outro lado: um arco curto e desce
+        const float u = (t - 0.5f) / 0.5f;
+        p = glm::mix(c.vaultB, c.vaultC, u * (2.f - u));
+        p.y = glm::mix(c.vaultB.y, c.vaultC.y, u * u) + 0.12f * std::sin(u * 3.14159265f);
+    }
+    go.transform.setPosition(p);
+    if (go.rigidBody) e->physics.syncFromTransform(*go.rigidBody);
+    b->setLinearVelocity(btVector3(0, 0, 0));
+    c.airborne = true;
+    animateCharacter(c, go.transform.rotation, glm::vec3(c.vaultDir.x, 3.f, c.vaultDir.z), false, true);
+    if (t >= 1.f) {  // chegou: volta a bater nas coisas, sai andando para a frente
+        c.vaultT = -1.f;
+        c.jumpHold = 0.f;
+        b->setCollisionFlags(b->getCollisionFlags() & ~btCollisionObject::CF_NO_CONTACT_RESPONSE);
+        b->setLinearVelocity(btVector3(c.vaultDir.x * 2.f, -1.f, c.vaultDir.z * 2.f));
+    }
+}
+
 void updatePlayer(Engine* e, float dt) {
     for (auto& t : e->tracers) t.life -= dt;
     e->fireCooldown -= dt;
@@ -1469,7 +1575,10 @@ void updatePlayer(Engine* e, float dt) {
     c.crouch = alive && e->crouchInput && c.weaponKind >= 0 && c.weaponKind != WK_Pistol;
     float speed = c.crouch ? 1.6f : e->runInput && !c.aimHold ? 6.5f : 2.6f;  // mirando: anda devagar; agachado mais ainda
     if (fp && c.weaponKind == WK_Pistol) c.aimTimer = std::max(c.aimTimer, 0.1f);  // primeira pessoa: pistola sempre à frente
-    driveCharacter(e, c, move, speed, alive && e->jumpRequest, dt, face);
+    if (c.vaultT >= 0.f) updateVault(e, c, *go, b, dt);  // pulando janela: o caminho manda
+    // só andando na direção da janela (pulo parado perto da mureta da laje continua sendo pulo normal)
+    else if (alive && e->jumpRequest && glm::length(move) > 0.3f && tryVault(e, c, *go, b, move)) updateVault(e, c, *go, b, dt);
+    else driveCharacter(e, c, move, speed, alive && e->jumpRequest, dt, face);
     e->jumpRequest = false;
     if (fp) {  // primeira pessoa: o corpo vira junto com o olhar, sem atraso (a arma fica no centro da tela)
         glm::quat q = glm::angleAxis(std::atan2(fwd.x, fwd.z), glm::vec3(0, 1, 0));

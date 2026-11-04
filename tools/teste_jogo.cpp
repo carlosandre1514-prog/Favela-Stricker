@@ -458,6 +458,50 @@ int main(int argc, char** argv) {
         std::printf(g_fail ? "FALHOU\n" : "OK\n");
         return g_fail ? 1 : 0;
     }
+    // Pular janela e câmera colada na parede (SO_JANELA=1): casa com janela na frente; o boneco corre, pula e tem que
+    // cair dentro; depois anda contra a parede do fundo e o olho não pode entrar nela (fotos janela_*.png)
+    if (std::getenv("SO_JANELA")) {
+        using nlohmann::json;
+        eng::Engine* E = reinterpret_cast<eng::Engine*>(e);
+        for (int fp = 1; fp >= 0; --fp) {
+            engine_new_scene(e);
+            engine_add_spec(e, json{{"tipo", "modulo"}, {"pos", {0, 0, -3.3}}, {"paredes", {"janela", "lisa", "lisa", "lisa"}}, {"escada", "nenhuma"}}.dump().c_str());
+            const int ch = engine_create_random_character(e, 7, 1);
+            engine_set_first_person(e, fp);
+            engine_set_play(e, 1);
+            engine_set_camera(e, 0.f, 1.f, 0.f, 0.f, fp ? 0.f : 0.25f, 4.f);
+            frames(e, 30);
+            float p[3], r[3], sc[3];
+            engine_player_input(e, 0.f, 1.f, 0);
+            for (int k = 0; k < 120; ++k) {
+                frames(e, 1);
+                engine_get_transform(e, ch, p, r, sc);
+                if (p[2] < -0.55f) break;
+            }
+            engine_player_jump(e);
+            for (int k = 0; k < 50; ++k) {
+                frames(e, 1);
+                if (k % 6 == 0) save(out, ("janela_" + std::string(fp ? "fp_" : "tp_") + std::to_string(k) + ".png").c_str());
+            }
+            engine_player_input(e, 0.f, 0.f, 0);
+            frames(e, 20);
+            engine_get_transform(e, ch, p, r, sc);
+            std::printf("  janela (%s): depois do pulo z=%.2f y=%.2f\n", fp ? "1ª pessoa" : "3ª pessoa", p[2], p[1]);
+            if (p[2] > -1.75f || p[1] < 0.05f || p[1] > 0.5f) { std::printf("  [ERRO] não entrou pela janela\n"); ++g_fail; }
+            if (fp) {  // contra a parede do fundo (face de dentro em z = -5,15): o olho fica do lado de cá
+                engine_player_input(e, 0.f, 1.f, 1);
+                frames(e, 90);
+                save(out, "janela_parede.png");
+                std::printf("  olho colado na parede: z=%.3f (parede em -5,15)\n", E->fpEye.z);
+                if (E->fpEye.z < -5.15f + 0.09f) { std::printf("  [ERRO] o olho entrou na parede\n"); ++g_fail; }
+                engine_player_input(e, 0.f, 0.f, 0);
+            }
+            engine_set_play(e, 0);
+        }
+        engine_destroy(e);
+        std::printf(g_fail ? "FALHOU\n" : "OK\n");
+        return g_fail ? 1 : 0;
+    }
     // Céu ao longo do dia (SO_CEU=1): o mapa da partida de várias horas e com chuva (fotos ceu_<hora>.png, chuva_<hora>.png)
     if (std::getenv("SO_CEU")) {
         const char* proj = "app/src/main/assets/exemplos/5_policia_x_bandidos.json";

@@ -74,6 +74,9 @@ struct CharacterInfo {
     float gunDmg = 0.f, gunInterval = 0.1f, gunSpread = 0.f, gunFalloff = 1e9f;
     int gunPellets = 1, magSize = 30, reserve = -1;
     int shots = 0;             // tiros dados (online: os outros celulares mostram o tiro quando o número sobe)
+    // pular janela (ou mureta): caminho do pé em 3 pontos, de A (antes) por B (no vão) até C (do outro lado)
+    float vaultT = -1.f, vaultDur = 0.6f;   // < 0: não está pulando janela; 0..1 progresso
+    glm::vec3 vaultA{0.f}, vaultB{0.f}, vaultC{0.f}, vaultDir{0.f, 0.f, 1.f};
     bool wasAir = false, landing = false;  // pulo: estava no ar no quadro anterior / tocando a aterrissagem
     float jumpHold = 0.f;      // > 0: acabou de pular (conta como no ar mesmo com o chão ainda perto do pé)
     bool airborne = false;     // no ar (pulando/caindo): online, os outros veem o pulo
