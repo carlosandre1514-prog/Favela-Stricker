@@ -387,7 +387,17 @@ static void buildBlockBody(const CharacterParams& p, MeshBuilder& b, float H, fl
     const float tw = (sx - 0.05f * H) * 2.f, td = 0.12f * H;    // tronco: largura e profundidade
     const float waist = thighY, chestTop = 0.84f * H;
     // ---- tronco: cintura (calça), barriga e peito (camisa)
-    part(CJ_Hips, p.pants, {0, (waist + 0.6f * H) * 0.5f, 0}, {tw, 0.6f * H - waist + 0.002f * H, td});
+    // cintura num tom mais escuro que as pernas (dá para ver onde o tronco acaba e as pernas começam) e cinto em cima
+    // (calça muito escura: a cintura fica um pouco mais clara, senão não aparece a diferença)
+    const float lum = 0.2126f * p.pants.r + 0.7152f * p.pants.g + 0.0722f * p.pants.b;  // cores lineares
+    const glm::vec4 cintura = lum < 0.02f ? glm::vec4(glm::vec3(p.pants) + glm::vec3(0.035f), 1.f)
+                                          : glm::vec4(glm::vec3(p.pants) * 0.68f, 1.f);
+    part(CJ_Hips, cintura, {0, (waist + 0.6f * H) * 0.5f, 0}, {tw, 0.6f * H - waist + 0.002f * H, td});
+    {
+        const float ec = 0.003f * H;
+        part(CJ_Hips, srgb(30, 25, 22), {0, 0.59f * H, 0}, {tw + 2.f * ec, 0.022f * H, td + 2.f * ec});                 // cinto
+        part(CJ_Hips, srgb(190, 170, 110), {0, 0.59f * H, td / 2 + 1.5f * ec}, {0.03f * H, 0.016f * H, 0.004f * H});  // fivela
+    }
     part(CJ_Spine, p.shirt, {0, 0.64f * H, 0}, {tw, 0.08f * H, td});
     part(CJ_Chest, p.shirt, {0, (0.68f * H + chestTop) * 0.5f, 0}, {tw, chestTop - 0.68f * H, td});
     // estampas da camisa (um pouco por fora do tronco, para não piscar)
