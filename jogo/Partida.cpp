@@ -28,12 +28,12 @@ const SkinDef kSkins[2][5] = {
      {"Polícia Civil", 0, R"({"camisa":"#1C1C20","calca":"#2E4A78","tenis":"#3A2A20","chapeu":"bone","cor_chapeu":"#1C1C20","colete":true,"cor_colete":"#2A2A2E","estampa":"gola","cor2":"#D9B24A"})"},
      {"Exército", 0, R"({"camisa":"#5C6B3A","calca":"#4A5530","tenis":"#3B2E22","chapeu":"capacete","cor_chapeu":"#4E5A32","colete":true,"cor_colete":"#6B7A45","manga_comprida":true,"luvas":"#2E2A22"})"},
      {"Choque", 0, R"({"camisa":"#16181C","calca":"#16181C","tenis":"#0E0E10","chapeu":"viseira","cor_chapeu":"#202228","colete":true,"cor_colete":"#2B2E34","manga_comprida":true,"luvas":"#0E0E10"})"},
-     {"BOPE", 0, R"({"camisa":"#1E1F22","calca":"#1E1F22","tenis":"#121214","manga_comprida":true,"luvas":"#141416"})"}},
-    {{"Rubro", 0, R"({"camisa":"#C8202A","calca":"#18181C","tenis":"#F2F2F2","estampa":"listras","cor2":"#18181C","bermuda":true,"chapeu":"bone","cor_chapeu":"#F2F2F2"})"},
-     {"Alvinegro", 0, R"({"camisa":"#F2F2F2","calca":"#18181C","tenis":"#18181C","estampa":"listras_em_pe","cor2":"#18181C","bermuda":true,"chapeu":"bone","cor_chapeu":"#18181C"})"},
-     {"Tricolor", 0, R"({"camisa":"#1E7A3C","calca":"#F2F2F2","tenis":"#F2F2F2","estampa":"tres_cores","cor2":"#F2F2F2","cor3":"#8E1B2E","bermuda":true,"chapeu":"bone","cor_chapeu":"#F2F2F2"})"},
-     {"Canarinho", 0, R"({"camisa":"#F5D21E","calca":"#1F4FA8","tenis":"#F2F2F2","estampa":"gola","cor2":"#1E8A3C","bermuda":true,"chapeu":"touca","cor_chapeu":"#1F4FA8"})"},
-     {"Faixa", 0, R"({"camisa":"#18181C","calca":"#18181C","tenis":"#F2F2F2","estampa":"faixa","cor2":"#F2F2F2","bermuda":true,"chapeu":"bone","cor_chapeu":"#18181C"})"}}};
+     {"BOPE", 0, R"({"camisa":"#1E1F22","calca":"#1E1F22","tenis":"#121214","manga_comprida":true,"luvas":"#141416","colete":true,"cor_colete":"#1A1B1E"})"}},
+    {{"Rubro", 0, R"({"camisa":"#C8202A","calca":"#18181C","tenis":"#F2F2F2","estampa":"listras","cor2":"#18181C","bermuda":true,"chapeu":"bone","cor_chapeu":"#F2F2F2","colete":true,"cor_colete":"#33382C"})"},
+     {"Alvinegro", 0, R"({"camisa":"#F2F2F2","calca":"#18181C","tenis":"#18181C","estampa":"listras_em_pe","cor2":"#18181C","bermuda":true,"chapeu":"bone","cor_chapeu":"#18181C","colete":true,"cor_colete":"#33382C"})"},
+     {"Tricolor", 0, R"({"camisa":"#1E7A3C","calca":"#F2F2F2","tenis":"#F2F2F2","estampa":"tres_cores","cor2":"#F2F2F2","cor3":"#8E1B2E","bermuda":true,"chapeu":"bone","cor_chapeu":"#F2F2F2","colete":true,"cor_colete":"#33382C"})"},
+     {"Canarinho", 0, R"({"camisa":"#F5D21E","calca":"#1F4FA8","tenis":"#F2F2F2","estampa":"gola","cor2":"#1E8A3C","bermuda":true,"chapeu":"touca","cor_chapeu":"#1F4FA8","colete":true,"cor_colete":"#33382C"})"},
+     {"Faixa", 0, R"({"camisa":"#18181C","calca":"#18181C","tenis":"#F2F2F2","estampa":"faixa","cor2":"#F2F2F2","bermuda":true,"chapeu":"bone","cor_chapeu":"#18181C","colete":true,"cor_colete":"#33382C"})"}}};
 
 // Nome do arquivo da skin pintada de cada roupa: shaders/kit/personagens/texturas/<nome>.png (molde em docs/skins).
 // Com o arquivo, o boneco usa a imagem; sem ele, as cores acima.
@@ -229,6 +229,81 @@ glm::vec3 chestOf(Engine* e, Fighter& f, float k = 0.7f) {
     return g->transform.position + glm::vec3(0, e->characters[ci].height * k, 0);
 }
 
+}  // namespace
+int playerFighter(Engine* e);  // (mais abaixo, fora do namespace anônimo)
+namespace {
+
+// Caixa de munição no chão (offline): some em 40 s; o jogador pega passando por cima
+void dropAmmo(Engine* e, glm::vec3 p) {
+    TeamMatch& M = matchOf(e);
+    json spec = {{"tipo", "forma"}, {"forma", "cubo"}, {"fisica", false}, {"paleta", "ouro"}, {"escala", {0.34f, 0.2f, 0.24f}},
+                 {"pos", {p.x, p.y + 0.25f, p.z}}, {"nome", "Munição"}};
+    Scene::Handle selected = e->selected;
+    int id = createFromSpecJson(e, spec.dump(), nullptr);
+    e->selected = selected;
+    TeamMatch::Drop d;
+    if (GameObject* g = objectById(e, id)) { d.h = Scene::handleOf(*g); e->game.spawned.push_back(d.h); }
+    d.pos = p;
+    M.drops.push_back(d);
+}
+
+// Pega a munição: um pente a mais da arma na mão e um da outra (até o dobro da reserva normal)
+void pickAmmo(Engine* e, Fighter& f) {
+    int ci = charIndexOfRoot(e, f.root);
+    if (ci < 0) return;
+    CharacterInfo& c = e->characters[ci];
+    for (int s = 0; s < 2; ++s) {
+        const std::string& key = s == 0 ? f.primary : f.secondary;
+        if (key.empty()) continue;
+        const GunDef& g = gunOf(key);
+        if (s == f.slot) { if (c.reserve >= 0) c.reserve = std::min(c.reserve + g.mag, g.reserve * 2); }
+        else f.reserve[s] = std::min(f.reserve[s] + g.mag, g.reserve * 2);
+    }
+    playSound(e, "recarga", e->scene.get(f.root) ? e->scene.get(f.root)->transform.position : glm::vec3(0.f), 0.6f);
+    e->game.message = "+ Munição";
+}
+
+void updateDrops(Engine* e, float dt) {
+    TeamMatch& M = matchOf(e);
+    const int pf = playerFighter(e);
+    GameObject* pg = pf >= 0 && !M.f[pf].dead ? e->scene.get(M.f[pf].root) : nullptr;
+    for (size_t i = 0; i < M.drops.size();) {
+        TeamMatch::Drop& d = M.drops[i];
+        d.t += dt;
+        GameObject* g = e->scene.get(d.h);
+        bool pega = pg && glm::length(glm::vec2(pg->transform.position.x - d.pos.x, pg->transform.position.z - d.pos.z)) < 1.3f &&
+                    std::abs(pg->transform.position.y - d.pos.y) < 1.6f;
+        if (pega) pickAmmo(e, M.f[pf]);
+        if (pega || d.t > 40.f || !g) {
+            if (g) deleteObject(e, d.h);
+            M.drops.erase(M.drops.begin() + i);
+            continue;
+        }
+        g->transform.setPosition(d.pos + glm::vec3(0.f, 0.25f + 0.06f * std::sin(d.t * 3.f), 0.f));  // flutua e gira
+        g->transform.setRotation(glm::angleAxis(d.t * 2.f, glm::vec3(0.f, 1.f, 0.f)));
+        ++i;
+    }
+}
+
+// Vida volta sozinha fora do combate: 5 s sem levar tiro nem atirar, 12 de vida por segundo
+void regenerate(Engine* e, float dt) {
+    TeamMatch& M = matchOf(e);
+    GameState& G = e->game;
+    const int pf = playerFighter(e);
+    if (pf >= 0) {
+        const int ci = charIndexOfRoot(e, M.f[pf].root);
+        const int shots = ci >= 0 ? e->characters[ci].shots : 0;
+        if (shots != M.playerShots) { M.playerShots = shots; M.playerShotAgo = 0.f; }
+        else M.playerShotAgo += dt;
+        if (!M.f[pf].dead && G.playerHp > 0.f && M.lastDamage > 5.f && M.playerShotAgo > 5.f)
+            G.playerHp = std::min(G.playerMax, G.playerHp + 12.f * dt);
+    }
+    for (Fighter& f : M.f) {
+        f.hurtAgo += dt;
+        if (f.bot && !f.remote && !f.dead && f.hurtAgo > 5.f && f.shotAgo > 5.f) f.hp = std::min(100.f, f.hp + 12.f * dt);
+    }
+}
+
 void killFighter(Engine* e, int vi, int ai) {
     TeamMatch& M = matchOf(e);
     Fighter& v = M.f[vi];
@@ -237,6 +312,9 @@ void killFighter(Engine* e, int vi, int ai) {
     int ci = charIndexOfRoot(e, v.root);
     if (ci >= 0) playDeath(e->characters[ci]);
     if (GameObject* g = e->scene.get(v.root); g && g->rigidBody) e->physics.setEnabled(*g->rigidBody, false);
+    // offline: o inimigo abatido derruba uma caixa de munição onde caiu
+    if (!M.online && v.bot && ai >= 0 && ai < int(M.f.size()) && !M.f[ai].bot)
+        if (GameObject* g = e->scene.get(v.root)) dropAmmo(e, g->transform.position);
     std::string msg;
     {
         TeamMatch::Feed fd;
@@ -725,6 +803,8 @@ void teamUpdate(Engine* e, float dt) {
     for (auto& fd : M.feed) fd.age += dt;
     for (auto& f : M.f) f.shotAgo += dt;
     M.lastDamage += dt;
+    updateDrops(e, dt);
+    if (G.state == 0) regenerate(e, dt);
     for (size_t i = 0; i < M.f.size(); ++i) {
         Fighter& f = M.f[i];
         if (f.remote) { remoteUpdate(e, f, dt); continue; }
@@ -739,7 +819,7 @@ void teamUpdate(Engine* e, float dt) {
         if (G.state == 0) botUpdate(e, int(i), dt);
     }
     if (G.state != 0) return;
-    int need = e->rules.quantidade > 0 ? e->rules.quantidade : 25;
+    int need = e->rules.quantidade > 0 ? e->rules.quantidade : 50;
     int winner = M.score[0] >= need ? 0 : M.score[1] >= need ? 1 : -2;
     if (winner < -1 && e->rules.tempo > 0.f && G.time >= e->rules.tempo)
         winner = M.score[0] > M.score[1] ? 0 : M.score[1] > M.score[0] ? 1 : -1;
@@ -772,6 +852,7 @@ bool teamDamage(Engine* e, GameObject* root, float dmg) {
             if (e->game.playerHp <= 0.f) killFighter(e, int(i), att);
         } else {
             f.hp -= dmg;
+            f.hurtAgo = 0.f;
             if (att >= 0) { f.target = att; f.think = 0.3f; }  // vira para quem atirou
             if (f.hp <= 0.f) killFighter(e, int(i), att);
         }
@@ -1013,7 +1094,7 @@ std::string hudJson(Engine* e) {
     j["ativo"] = M.active;
     if (!M.active) return j.dump();
     int pf = playerFighter(e);
-    int need = e->rules.quantidade > 0 ? e->rules.quantidade : 25;
+    int need = e->rules.quantidade > 0 ? e->rules.quantidade : 50;
     j["estado"] = G.state;
     j["placar"] = {M.score[0], M.score[1]};
     j["meta"] = need;
@@ -1269,7 +1350,7 @@ std::string Partida::statusText(Engine* e) {
     if (e->rules.objetivo != "times" || !M.active) return "";
     int pf = -1;
     for (size_t i = 0; i < M.f.size(); ++i) if (!M.f[i].bot) pf = int(i);
-    int need = e->rules.quantidade > 0 ? e->rules.quantidade : 25;
+    int need = e->rules.quantidade > 0 ? e->rules.quantidade : 50;
     char buf[200];
     if (pf >= 0)
         std::snprintf(buf, sizeof(buf), "🚓 Polícia %d x %d Bandidos 🔫  (até %d)   💰 $%d   abates %d / mortes %d", M.score[0], M.score[1], need,

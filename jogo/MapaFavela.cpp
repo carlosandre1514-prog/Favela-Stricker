@@ -325,6 +325,8 @@ void genFavela(Engine* e, Rng& r, glm::vec3& spawn, float& spawnYaw) {
                     // as versões simples ficam um pouco abaixo: com menos pontos, o chão "esticado" subiria por cima
                     // do cimentado e dos pisos (manchas verdes de longe)
                     if (l > 0) for (Vertex& x : v) x.pos.y -= l == 1 ? 0.18f : 0.4f;
+                    // dentro da favela o chão é concreto (sem grama): vai no alfa da cor (o shader do terreno lê)
+                    for (Vertex& x : v) x.color.a = 1.f - (1.f - smooth01(1.36f, 1.46f, favelaEdge(x.pos.x, x.pos.z)));
                     const uint32_t W = uint32_t(r2 + 1);
                     auto saia = [&](uint32_t a, uint32_t b) {  // vira para os dois lados (não importa de onde se olha)
                         const uint32_t base = uint32_t(v.size());
@@ -531,97 +533,8 @@ void genFavela(Engine* e, Rng& r, glm::vec3& spawn, float& spawnYaw) {
         }
     if (std::getenv("MAPA_DEBUG")) std::printf("  casas: %d de %d\n", houseKept, houseTotal);
 
-    // ---- chão cimentado (becos, quintais), com alguns cantos de terra; onde é muito inclinado vira escadinha ----
-    {
-        std::set<Geo*> started;
-        const float rise = 0.17f;  // altura do degrau
-        auto underHouse = [&](float cx, float cz) {
-            for (auto& [lc, lh] : lots) if (std::abs(cx - lc.x) < lh.x - 0.3f && std::abs(cz - lc.y) < lh.y - 0.3f) return true;
-            return false;
-        };
-        // células planas: guardadas e desenhadas depois em placas de 2x2 m quando as 4 forem planas (4x menos triângulos)
-        struct Plana { glm::vec4 col; Geo* g; };
-        std::map<std::pair<int, int>, Plana> planas;
-        for (float z = -96.f; z < 94.f; z += 1.f)
-            for (float x = -98.f; x < 98.f; x += 1.f) {
-                float cx = x + 0.5f, cz = z + 0.5f;
-                if (favelaEdge(cx, cz) > 1.44f) continue;
-                bool onPad = false;
-                for (int k = 0; k < FP_Count && !onPad; ++k) onPad = padDist(pads[k], cx, cz) < 0.3f;
-                if (onPad || (std::abs(cx) < 3.6f && cz > 54.f)) continue;
-                if (nearRoute({cx, cz}, 0.6f) || underHouse(cx, cz)) continue;  // escadaria já tem degrau; casa cobre
-                if (fbm(cx * 0.07f + 3.f, cz * 0.07f, 3, seed + 41) > 0.63f) continue;  // canto de terra
-                Geo& g = cells.at({cx, 0.f, cz});
-                if (started.insert(&g).second) g.place(glm::vec3(0.f), 0.f);
-                float tone = 0.82f + 0.25f * fbm(cx * 0.2f, cz * 0.2f, 2, seed + 43);
-                glm::vec4 col(tone, tone, tone * 0.97f, 1.f);
-                float h00 = H(x, z), h10 = H(x + 1, z), h01 = H(x, z + 1), h11 = H(x + 1, z + 1);
-                glm::vec2 uv[4] = {{x / 2.f, z / 2.f}, {x / 2.f, (z + 1) / 2.f}, {(x + 1) / 2.f, (z + 1) / 2.f}, {(x + 1) / 2.f, z / 2.f}};
-                auto flat = [&](MeshBuilder& m) {
-                    m.color = col;
-                    m.quad({x, h00 + 0.04f, z}, {x, h01 + 0.04f, z + 1}, {x + 1, h11 + 0.04f, z + 1}, {x + 1, h10 + 0.04f, z}, uv);
-                };
-                float gx = ((h10 - h00) + (h11 - h01)) * 0.5f, gz = ((h01 - h00) + (h11 - h10)) * 0.5f;
-                float slope = std::max(std::abs(gx), std::abs(gz));
-                if (slope < 0.2f) { planas[{int(x), int(z)}] = {col, &g}; continue; }
-                { FarScope fs(g); flat(g[Mat::Cement]); }  // de longe: liso
-                DetailScope ds(g);
-                MeshBuilder& m = g[Mat::Cement];
-                m.color = col;
-                const bool alongX = std::abs(gx) >= std::abs(gz);
-                const float dir = alongX ? (gx > 0 ? 1.f : -1.f) : (gz > 0 ? 1.f : -1.f);  // para onde sobe
-                const int n = slope > 0.35f ? 2 : 1;
-                auto hAt = [&](float u, float v) {  // bilinear dentro da célula (u em x, v em z, 0..1)
-                    return glm::mix(glm::mix(h00, h10, u), glm::mix(h01, h11, u), v);
-                };
-                for (int i = 0; i < n; ++i) {
-                    float a0 = float(i) / n, a1 = float(i + 1) / n;
-                    float hs[4] = {alongX ? hAt(a0, 0) : hAt(0, a0), alongX ? hAt(a1, 0) : hAt(1, a0),
-                                   alongX ? hAt(a0, 1) : hAt(0, a1), alongX ? hAt(a1, 1) : hAt(1, a1)};
-                    float mx = *std::max_element(hs, hs + 4), mn = *std::min_element(hs, hs + 4);
-                    float top = std::ceil(mx / rise) * rise + 0.02f;
-                    // pisada
-                    glm::vec3 p0, p1, p2, p3;
-                    if (alongX) { p0 = {x + a0, top, z}; p1 = {x + a0, top, z + 1}; p2 = {x + a1, top, z + 1}; p3 = {x + a1, top, z}; }
-                    else { p0 = {x, top, z + a0}; p1 = {x, top, z + a1}; p2 = {x + 1, top, z + a1}; p3 = {x + 1, top, z + a0}; }
-                    glm::vec2 tuv[4] = {{p0.x / 2, p0.z / 2}, {p1.x / 2, p1.z / 2}, {p2.x / 2, p2.z / 2}, {p3.x / 2, p3.z / 2}};
-                    m.quad(p0, p1, p2, p3, tuv);
-                    // espelho do degrau, no lado que desce
-                    float e = dir > 0 ? a0 : a1, lo = mn - 0.08f;
-                    glm::vec3 r0, r1, r2, r3;
-                    if (alongX) { float X = x + e; r0 = {X, lo, z}; r1 = {X, lo, z + 1}; r2 = {X, top, z + 1}; r3 = {X, top, z}; }
-                    else { float Z = z + e; r0 = {x + 1, lo, Z}; r1 = {x, lo, Z}; r2 = {x, top, Z}; r3 = {x + 1, top, Z}; }
-                    glm::vec3 nrm = glm::cross(r1 - r0, r3 - r0);
-                    glm::vec3 want = alongX ? glm::vec3(-dir, 0, 0) : glm::vec3(0, 0, -dir);
-                    glm::vec2 ruv[4] = {{0, 0}, {0.5f, 0}, {0.5f, (top - lo) / 2}, {0, (top - lo) / 2}};
-                    if (glm::dot(nrm, want) < 0.f) m.quad(r0, r3, r2, r1, ruv); else m.quad(r0, r1, r2, r3, ruv);
-                }
-            }
-        std::set<std::pair<int, int>> feitas;
-        for (auto& [k, pl] : planas) {
-            if (feitas.count(k)) continue;
-            const int x = k.first, z = k.second;
-            int sz = 1;
-            if ((x & 1) == 0 && (z & 1) == 0) {  // canto de um bloco 2x2: as 4 planas, na mesma célula do mapa e livres?
-                bool ok = true;
-                glm::vec4 soma(0.f);
-                for (int dz = 0; dz < 2 && ok; ++dz)
-                    for (int dx = 0; dx < 2 && ok; ++dx) {
-                        auto it = planas.find({x + dx, z + dz});
-                        ok = it != planas.end() && it->second.g == pl.g && !feitas.count({x + dx, z + dz});
-                        if (ok) soma += it->second.col;
-                    }
-                if (ok) { sz = 2; pl.col = soma / 4.f; }
-            }
-            for (int dz = 0; dz < sz; ++dz)
-                for (int dx = 0; dx < sz; ++dx) feitas.insert({x + dx, z + dz});
-            const float X = float(x), Z = float(z), S = float(sz);
-            MeshBuilder& m = (*pl.g)[Mat::Cement];
-            m.color = pl.col;
-            glm::vec2 uv[4] = {{X / 2.f, Z / 2.f}, {X / 2.f, (Z + S) / 2.f}, {(X + S) / 2.f, (Z + S) / 2.f}, {(X + S) / 2.f, Z / 2.f}};
-            m.quad({X, H(X, Z) + 0.04f, Z}, {X, H(X, Z + S) + 0.04f, Z + S}, {X + S, H(X + S, Z + S) + 0.04f, Z + S}, {X + S, H(X + S, Z) + 0.04f, Z}, uv);
-        }
-    }
+    // (chão dos becos e quintais: o próprio terreno, que dentro da favela é concreto; as encostas são rampas lisas,
+    // sem os degrauzinhos de cada metro quadrado que se misturavam com as escadarias)
 
     // ---- muros de arrimo dos patamares (grafitados) ----
     for (int k = 0; k < FP_Count; ++k) {

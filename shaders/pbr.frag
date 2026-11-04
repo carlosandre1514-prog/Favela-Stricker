@@ -187,6 +187,20 @@ void terrainLayers(out vec3 albedo, out vec3 nt, out float cavity) {
     albedo *= mix(0.62, 1.0, smoothstep(-0.2, 0.9, y));
     vec3 snow = vec3(0.90, 0.92, 0.96);
     albedo = mix(albedo, snow, smoothstep(95.0, 115.0, y + n2 * 10.0) * (1.0 - smoothstep(0.35, 0.6, slope)));
+    // concreto (alfa da cor da malha: 0 = concreto): placas de 2 m com juntas, manchas e desgaste, sem grama
+    float conc = 1.0 - vColor.a;
+    if (conc > 0.01) {
+        vec2 q = p / 2.0, f = abs(fract(q) - 0.5);
+        float junta = smoothstep(0.47, 0.495, max(f.x, f.y));
+        float placa = hash12(floor(q));
+        vec3 cc = vec3(0.40, 0.39, 0.37) * (0.86 + 0.16 * placa);
+        cc *= 0.84 + 0.22 * vnoise(p * 1.7) * (0.7 + 0.3 * vnoise(p * 6.0));   // grão
+        cc *= 1.0 - 0.22 * smoothstep(0.55, 0.85, vnoise(p * 0.35 + 9.0));       // manchas de sujeira/água
+        cc *= 1.0 - 0.38 * junta;
+        albedo = mix(albedo, cc, conc);
+        nt = normalize(mix(nt, vec3(0.0, 0.0, 1.0), conc));
+        cavity = mix(cavity, 1.0 - 0.3 * junta, conc);
+    }
 }
 
 void main() {
@@ -208,7 +222,7 @@ void main() {
     }
     vec3 tnt = vec3(0.0, 0.0, 1.0);
     float cavity = 1.0;
-    if (uMode == 3) terrainLayers(albedoS.rgb, tnt, cavity);
+    if (uMode == 3) { terrainLayers(albedoS.rgb, tnt, cavity); albedoS.a = 1.0; }  // (o alfa da cor é a dica do concreto)
     vec3 orm = texture(uOrmMap, vUV).rgb;
     float ao = mix(1.0, texture(uOcclusionMap, vUV).r, uOcclusionStrength) * cavity;
     float rough = clamp(orm.g * uRoughnessFactor, 0.045, 1.0), metal = clamp(orm.b * uMetallicFactor, 0.0, 1.0);

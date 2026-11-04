@@ -29,6 +29,7 @@ struct Fighter {
     float think = 0.f, fireTimer = 0.f, stuckTimer = 0.f, strafe = 1.f, strafeTimer = 0.f;
     int burst = 0;
     float shotAgo = 99.f;          // segundos desde o último tiro (aparece no minimapa do inimigo)
+    float hurtAgo = 99.f;          // segundos desde o último dano (robô: a vida volta fora do combate)
     // online: lutador comandado por outro celular (jogador da sala, ou robô de quem criou a sala)
     bool remote = false, left = false;
     std::string netId;             // id na sala (jogador: id do Firebase; robô: "b<time>_<n>")
@@ -65,6 +66,11 @@ struct TeamMatch {
     struct Feed { std::string killer, victim, weapon; int kt = 0, vt = 0; bool you = false; float age = 0.f; };
     std::vector<Feed> feed;                    // últimos abates (quadro do HUD)
     float lastDamage = 0.f;                    // tempo desde o último dano no jogador
+    // munição que o inimigo abatido derruba (offline): caixinha girando no chão; passando por cima, pega
+    struct Drop { Scene::Handle h; glm::vec3 pos{0.f}; float t = 0.f; };
+    std::vector<Drop> drops;
+    int playerShots = -1;                      // tiros do jogador (para saber se está trocando tiro)
+    float playerShotAgo = 99.f;
     // partida online (sala do Firebase): quem é o jogador local, se ele criou a sala (comanda os robôs),
     // os jogadores da sala e os eventos a enviar (dano, abate, granada) em JSON
     bool online = false, host = false;

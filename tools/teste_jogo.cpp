@@ -551,6 +551,70 @@ int main(int argc, char** argv) {
         std::printf(g_fail ? "FALHOU\n" : "OK\n");
         return g_fail ? 1 : 0;
     }
+    // Offline: inimigo abatido derruba munição; a vida volta fora do combate (SO_DROP=1)
+    if (std::getenv("SO_DROP")) {
+        eng::Engine* E = reinterpret_cast<eng::Engine*>(e);
+        abrirPartida();
+        jogo_escolhas(e, 0, 0, "m4a1", "tt33");
+        engine_set_first_person(e, 1);
+        engine_set_play(e, 1);
+        frames(e, 30);
+        eng::TeamMatch& M = eng::matchOf(E);
+        int pf = -1, en = -1;
+        for (size_t i = 0; i < M.f.size(); ++i) { if (!M.f[i].bot) pf = int(i); else if (M.f[i].team == 1 && en < 0) en = int(i); }
+        if (pf < 0 || en < 0) { std::printf("  [ERRO] sem jogador ou inimigo\n"); ++g_fail; }
+        else {
+            M.attacker = pf;
+            E->module->onDamage(E, E->scene.get(M.f[en].root), 500.f);
+            M.attacker = -1;
+            std::printf("  inimigo abatido: %s · caixas no chão: %zu\n", M.f[en].dead ? "sim" : "não", M.drops.size());
+            if (M.drops.size() != 1) { std::printf("  [ERRO] não caiu munição\n"); ++g_fail; }
+            else {
+                int ci = E->player;
+                int antes = E->characters[ci].reserve;
+                float p[3], r[3], sc[3];
+                int ch = engine_player_id(e);
+                engine_get_transform(e, ch, p, r, sc);
+                p[0] = M.drops[0].pos.x; p[1] = M.drops[0].pos.y + 0.1f; p[2] = M.drops[0].pos.z;
+                engine_set_transform(e, ch, p, r, sc);
+                frames(e, 10);
+                std::printf("  munição: reserva %d -> %d · caixas %zu\n", antes, E->characters[ci].reserve, M.drops.size());
+                if (E->characters[ci].reserve <= antes || !M.drops.empty()) { std::printf("  [ERRO] não pegou a munição\n"); ++g_fail; }
+            }
+            for (auto& f : M.f) if (f.bot) { f.dead = true; f.deadTime = -1e6f; }  // sem robôs atirando no teste da vida
+            E->game.playerHp = 40.f; M.lastDamage = 0.f;
+            frames(e, 180);
+            const float v3 = E->game.playerHp;
+            frames(e, 240);
+            std::printf("  vida: 40 -> %.0f (3 s) -> %.0f (7 s)\n", v3, E->game.playerHp);
+            if (v3 > 41.f || E->game.playerHp < 60.f) { std::printf("  [ERRO] a vida não voltou como esperado\n"); ++g_fail; }
+        }
+        engine_destroy(e);
+        std::printf(g_fail ? "FALHOU\n" : "OK\n");
+        return g_fail ? 1 : 0;
+    }
+    // Escadarias de perto (SO_ESCADARIAS=1): fotos escadaria_<rota>_<n>.png em pontos de cada rota
+    if (std::getenv("SO_ESCADARIAS")) {
+        const char* proj = "app/src/main/assets/exemplos/5_policia_x_bandidos.json";
+        if (!engine_import_project(e, lerProjeto(proj).dump().c_str())) { std::printf("  projeto não abriu\n"); ++g_fail; }
+        engine_set_time_of_day(e, 11.f);
+        const auto& rotas = eng::favelaRotas();
+        for (size_t ri = 0; ri < rotas.size(); ++ri) {
+            const auto& rt = rotas[ri];
+            for (size_t k = 0; k + 1 < rt.size(); k += std::max<size_t>(1, rt.size() / 2)) {
+                glm::vec2 a = rt[k], b = rt[k + 1], m = (a + b) * 0.5f, d = glm::normalize(b - a);
+                glm::vec3 hit; eng::GameObject* obj = nullptr;
+                float h = reinterpret_cast<eng::Engine*>(e)->physics.raycast({m.x, 80.f, m.y}, {m.x, -40.f, m.y}, hit, obj) ? hit.y : 0.f;
+                engine_set_camera(e, m.x, h + 0.5f, m.y, std::atan2(-d.x, -d.y) + 0.5f, 0.32f, 7.f);
+                frames(e, 3);
+                char n[48]; std::snprintf(n, sizeof n, "escadaria_%zu_%zu.png", ri, k);
+                save(out, n);
+            }
+        }
+        engine_destroy(e);
+        std::printf(g_fail ? "FALHOU\n" : "OK\n");
+        return g_fail ? 1 : 0;
+    }
     // Céu ao longo do dia (SO_CEU=1): o mapa da partida de várias horas e com chuva (fotos ceu_<hora>.png, chuva_<hora>.png)
     if (std::getenv("SO_CEU")) {
         const char* proj = "app/src/main/assets/exemplos/5_policia_x_bandidos.json";

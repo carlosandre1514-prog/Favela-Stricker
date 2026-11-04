@@ -47,7 +47,7 @@ function pecaHtml(id) {
     case 'agachar': return `<button class="peca so-toque redondo" data-peca="agachar" id="b-agachar" style="width:54px;height:54px">${ICONE.baixo}<span class="r">AGACHAR</span></button>`;
     case 'granada': return `<button class="peca so-toque redondo" data-peca="granada" id="b-granada" style="width:54px;height:54px;border-color:rgba(252,211,77,.8)">${ICONE.granada}<span class="contador" id="n-granadas">2</span></button>`;
     case 'correr': return `<button class="peca so-toque redondo" data-peca="correr" id="b-correr" style="width:54px;height:54px"><span style="font-size:20px;font-weight:900;line-height:1">»</span><span class="r">CORRER</span></button>`;
-    case 'zoom': return '<div class="peca so-toque" data-peca="zoom" id="zoom-luneta" style="display:flex;flex-direction:column;align-items:center;gap:6px"><button class="redondo" id="b-zoom-mais" style="width:44px;height:44px;font-size:24px;font-weight:800">+</button><span id="zoom-nivel" style="font-size:11px;font-weight:800;text-shadow:0 1px 2px #000">1,7x</span><button class="redondo" id="b-zoom-menos" style="width:44px;height:44px;font-size:24px;font-weight:800">−</button></div>';
+    case 'zoom': return '<div class="peca so-toque" data-peca="zoom" id="zoom-luneta" style="flex-direction:column;align-items:center;gap:6px;visibility:hidden"><button class="redondo" id="b-zoom-mais" style="width:44px;height:44px;font-size:24px;font-weight:800">+</button><span id="zoom-nivel" style="font-size:11px;font-weight:800;text-shadow:0 1px 2px #000">1,7x</span><button class="redondo" id="b-zoom-menos" style="width:44px;height:44px;font-size:24px;font-weight:800">−</button></div>';
     case 'recarregar': return `<button class="peca so-toque redondo" data-peca="recarregar" id="b-recarregar" style="width:48px;height:48px">${ICONE.recarregar}</button>`;
     case 'armas': return `<div class="peca" data-peca="armas" id="armas"><button class="slot ativa" data-slot="0"><img alt=""><span>–</span></button><button class="slot" data-slot="1"><img alt=""><span>–</span></button><button class="troca" id="b-trocar" aria-label="Troca rápida de arma">${ICONE.trocar}</button></div>`;
     case 'minimapa': return '<canvas class="peca" data-peca="minimapa" id="minimapa" width="168" height="168" style="width:84px;height:84px"></canvas>';
@@ -164,7 +164,7 @@ function montarHud(online) {
     <div id="info"><span id="dinheiro">$ 0</span><span id="kd">0 abates · 0 mortes</span></div>
     <div id="placar"><div class="faixa"><div class="pol"><span class="rot">POLÍCIA</span><span class="num" id="pt-pol">0</span></div>
       <div class="relogio" id="relogio">10:00</div><div class="ban"><span class="num" id="pt-ban">0</span><span class="rot">BANDIDOS</span></div></div>
-      <span class="meta" id="meta">até 25 abates</span></div>
+      <span class="meta" id="meta">até 50 abates</span></div>
     <div id="rede" style="display:${online ? '' : 'none'}"></div>
     <div id="abates"></div>
     <button id="pausar" aria-label="Pausar">${ICONE.pausa}</button>
@@ -308,7 +308,7 @@ function atualizarHud(j) {
   $('#luneta', t).style.display = luneta ? 'block' : 'none';
   const zl = $('#zoom-luneta', t);  // botões + e - da luneta: só mirando com ela
   if (zl) {
-    zl.style.display = luneta ? 'flex' : 'none';
+    zl.style.visibility = luneta ? 'visible' : 'hidden';  // (display não serve: .so-toque força display com !important)
     $('#zoom-nivel', t).textContent = ['1,7x', '2,4x', '3,6x'][j.zoom | 0] || '1,7x';
   }
   if (j.morto && partida.correAuto) pararCorrida(t);

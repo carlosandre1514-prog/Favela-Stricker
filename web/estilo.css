@@ -216,6 +216,7 @@ input[type=range]::-moz-range-thumb { width: 18px; height: 18px; border-radius: 
 .so-toque { display: none !important; }
 body.toque .so-toque { display: flex !important; }
 body.toque .so-teclado { display: none !important; }
+#zoom-luneta.editavel { visibility: visible !important; }  /* no editor do HUD aparece para posicionar */
 
 /* loja de armas da partida */
 #loja-partida { position: absolute; inset: 0; background: var(--fundo); display: flex; flex-direction: column; gap: 12px; padding: 16px 20px 16px; }
