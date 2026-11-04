@@ -537,13 +537,29 @@ struct HairMesh {
             nor = Nn[i] * std::cos(a) + B[i] * std::sin(a);
             pos = P[i] + nor * R[i];
         };
+        // anéis com vértices compartilhados (malha indexada: bem menos memória que um vértice por canto de triângulo)
+        const uint32_t v0i = uint32_t(b.v.size());
+        for (size_t i = 0; i < N; ++i)
+            for (int k = 0; k <= n; ++k) {
+                glm::vec3 pos, nor;
+                ring(i, k, pos, nor);
+                b.pushVertex(pos, nor, uvIn(uvr, float(k) / n, float(i) / (N - 1)), T[i]);
+            }
+        // sentido dos triângulos: confere uma vez (todos os anéis seguem a mesma orientação)
+        glm::vec3 a0, a1, b0, na;
+        ring(0, 0, a0, na); ring(0, 1, a1, na); ring(1, 0, b0, na);
+        const bool inv = glm::dot(glm::cross(a1 - a0, b0 - a0), na) < 0.f;
+        auto quadIdx = [&](uint32_t x, uint32_t y, uint32_t z) {
+            b.idx.push_back(x);
+            b.idx.push_back(inv ? z : y);
+            b.idx.push_back(inv ? y : z);
+        };
+        const uint32_t W = uint32_t(n + 1);
         for (size_t i = 0; i + 1 < N; ++i)
             for (int k = 0; k < n; ++k) {
-                glm::vec3 a0, a1, b0, b1, na0, na1, nb0, nb1;
-                ring(i, k, a0, na0); ring(i, k + 1, a1, na1); ring(i + 1, k, b0, nb0); ring(i + 1, k + 1, b1, nb1);
-                const float u0 = float(k) / n, u1 = float(k + 1) / n, v0 = float(i) / (N - 1), v1 = float(i + 1) / (N - 1);
-                tri(a0, a1, b0, na0, na1, nb0, uvIn(uvr, u0, v0), uvIn(uvr, u1, v0), uvIn(uvr, u0, v1));
-                tri(a1, b1, b0, na1, nb1, nb0, uvIn(uvr, u1, v0), uvIn(uvr, u1, v1), uvIn(uvr, u0, v1));
+                const uint32_t A0 = v0i + uint32_t(i) * W + k, A1 = A0 + 1, B0 = A0 + W, B1 = B0 + 1;
+                quadIdx(A0, A1, B0);
+                quadIdx(A1, B1, B0);
             }
         for (int k = 0; k < n; ++k) {  // tampa da ponta
             glm::vec3 a0, a1, na0, na1;
@@ -619,11 +635,11 @@ void buildBlockHair(const CharacterParams& p, Geo& g, uint32_t seed) {
     base.joint = -1; base.xf = glm::mat4(1.f); base.uvTile = glm::vec2(0.f);
     HairMesh hb{base};
     // touca de cada estilo (centro, raios, quanto desce na frente e atrás)
-    glm::vec3 c(0.f, 0.935f * H, -0.004f * H), rad(0.097f * H, 0.088f * H, 0.096f * H);
-    float phiF = 1.32f, phiA = 2.45f;
-    if (tipo == 2) { c.y = 0.96f * H; rad = glm::vec3(0.128f, 0.118f, 0.128f) * H; phiF = 1.18f; phiA = 2.2f; }   // black: volume grande
-    if (tipo == 3) { rad = glm::vec3(0.091f, 0.08f, 0.09f) * H; phiF = 1.25f; phiA = 1.7f; }                      // curto: lados raspados
-    if (tipo == 4) { rad = glm::vec3(0.093f, 0.083f, 0.092f) * H; phiF = 1.3f; phiA = 2.0f; }
+    glm::vec3 c(0.f, 0.945f * H, -0.006f * H), rad(0.106f * H, 0.098f * H, 0.106f * H);                          // cacheado: volume cheio
+    float phiF = 1.3f, phiA = 2.5f;
+    if (tipo == 2) { c.y = 0.965f * H; rad = glm::vec3(0.135f, 0.125f, 0.135f) * H; phiF = 1.18f; phiA = 2.25f; } // black: volume grande
+    if (tipo == 3) { c.y = 0.94f * H; rad = glm::vec3(0.094f, 0.086f, 0.093f) * H; phiF = 1.25f; phiA = 1.8f; }   // curto: lados raspados
+    if (tipo == 4) { c.y = 0.94f * H; rad = glm::vec3(0.099f, 0.09f, 0.098f) * H; phiF = 1.3f; phiA = 2.15f; }
     cor(base);
     hb.cap(c, rad, phiF, phiA, 16, 7, topo);
     // detalhe (só de perto): cachos, mechas, bolinhas
@@ -653,57 +669,90 @@ void buildBlockHair(const CharacterParams& p, Geo& g, uint32_t seed) {
         hd.tube(P, R, lados, pedaco(0.25f));
     };
     const glm::vec3 up(0.f, 1.f, 0.f), frente(0.f, 0.f, 1.f);
-    if (tipo == 1) {  // cacheado: espirais por toda a touca + franja de cachos caindo na testa
-        for (int i = 0; i < 64; ++i) {
-            glm::vec3 n;
-            const float th = r.range(0.f, 6.2831853f), vf = std::sqrt(r.range(0.02f, 0.92f));
+    // plantio espalhado por igual (sem buracos): ângulo em volta da cabeça em "girassol" + altura com sorteio leve
+    auto girassol = [&](int i, int n, float vMin, float vMax, float& th, float& vf) {
+        th = std::fmod(i * 2.3999632f + r.range(-0.15f, 0.15f), 6.2831853f);
+        vf = std::sqrt(vMin * vMin + (vMax * vMax - vMin * vMin) * (i + r.range(0.f, 1.f)) / n);
+    };
+    if (tipo == 1) {  // cacheado: duas camadas de espirais cobrindo a touca inteira + franja + cachos caindo na nuca e dos lados
+        const int N1 = 150;
+        for (int i = 0; i < N1; ++i) {
+            glm::vec3 n; float th, vf;
+            girassol(i, N1, 0.05f, 0.97f, th, vf);
             glm::vec3 pt = plantar(th, vf, phiF, phiA, n);
-            glm::vec3 eixo = n + up * 0.35f + glm::vec3(r.range(-0.3f, 0.3f), 0.f, r.range(-0.3f, 0.3f));
-            espiral(pt - n * 0.006f * H, eixo, r.range(0.026f, 0.04f) * H, 0.0095f * H, 0.0068f * H, r.range(1.1f, 1.6f), 4);
+            glm::vec3 eixo = n + up * 0.25f + glm::vec3(r.range(-0.35f, 0.35f), r.range(-0.1f, 0.1f), r.range(-0.35f, 0.35f));
+            espiral(pt - n * 0.008f * H, eixo, r.range(0.03f, 0.048f) * H, 0.011f * H, 0.0078f * H, r.range(1.2f, 1.8f), 4);
         }
-        for (int i = 0; i < 8; ++i) {  // franja
+        for (int i = 0; i < 70; ++i) {  // reforço atrás e nos lados (a touca desce mais ali)
             glm::vec3 n;
-            const float th = -0.75f + 1.5f * (i + 0.5f) / 8.f;
-            glm::vec3 pt = plantar(th, 0.97f, phiF, phiA, n);
-            espiral(pt, frente * 0.6f - up + glm::vec3(r.range(-0.2f, 0.2f), 0.f, 0.f), r.range(0.022f, 0.032f) * H, 0.007f * H, 0.005f * H, 1.2f, 4);
+            const float th = 3.14159265f + r.range(-2.3f, 2.3f), vf = r.range(0.45f, 0.98f);
+            glm::vec3 pt = plantar(th, vf, phiF, phiA, n);
+            glm::vec3 eixo = n - up * 0.15f + glm::vec3(r.range(-0.35f, 0.35f), r.range(-0.1f, 0.1f), r.range(-0.35f, 0.35f));
+            espiral(pt - n * 0.008f * H, eixo, r.range(0.03f, 0.046f) * H, 0.011f * H, 0.0078f * H, r.range(1.2f, 1.8f), 4);
         }
-    } else if (tipo == 2) {  // black: bolinhas por toda a superfície do volume
-        for (int i = 0; i < 70; ++i) {
+        for (int i = 0; i < 12; ++i) {  // franja
             glm::vec3 n;
-            const float th = r.range(0.f, 6.2831853f), vf = std::sqrt(r.range(0.f, 0.95f));
+            const float th = -0.85f + 1.7f * (i + r.range(0.3f, 0.7f)) / 12.f;
+            glm::vec3 pt = plantar(th, r.range(0.93f, 1.f), phiF, phiA, n);
+            espiral(pt, frente * 0.55f - up + glm::vec3(r.range(-0.25f, 0.25f), 0.f, 0.f), r.range(0.026f, 0.04f) * H, 0.008f * H, 0.0058f * H, 1.4f, 4);
+        }
+        for (int i = 0; i < 26; ++i) {  // cachos que caem dos lados e na nuca
+            glm::vec3 n;
+            const float th = 0.9f + (6.2831853f - 1.8f) * (i + r.range(0.2f, 0.8f)) / 26.f;
+            glm::vec3 pt = plantar(th, r.range(0.85f, 1.f), phiF, phiA, n);
+            glm::vec3 eixo = glm::vec3(n.x, 0.f, n.z) * 0.45f - up;
+            espiral(pt - n * 0.004f * H, eixo, r.range(0.03f, 0.05f) * H, 0.0095f * H, 0.0068f * H, r.range(1.4f, 2.f), 4);
+        }
+    } else if (tipo == 2) {  // black: bolinhas em duas camadas por toda a superfície do volume
+        const int N1 = 170;
+        for (int i = 0; i < N1; ++i) {
+            glm::vec3 n; float th, vf;
+            girassol(i, N1, 0.f, 0.97f, th, vf);
             glm::vec3 pt = plantar(th, vf, phiF, phiA, n);
             cor(det);
-            hd.ball(pt + n * 0.004f * H, r.range(0.012f, 0.02f) * H, pedaco(0.2f));
+            hd.ball(pt + n * r.range(0.f, 0.008f) * H, r.range(0.014f, 0.022f) * H, pedaco(0.2f));
         }
-    } else if (tipo == 3) {  // curto: espirais pequenas só no alto
-        for (int i = 0; i < 36; ++i) {
-            glm::vec3 n;
-            const float th = r.range(0.f, 6.2831853f), vf = std::sqrt(r.range(0.f, 0.7f));
+    } else if (tipo == 3) {  // curto: tapete denso de espirais pequenas no alto
+        const int N1 = 110;
+        for (int i = 0; i < N1; ++i) {
+            glm::vec3 n; float th, vf;
+            girassol(i, N1, 0.f, 0.85f, th, vf);
             glm::vec3 pt = plantar(th, vf, phiF, phiA, n);
-            espiral(pt - n * 0.003f * H, n + up * 0.5f, r.range(0.014f, 0.022f) * H, 0.006f * H, 0.004f * H, 1.1f, 4);
+            espiral(pt - n * 0.004f * H, n + up * 0.4f + glm::vec3(r.range(-0.2f, 0.2f), 0.f, r.range(-0.2f, 0.2f)),
+                    r.range(0.016f, 0.026f) * H, 0.0068f * H, 0.0048f * H, r.range(1.f, 1.4f), 4);
         }
-    } else if (tipo == 4) {  // dreads: mechas torcidas que saem da cabeça e caem com o peso
-        for (int i = 0; i < 34; ++i) {
-            glm::vec3 n;
-            const float th = 6.2831853f * (i + r.range(0.f, 0.8f)) / 34.f, vf = r.range(0.55f, 0.85f);
-            glm::vec3 pt = plantar(th, vf, phiF, phiA, n);
-            const float tt = 0.5f - 0.5f * std::cos(th);                 // 0 frente, 1 atrás
-            const float comp = (0.035f + 0.085f * tt) * H * r.range(0.85f, 1.15f);
+    } else if (tipo == 4) {  // dreads: três fileiras de mechas torcidas caindo com o peso + o alto todo coberto
+        auto dread = [&](glm::vec3 pt, glm::vec3 n, float tt, float compMul, float grosso) {
+            const float comp = (0.04f + 0.1f * tt) * H * compMul;
             glm::vec3 sai = glm::normalize(glm::vec3(n.x, 0.f, n.z) + glm::vec3(0.f, 0.001f, 0.f));
             std::vector<glm::vec3> P; std::vector<float> R;
-            const int K = 6;
+            const int K = 7;
+            const float bal = r.range(-0.006f, 0.006f) * H;
+            const glm::vec3 lado = glm::cross(up, sai);
             for (int k = 0; k <= K; ++k) {
                 const float t = float(k) / K;
-                P.push_back(pt - n * 0.003f * H + sai * (0.016f * H * std::sqrt(t)) - up * (comp * std::pow(t, 1.4f)));
-                R.push_back((0.0085f - 0.0025f * t) * H * (k % 2 ? 0.85f : 1.f));  // torção: grosso, fino, grosso...
+                P.push_back(pt - n * 0.004f * H + sai * (0.02f * H * std::sqrt(t)) - up * (comp * std::pow(t, 1.35f)) + lado * (bal * t * t));
+                R.push_back((0.0095f - 0.0028f * t) * H * grosso * (k % 2 ? 0.82f : 1.f));  // torção: grosso, fino, grosso...
             }
             cor(det);
             hd.tube(P, R, 5, pedaco(0.3f));
-        }
-        for (int i = 0; i < 18; ++i) {  // pontas curtas no alto
-            glm::vec3 n;
-            glm::vec3 pt = plantar(r.range(0.f, 6.2831853f), std::sqrt(r.range(0.f, 0.5f)), phiF, phiA, n);
-            espiral(pt - n * 0.003f * H, n + up * 0.6f, r.range(0.014f, 0.02f) * H, 0.003f * H, 0.0065f * H, 0.6f, 5);
+        };
+        const int fil[3] = {44, 34, 24};
+        const float vfil[3] = {0.9f, 0.68f, 0.46f};
+        for (int f = 0; f < 3; ++f)
+            for (int i = 0; i < fil[f]; ++i) {
+                glm::vec3 n;
+                const float th = 6.2831853f * (i + 0.5f * f + r.range(-0.2f, 0.2f)) / fil[f];
+                const float tt = 0.5f - 0.5f * std::cos(th);  // 0 frente, 1 atrás
+                if (f == 0 && tt < 0.12f) continue;            // testa livre na fileira de baixo
+                glm::vec3 pt = plantar(th, vfil[f] + r.range(-0.04f, 0.04f), phiF, phiA, n);
+                dread(pt, n, tt, r.range(0.85f, 1.15f) * (1.f + 0.12f * f), 1.f);
+            }
+        for (int i = 0; i < 40; ++i) {  // o alto: pontas curtas e grossas cobrindo o couro cabeludo
+            glm::vec3 n; float th, vf;
+            girassol(i, 40, 0.f, 0.5f, th, vf);
+            glm::vec3 pt = plantar(th, vf, phiF, phiA, n);
+            espiral(pt - n * 0.004f * H, n + up * 0.5f, r.range(0.016f, 0.024f) * H, 0.003f * H, 0.0075f * H, 0.6f, 5);
         }
     }
     base.color = glm::vec4(1.f);
