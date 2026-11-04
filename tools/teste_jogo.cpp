@@ -489,6 +489,10 @@ int main(int argc, char** argv) {
     // (velocidade bem abaixo da pedida por vários quadros seguidos). SO_CAMINHADA=1
     if (std::getenv("SO_CAMINHADA")) {
         abrirPartida();
+        // sozinho (sala online só comigo: sem robôs atirando, morrendo e renascendo no meio do caminho) e com a
+        // imagem pequena (o teste anda muito; desenhar menos deixa ele bem mais rápido)
+        jogo_rede_sala(e, 1, "eu", R"([{"id":"eu","nome":"Eu","time":1,"skin":0,"arma":"ak47"}])");
+        engine_resize(e, 240, 135);
         jogo_escolhas(e, 1, 0, "ak47", "tt33");
         engine_set_play(e, 1);
         frames(e, 10);
@@ -534,8 +538,9 @@ int main(int argc, char** argv) {
                             ++travadas;
                             if (travadas <= 3) {  // foto de onde travou (de trás do boneco e de cima)
                                 engine_set_camera(e, agora.x, agora.y + 1.f, agora.z, std::atan2(-d.x, -d.y), 0.35f, 4.f);
-                                engine_set_first_person(e, 0); frames(e, 2);
+                                engine_set_first_person(e, 0); engine_resize(e, W, H); frames(e, 2);
                                 char fn[64]; std::snprintf(fn, sizeof fn, "trava_%d.png", travadas); save(out, fn);
+                                engine_resize(e, 240, 135);
                             }
                             if (travadas <= 25) std::printf("  trava: rota %zu %s %s em (%.1f, %.1f, %.1f) v=%.2f\n", ri, sentido ? "descendo" : "subindo",
                                                             corre ? "correndo" : "andando", agora.x, agora.y, agora.z, v);
