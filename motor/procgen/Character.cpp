@@ -615,6 +615,46 @@ struct HairMesh {
 };
 }  // namespace
 
+
+// Boné por cima da cabeça (skin pintada): copa arredondada que cobre o alto do cubo, aba na frente e botão em cima
+void buildBlockCap(const CharacterParams& p, MeshBuilder& b) {
+    const float H = p.height;
+    b.joint = -1; b.xf = glm::mat4(1.f); b.uvTile = glm::vec2(0.f);
+    glm::vec4 cor = p.chapeuCor; cor.a = 1.f;
+    const glm::vec4 aba(cor.r * 0.82f, cor.g * 0.82f, cor.b * 0.82f, 1.f);
+    HairMesh m{b};
+    const glm::vec3 c(0.f, 0.946f * H, -0.003f * H), rad(0.097f * H, 0.068f * H, 0.097f * H);
+    b.color = cor;
+    m.cap(c, rad, 1.5708f, 1.5708f, 20, 6, glm::vec4(0.f, 0.f, 1.f, 1.f));
+    // aba: meia elipse achatada saindo da frente, levemente inclinada para baixo
+    b.color = aba;
+    const int n = 12;
+    const float y = c.y + 0.004f * H, esp = 0.007f * H, z0 = 0.06f * H, larg = 0.088f * H, comp = 0.085f * H, queda = 0.012f * H;
+    for (int i = 0; i < n; ++i) {
+        const float a0 = 3.14159265f * i / n, a1 = 3.14159265f * (i + 1) / n;
+        auto ponta = [&](float a) {
+            const float x = -std::cos(a) * larg, z = z0 + std::sin(a) * comp;
+            return glm::vec3(x, y - queda * (z - z0) / comp, z);
+        };
+        const glm::vec3 p0 = ponta(a0), p1 = ponta(a1), c0(p0.x, y, z0), c1(p1.x, y, z0);
+        const glm::vec3 dn(0.f, -esp, 0.f);
+        const glm::vec2 t(0.5f);
+        const glm::vec3 up(0.f, 1.f, 0.f);
+        m.tri(c0, p0, p1, up, up, up, t, t, t);
+        m.tri(c0, p1, c1, up, up, up, t, t, t);
+        m.tri(c0 + dn, p1 + dn, p0 + dn, -up, -up, -up, t, t, t);
+        m.tri(c0 + dn, c1 + dn, p1 + dn, -up, -up, -up, t, t, t);
+        const glm::vec3 nb = glm::normalize(glm::vec3(p0.x + p1.x, 0.f, (p0.z + p1.z) * 0.5f - z0 + 1e-4f));
+        m.tri(p0, p0 + dn, p1, nb, nb, nb, t, t, t);
+        m.tri(p1, p0 + dn, p1 + dn, nb, nb, nb, t, t, t);
+    }
+    // botão em cima
+    b.color = aba;
+    m.ball(c + glm::vec3(0.f, rad.y - 0.002f * H, 0.f), 0.009f * H, glm::vec4(0.f, 0.f, 1.f, 1.f));
+    b.color = glm::vec4(1.f);
+}
+
+
 // Cabelo 3D (ver Character.h). Cabeça: cubo de 0,15H centrado em 0,915H (frente em +0,07H).
 void buildBlockHair(const CharacterParams& p, Geo& g, uint32_t seed) {
     if (p.cabelo3d <= 0) return;

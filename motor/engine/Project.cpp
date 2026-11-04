@@ -943,6 +943,14 @@ int createFromSpecJson(Engine* e, const std::string& specJson, std::string* err)
             buildBlockVest(p, vest[Mat::Painted]);
             if (attachGearMesh(e, ci, CJ_Chest, vest, "Colete") < 0) e->lastError.clear();
         }
+        if (p.bloco && p.texturizado && p.chapeu == 1) {  // boné por cima da skin pintada (some na primeira pessoa)
+            Geo cap;
+            cap.place(glm::vec3(0.f), 0.f);
+            buildBlockCap(p, cap[Mat::Painted]);
+            const int cid = attachGearMesh(e, ci, CJ_Head, cap, "Bone");
+            if (cid < 0) e->lastError.clear();
+            else e->characters[ci].hair = e->objects[cid];
+        }
         // cabelo de modelo 3D (cor própria, sem a textura da skin); se o arquivo faltar, cai no cabelo 3D gerado
         bool modelHair = false;
         if (p.bloco && !p.cabeloModelo.empty()) {

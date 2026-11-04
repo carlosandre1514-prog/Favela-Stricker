@@ -29,11 +29,11 @@ const SkinDef kSkins[2][5] = {
      {"Exército", 0, R"({"camisa":"#5C6B3A","calca":"#4A5530","tenis":"#3B2E22","chapeu":"capacete","cor_chapeu":"#4E5A32","colete":true,"cor_colete":"#6B7A45","manga_comprida":true,"luvas":"#2E2A22"})"},
      {"Choque", 0, R"({"camisa":"#16181C","calca":"#16181C","tenis":"#0E0E10","chapeu":"viseira","cor_chapeu":"#202228","colete":true,"cor_colete":"#2B2E34","manga_comprida":true,"luvas":"#0E0E10"})"},
      {"BOPE", 0, R"({"camisa":"#1E1F22","calca":"#1E1F22","tenis":"#121214","manga_comprida":true,"luvas":"#141416"})"}},
-    {{"Rubro", 0, R"({"cabelo_modelo":"branco","cabelo_3d":"cacheado","camisa":"#C8202A","calca":"#18181C","tenis":"#F2F2F2","estampa":"listras","cor2":"#18181C","bermuda":true,"chapeu":"touca","cor_chapeu":"#18181C"})"},
-     {"Alvinegro", 0, R"({"cabelo_modelo":"twists","cabelo_3d":"dreads","camisa":"#F2F2F2","calca":"#18181C","tenis":"#18181C","estampa":"listras_em_pe","cor2":"#18181C","bermuda":true,"chapeu":"touca","cor_chapeu":"#18181C"})"},
-     {"Tricolor", 0, R"({"cabelo_modelo":"ondulado","cabelo_3d":"curto","camisa":"#1E7A3C","calca":"#F2F2F2","tenis":"#F2F2F2","estampa":"tres_cores","cor2":"#F2F2F2","cor3":"#8E1B2E","bermuda":true,"chapeu":"bone","cor_chapeu":"#F2F2F2"})"},
+    {{"Rubro", 0, R"({"camisa":"#C8202A","calca":"#18181C","tenis":"#F2F2F2","estampa":"listras","cor2":"#18181C","bermuda":true,"chapeu":"bone","cor_chapeu":"#F2F2F2"})"},
+     {"Alvinegro", 0, R"({"camisa":"#F2F2F2","calca":"#18181C","tenis":"#18181C","estampa":"listras_em_pe","cor2":"#18181C","bermuda":true,"chapeu":"bone","cor_chapeu":"#18181C"})"},
+     {"Tricolor", 0, R"({"camisa":"#1E7A3C","calca":"#F2F2F2","tenis":"#F2F2F2","estampa":"tres_cores","cor2":"#F2F2F2","cor3":"#8E1B2E","bermuda":true,"chapeu":"bone","cor_chapeu":"#F2F2F2"})"},
      {"Canarinho", 0, R"({"camisa":"#F5D21E","calca":"#1F4FA8","tenis":"#F2F2F2","estampa":"gola","cor2":"#1E8A3C","bermuda":true,"chapeu":"touca","cor_chapeu":"#1F4FA8"})"},
-     {"Faixa", 0, R"({"cabelo_modelo":"cacheado","cabelo_3d":"cacheado","camisa":"#18181C","calca":"#18181C","tenis":"#F2F2F2","estampa":"faixa","cor2":"#F2F2F2","bermuda":true,"chapeu":"bone","cor_chapeu":"#18181C"})"}}};
+     {"Faixa", 0, R"({"camisa":"#18181C","calca":"#18181C","tenis":"#F2F2F2","estampa":"faixa","cor2":"#F2F2F2","bermuda":true,"chapeu":"bone","cor_chapeu":"#18181C"})"}}};
 
 // Nome do arquivo da skin pintada de cada roupa: shaders/kit/personagens/texturas/<nome>.png (molde em docs/skins).
 // Com o arquivo, o boneco usa a imagem; sem ele, as cores acima.

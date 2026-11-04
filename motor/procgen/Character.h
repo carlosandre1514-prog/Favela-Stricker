@@ -67,6 +67,8 @@ void buildBlockVest(const CharacterParams& p, MeshBuilder& mesh);
 // Cabelo 3D (p.cabelo3d): touca arredondada + espirais (cacheado/curto), bolinhas (black) ou mechas (dreads), no espaço do
 // personagem; vai preso no osso da cabeça. Com skin pintada, usa o desenho do cabelo do TOPO da cabeça; sem, a cor p.hair.
 void buildBlockHair(const CharacterParams& p, Geo& g, uint32_t seed);
+// Boné separado (p.chapeu == 1 com skin pintada), na cor p.chapeuCor, no espaço do personagem (preso na cabeça)
+void buildBlockCap(const CharacterParams& p, MeshBuilder& b);
 // Cabelo de modelo 3D (arquivo .bin feito por tools/converter_cabelo.py): a touca arredondada na cor do modelo (sempre)
 // e as peças do modelo (cachos, twists, mechas) na camada de detalhe. false = arquivo inválido.
 bool buildModelHair(const CharacterParams& p, Geo& g, const std::vector<uint8_t>& data);  // a base fica sempre; cachos/mechas só de perto
