@@ -1076,11 +1076,13 @@ void applyFirstPerson(Engine* e) {
     };
     CharacterInfo* pc = e->player >= 0 && e->player < int(e->characters.size()) ? &e->characters[e->player] : nullptr;
     // a arma guardada nas costas/coxa do próprio jogador não aparece na primeira pessoa (os outros veem)
+    // o cabelo 3D também (ficaria na frente da câmera)
     if (pc)
-        if (GameObject* hw = e->scene.get(pc->holster)) {
-            const bool show = !(e->firstPerson && e->playing && e->fpEyeValid);
-            if (hw->active != show) Scene::forEachInSubtree(*hw, [&](GameObject& o) { o.active = show; });
-        }
+        for (Scene::Handle hh : {pc->holster, pc->hair})
+            if (GameObject* hw = e->scene.get(hh)) {
+                const bool show = !(e->firstPerson && e->playing && e->fpEyeValid);
+                if (hw->active != show) Scene::forEachInSubtree(*hw, [&](GameObject& o) { o.active = show; });
+            }
     if (!e->firstPerson || !e->playing || !e->fpEyeValid || !pc) {
         e->camera.fovYDeg = e->baseFov;
         if (e->fpScoped) { showWeapon(pc, true); e->fpScoped = false; }

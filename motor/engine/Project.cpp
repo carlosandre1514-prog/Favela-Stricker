@@ -301,6 +301,8 @@ CharacterParams characterParams(const json& spec, uint32_t seed) {
     if (auto k = a.find("cor3"); k != a.end() && colorOf(*k, c)) p.cor3 = linear(c);
     p.bermuda = flag(a, "bermuda", false);
     if (auto k = a.find("luvas"); k != a.end() && colorOf(*k, c)) p.luvas = linear(c);
+    if (auto k = a.find("cabelo_3d"); k != a.end() && k->is_string())
+        p.cabelo3d = lookup(k->get<std::string>(), {{"nenhum", 0}, {"cacheado", 1}, {"black", 2}, {"afro", 2}, {"curto", 3}, {"dreads", 4}}, 0);
     if (p.bloco) { p.height = 1.75f; p.build = 1; }  // todos do mesmo tamanho
     return p;
 }
@@ -939,6 +941,19 @@ int createFromSpecJson(Engine* e, const std::string& specJson, std::string* err)
             vest.place(glm::vec3(0.f), 0.f);
             buildBlockVest(p, vest[Mat::Painted]);
             if (attachGearMesh(e, ci, CJ_Chest, vest, "Colete") < 0) e->lastError.clear();
+        }
+        if (p.bloco && p.cabelo3d > 0 && (p.chapeu == 0 || p.texturizado)) {  // cabelo 3D (por cima da cabeça)
+            Geo hair;
+            hair.place(glm::vec3(0.f), 0.f);
+            buildBlockHair(p, hair[Mat::Painted], seed);
+            const int hid = attachGearMesh(e, ci, CJ_Head, hair, "Cabelo");
+            if (hid < 0) e->lastError.clear();
+            else {
+                e->characters[ci].hair = e->objects[hid];
+                if (!skinFile.empty())  // os blocos usam o desenho do cabelo da própria skin
+                    if (GameObject* hg = e->scene.get(e->objects[hid]))
+                        applyMaterialTo(e, *hg, true, json{{"textura", skinFile}, {"metal", 0.f}, {"rugosidade", 0.9f}});
+            }
         }
         if (!skinFile.empty())  // skin pintada: a imagem por cima dos blocos (cada imagem vai uma vez só para a memória)
             if (GameObject* g = e->scene.get(e->objects[id]))

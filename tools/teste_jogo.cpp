@@ -331,10 +331,13 @@ int main(int argc, char** argv) {
         engine_set_play(e, 0);
         engine_set_first_person(e, 0);
         frames(e, 5);
-        jogo_escolhas(e, 1, 3, "ak47", "tt33");
+        jogo_escolhas(e, 1, 0, "ak47", "tt33");  // bandido de cabelo 3D (Rubro): na primeira pessoa o cabelo não aparece
         engine_set_first_person(e, 1);
         engine_set_play(e, 1);
         frames(e, 60);
+        engine_set_camera(e, 0.f, 0.f, 0.f, 0.f, -0.5f, 3.f);  // olhando para cima: se o cabelo aparecesse, taparia aqui
+        frames(e, 5);
+        save(out, "41_bandido_cabelo_fp.png");
         mem("2ª partida");
         engine_destroy(e);
         std::printf(g_fail ? "FALHOU\n" : "OK\n");
@@ -405,6 +408,14 @@ int main(int argc, char** argv) {
                 engine_set_camera(e, 0.f, 0.95f, 0.f, 0.35f, 0.08f, 3.2f);
                 frames(e, 4);
                 save(out, (std::string("previa_") + keys[t][k] + ".png").c_str());
+                if (std::getenv("PERTO")) {  // a cabeça de perto (cabelo 3D), de três quartos e de trás
+                    engine_set_camera(e, 0.f, 1.62f, 0.f, 0.6f, 0.12f, 0.75f);
+                    frames(e, 2);
+                    save(out, (std::string("cabeca_") + keys[t][k] + ".png").c_str());
+                    engine_set_camera(e, 0.f, 1.62f, 0.f, 3.5f, 0.25f, 0.75f);
+                    frames(e, 2);
+                    save(out, (std::string("nuca_") + keys[t][k] + ".png").c_str());
+                }
                 engine_remove_object(e, id);
             }
         engine_destroy(e);

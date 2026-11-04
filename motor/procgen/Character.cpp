@@ -505,6 +505,96 @@ void buildBlockVest(const CharacterParams& p, MeshBuilder& b) {
     b.color = glm::vec4(1.f);
 }
 
+// Cabelo 3D de blocos (ver Character.h). Cabeça: cubo de 0,15H centrado em 0,915H (frente em +0,07H).
+void buildBlockHair(const CharacterParams& p, MeshBuilder& b, uint32_t seed) {
+    if (p.cabelo3d <= 0) return;
+    const float H = p.height, hy = 0.915f * H, top = hy + 0.075f * H, hx = 0.075f * H, hzF = 0.07f * H, hzB = -0.07f * H;
+    Rng r(seed * 2654435761u + 17u);
+    b.joint = -1;
+    b.xf = glm::mat4(1.f);
+    b.uvTile = glm::vec2(0.f);
+    // pedaço da skin para cada bloco: um quadradinho do TOPO da cabeça (ou do alto das COSTAS)
+    glm::vec4 rects[6];
+    auto escolheUV = [&](bool costas) {
+        if (!p.texturizado) { b.faceRects = nullptr; return; }
+        const glm::vec4 q = costas ? p.molde[SP_Cabeca][1] : p.molde[SP_Cabeca][4];
+        const float w = q.z - q.x, h = (q.w - q.y) * (costas ? 0.45f : 1.f);
+        const float fw = w * 0.3f, fh = h * 0.3f;
+        const float u0 = q.x + r.range(0.f, w - fw), v0 = q.y + r.range(0.f, h - fh);
+        for (glm::vec4& x : rects) x = {u0, v0, u0 + fw, v0 + fh};
+        b.faceRects = rects;
+    };
+    auto cor = [&]() {
+        if (p.texturizado) return glm::vec4(1.f);
+        const float k = r.range(0.85f, 1.12f);
+        return glm::vec4(glm::min(glm::vec3(p.hair) * k, glm::vec3(1.f)), 1.f);
+    };
+    auto bloco = [&](glm::vec3 c, glm::vec3 s, bool costas = false) {
+        escolheUV(costas);
+        b.color = cor();
+        b.boxC(c, s);
+    };
+    const float u = H;  // medidas em fração da altura
+    const int tipo = p.cabelo3d;
+    // base: touca colada na cabeça (alto, laterais de cima e nuca)
+    const float folga = 0.006f * u;
+    const float capY = tipo == 3 ? 0.012f * u : 0.02f * u;
+    bloco({0.f, top + capY * 0.5f - 0.004f * u, -0.004f * u}, {2.f * (hx + folga), capY + 0.008f * u, hzF - hzB + 0.006f * u});
+    if (tipo != 3) {  // curto: lados raspados (degradê); os outros cobrem lados e nuca
+        for (float s : {-1.f, 1.f})
+            bloco({s * (hx + folga * 0.5f), top - 0.025f * u, -0.01f * u}, {folga, 0.05f * u, hzF - hzB - 0.02f * u});
+        bloco({0.f, top - 0.04f * u, hzB - folga * 0.5f}, {2.f * (hx + folga), 0.08f * u, folga}, true);
+    }
+    auto noAlto = [&](float rx, float rz, float lift) {  // ponto no alto da cabeça (rx, rz de -1 a 1)
+        return glm::vec3(rx * hx, top + capY + lift, hzB + (rz * 0.5f + 0.5f) * (hzF - hzB));
+    };
+    if (tipo == 1 || tipo == 2) {  // cacheado / black: cachos (blocos) por cima, dos lados e atrás
+        const int n = tipo == 2 ? 70 : 46;
+        const float esc = tipo == 2 ? 1.35f : 1.f;
+        for (int i = 0; i < n; ++i) {
+            const float s = r.range(0.022f, 0.036f) * esc * u;
+            const int lado = i % 5;
+            glm::vec3 c;
+            if (lado < 3) c = noAlto(r.range(-1.f, 1.f), r.range(-1.f, 0.85f), r.range(-0.004f, 0.012f) * esc * u);
+            else if (lado == 3) {
+                const float sx = r.chance(0.5f) ? 1.f : -1.f;
+                c = {sx * (hx + folga + s * 0.25f), top - r.range(0.f, 0.035f) * u, r.range(hzB, hzF - 0.02f * u)};
+            } else c = {r.range(-hx, hx), top - r.range(0.f, 0.06f) * u, hzB - folga - s * 0.25f};
+            bloco(c, glm::vec3(s, s * r.range(0.8f, 1.1f), s), lado == 4);
+        }
+        // franja: cachos na beira da testa
+        for (int i = 0; i < 7; ++i) {
+            const float s = r.range(0.02f, 0.03f) * esc * u;
+            bloco({-hx + (i + 0.5f) * (2.f * hx / 7.f), top - 0.004f * u, hzF - 0.006f * u}, glm::vec3(s, s * 0.9f, s * 0.8f));
+        }
+        if (tipo == 2)  // black: o volume arredondado por baixo dos cachos
+            bloco({0.f, top + 0.035f * u, -0.01f * u}, {2.f * hx + 0.04f * u, 0.05f * u, hzF - hzB + 0.03f * u});
+    } else if (tipo == 3) {  // curto: cachinhos só no alto
+        for (int i = 0; i < 32; ++i) {
+            const float s = r.range(0.016f, 0.024f) * u;
+            bloco(noAlto(r.range(-0.95f, 0.95f), r.range(-0.95f, 0.9f), r.range(-0.006f, 0.004f) * u), glm::vec3(s));
+        }
+    } else if (tipo == 4) {  // dreads: mechas finas caindo pela testa, lados e nuca + bolinhas no alto
+        for (int i = 0; i < 26; ++i) {
+            const float s = r.range(0.018f, 0.024f) * u;
+            bloco(noAlto(r.range(-0.95f, 0.95f), r.range(-0.95f, 0.9f), 0.f), glm::vec3(s));
+        }
+        auto mecha = [&](glm::vec3 alto, float len, bool costas) {
+            const float g = r.range(0.013f, 0.017f) * u;
+            bloco(alto - glm::vec3(0, len * 0.5f, 0), {g, len, g}, costas);
+        };
+        for (int i = 0; i < 8; ++i)  // franja
+            mecha({-hx + (i + 0.5f) * (2.f * hx / 8.f), top + 0.004f * u, hzF + 0.004f * u}, r.range(0.03f, 0.05f) * u, false);
+        for (float sx : {-1.f, 1.f})
+            for (int i = 0; i < 5; ++i)
+                mecha({sx * (hx + 0.008f * u), top + 0.004f * u, hzB + (i + 0.5f) * ((hzF - hzB) * 0.75f / 5.f)}, r.range(0.05f, 0.08f) * u, false);
+        for (int i = 0; i < 8; ++i)
+            mecha({-hx + (i + 0.5f) * (2.f * hx / 8.f), top + 0.004f * u, hzB - 0.008f * u}, r.range(0.07f, 0.1f) * u, true);
+    }
+    b.faceRects = nullptr;
+    b.color = glm::vec4(1.f);
+}
+
 void buildCharacter(const CharacterParams& p, LoadedModel& out, MeshBuilder& b) {
     const float H = p.height;
     const float s = p.build == 0 ? 0.85f : p.build == 2 ? 1.2f : 1.f;

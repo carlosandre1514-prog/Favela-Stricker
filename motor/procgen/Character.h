@@ -47,6 +47,7 @@ struct CharacterParams {
     // Skin pintada (imagem no molde de tools/gerar_molde_personagem.py): só os blocos do corpo, com a imagem
     // por cima. molde[parte][face]: (u0, v0, u1, v1) na imagem; partes na ordem de SkinPart, faces na ordem
     // frente, costas, lado esquerdo (+X), lado direito (-X), topo, base.
+    int cabelo3d = 0;         // cabelo 3D de blocos por cima da cabeça: 0 nenhum, 1 cacheado, 2 black, 3 curto, 4 dreads
     bool texturizado = false;
     glm::vec4 molde[8][6];
 };
@@ -59,6 +60,9 @@ CharacterParams randomCharacter(uint32_t seed);
 void buildCharacter(const CharacterParams& p, LoadedModel& out, MeshBuilder& mesh);
 // Colete do boneco em blocos como peça separada (malha no espaço do personagem; vai preso no osso do peito)
 void buildBlockVest(const CharacterParams& p, MeshBuilder& mesh);
+// Cabelo 3D de blocos (p.cabelo3d), no espaço do personagem; vai preso no osso da cabeça. Com skin pintada
+// (p.texturizado), os blocos usam o desenho do cabelo do TOPO e das COSTAS da cabeça da skin; sem, a cor p.hair.
+void buildBlockHair(const CharacterParams& p, MeshBuilder& mesh, uint32_t seed);
 
 // Armas: origem no ponto de empunhadura, cano para +Z, topo para +Y
 enum WeaponKind { WK_Pistol, WK_Rifle, WK_Shotgun, WK_Sniper, WK_Knife, WK_Bat, WK_Count };

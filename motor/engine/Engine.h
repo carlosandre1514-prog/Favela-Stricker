@@ -37,6 +37,7 @@ struct Attachment {
 struct CharacterInfo {
     Scene::Handle root;        // GameObject raiz (origem nos pés)
     Scene::Handle holster;     // a arma guardada no corpo (fuzil nas costas, pistola na coxa)
+    Scene::Handle hair;        // cabelo 3D preso na cabeça (some na primeira pessoa do próprio jogador)
     Animator* anim = nullptr;
     float height = 1.75f;
     int clipMap[CC_Count];     // animação do motor (CharClip) -> índice no Animator
