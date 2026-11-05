@@ -263,10 +263,9 @@ int main(int argc, char** argv) {
         std::printf("  depois de abater o amigo: placar %s, meus abates %d\n", h["placar"].dump().c_str(), int(h["abates"]));
         if (h["placar"][0] != 1 || h["abates"] != 1) { std::printf("  [ERRO] abate recebido\n"); ++g_fail; }
         {
-            const json& as = h["abateSkin"];
             const json& fd = h["abatidos"].back();
-            std::printf("  abate com skin: faixa n=%d skin=%s, quadro skin=%s\n", as.value("n", 0), as.value("skin", "").c_str(), fd.value("skin", "").c_str());
-            if (as.value("n", 0) != 1 || as.value("skin", "") != "m4a1:neon" || fd.value("skin", "") != "m4a1:neon") {
+            std::printf("  abate com skin: quadro skin=%s\n", fd.value("skin", "").c_str());
+            if (fd.value("skin", "") != "m4a1:neon") {
                 std::printf("  [ERRO] abate com skin\n"); ++g_fail;
             }
         }

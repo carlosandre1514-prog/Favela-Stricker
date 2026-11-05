@@ -334,11 +334,6 @@ void killFighter(Engine* e, int vi, int ai) {
             const bool deTiro = g_killWeapon.empty() || g_killWeapon == gunOf(M.f[ai].weapon).name;  // (granada não)
             const std::string sk = deTiro ? skinNaMao(M, M.f[ai]) : "";
             if (!sk.empty()) fd.skin = std::string(gunOf(M.f[ai].weapon).key) + ":" + sk;
-            if (!fd.skin.empty() && !M.f[ai].bot && !M.f[ai].remote) {
-                ++M.abateSkinN;
-                M.abateSkin = fd.skin;
-                M.abateSkinVitima = v.name;
-            }
         }
         M.feed.push_back(fd);
         if (M.feed.size() > 5) M.feed.erase(M.feed.begin());
@@ -1152,7 +1147,6 @@ std::string hudJson(Engine* e) {
         if (fd.age < 7.f)
             feed.push_back({{"a", fd.killer}, {"at", fd.kt}, {"v", fd.victim}, {"vt", fd.vt}, {"arma", fd.weapon}, {"voce", fd.you}, {"skin", fd.skin}});
     j["abatidos"] = feed;
-    j["abateSkin"] = {{"n", M.abateSkinN}, {"skin", M.abateSkin}, {"vitima", M.abateSkinVitima}};
     json players = json::array();
     for (const Fighter& f : M.f) players.push_back({{"nome", f.name}, {"time", f.team}, {"abates", f.kills}, {"mortes", f.deaths}, {"voce", !f.bot}});
     j["jogadores"] = players;
