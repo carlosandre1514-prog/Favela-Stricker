@@ -208,6 +208,12 @@ input[type=range]::-moz-range-thumb { width: 18px; height: 18px; border-radius: 
   box-shadow: 0 0 10px rgba(60, 140, 255, 0.55); }
 #abates span.abate-dragao i { color: #7cc0ff; font-style: normal; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; }
 #abates span.abate-dragao em { color: #f2c464; font-style: normal; font-weight: 700; }
+/* abate com a M4 Colt Vermelho Carmesim: linha vermelha e preta com borda dourada (a coroa da skin) */
+#abates span.abate-carmesim { background: linear-gradient(90deg, rgba(40, 6, 8, 0.94), rgba(120, 12, 18, 0.9)); border: 1px solid rgba(232, 182, 72, 0.75);
+  box-shadow: 0 0 10px rgba(229, 38, 47, 0.6); }
+#abates span.abate-carmesim i { color: #ff5a5f; font-style: normal; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; }
+#abates span.abate-carmesim i::before { content: "\265B  "; color: #f2c464; }
+#abates span.abate-carmesim em { color: #f2c464; font-style: normal; font-weight: 700; }
 #pausar { position: absolute; right: 14px; top: 10px; width: 44px; height: 44px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.25);
   background: var(--escuro); display: flex; align-items: center; justify-content: center; }
 #rede { position: absolute; left: 50%; top: 66px; transform: translateX(-50%); font-size: 11px; font-weight: 800; padding: 2px 8px; border-radius: 6px; background: rgba(11, 15, 23, 0.6); }

@@ -272,6 +272,7 @@ const corTime = (t) => (t === 0 ? '#93C5FD' : '#FCD34D');
 // Skins com abate próprio: frase e visual próprios no quadro de abates (chave "arma:skin")
 const ABATES_SKIN = {
   'ak47:dragao_azul': { classe: 'dragao', frase: 'devorou', arma: 'AK-47 Dragão Azul' },
+  'm4colt:carmesim': { classe: 'carmesim', frase: 'destronou', arma: 'M4 Colt Vermelho Carmesim' },
 };
 function atualizarHud(j) {
   const t = partida && partida.hud;
