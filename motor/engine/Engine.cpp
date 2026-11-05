@@ -1818,13 +1818,24 @@ static Emitter* skinShot(Engine* e, Scene::Handle weapon) {
     GameObject* w = e->scene.get(weapon);
     return w && w->emitter && w->emitter->disparo ? w->emitter : nullptr;
 }
+// velocidade de quem segura a arma (o corpo do lutador): o clarão do tiro anda junto e fica na boca do cano
+static glm::vec3 armaVelocidade(Engine* e, Scene::Handle weapon) {
+    for (const CharacterInfo& c : e->characters)
+        if (c.weapon.index == weapon.index && c.weapon.gen == weapon.gen)
+            if (GameObject* r = e->scene.get(c.root); r && r->rigidBody && r->rigidBody->body) {
+                const btVector3 v = r->rigidBody->body->getLinearVelocity();
+                return glm::vec3(v.x(), v.y(), v.z());
+            }
+    return glm::vec3(0.f);
+}
 void muzzleFx(Engine* e, Scene::Handle weapon, glm::vec3 muzzle, glm::vec3 dir) {
+    const glm::vec3 carry = armaVelocidade(e, weapon);
     if (Emitter* em = skinShot(e, weapon)) {
-        addFlash(e, fxDisparoSkin(e->particles, e->fxRng, muzzle, dir, em->corDisparo, em->corDisparo2), 0.08f);
+        addFlash(e, fxDisparoSkin(e->particles, e->fxRng, muzzle, dir, em->corDisparo, em->corDisparo2, carry), 0.08f);
         em->pulso = 1.f;  // a pintura acende forte e apaga (updateEffects)
         return;
     }
-    addFlash(e, fxMuzzleFlash(e->particles, e->fxRng, muzzle, dir), 0.06f);
+    addFlash(e, fxMuzzleFlash(e->particles, e->fxRng, muzzle, dir, carry), 0.06f);
 }
 void bulletFx(Engine* e, Scene::Handle weapon, glm::vec3 from, glm::vec3 to) {
     Emitter* em = skinShot(e, weapon);

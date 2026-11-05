@@ -92,6 +92,8 @@ class PonteJogo(private val jogo: JogoActivity) {
 
     // HUD e loja da partida
     @JavascriptInterface fun hud(): String = hudJson
+    // medidor: "fps|ms médio|pior ms" do último segundo
+    @JavascriptInterface fun desempenho(): String = with(jogo.motorView) { "$medidorFps|$medidorMs|$medidorPior" }
     @JavascriptInterface fun loja(): String = lojaJson
     @JavascriptInterface fun lojaComprar(item: Int): String = glEspera("") {
         val msg = texto(NativeBridge.nativeShopBuy(item))

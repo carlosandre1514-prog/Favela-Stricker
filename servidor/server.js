@@ -121,6 +121,7 @@ wss.on('connection', (ws, req) => {
     }
     const texto = dado.toString();
     if (texto.length > 64 * 1024) return;
+    if (texto.startsWith('{"k":"pg"')) { if (texto.length < 200) ws.send(texto); return; }  // ping: volta só para quem mandou
     for (const p of sala.values()) if (p !== eu && p.ws.readyState === 1) p.ws.send(texto);
   });
 

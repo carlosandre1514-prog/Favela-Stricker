@@ -147,6 +147,7 @@ const CONFIG_PADRAO = {
   volume: 0.9,        // tiros, passos, explosões
   volumeVoz: 1.0,     // chat de voz do time
   vibrar: true,
+  medidor: true,      // FPS, tempo do quadro e ping na partida
 };
 const config = Object.assign({}, CONFIG_PADRAO, guardado.get('config', {}));
 function salvarConfig() { guardado.set('config', config); }

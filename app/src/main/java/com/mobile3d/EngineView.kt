@@ -1,6 +1,7 @@
 package com.mobile3d
 
 import android.app.Activity
+import android.opengl.EGL14
 import android.opengl.GLSurfaceView
 import android.widget.Toast
 import javax.microedition.khronos.egl.EGLConfig
@@ -14,9 +15,16 @@ class EngineView(activity: Activity, private val shaderDir: String, private val 
     @Volatile var renderScale = 1f
     @Volatile var maxFps = 60
     @Volatile var quality = 2
+    // Medidor (FPS, tempo do quadro e o pior quadro do último segundo: os engasgos aparecem nele)
+    @Volatile var medidorFps = 0
+    @Volatile var medidorMs = 0f
+    @Volatile var medidorPior = 0f
+    private val telaHz = (activity.windowManager.defaultDisplay?.refreshRate ?: 60f).coerceIn(30f, 240f)
+    @Volatile private var intervaloTroca = -1  // quadros da tela por quadro do jogo (aplicado na thread GL)
 
     fun applyQuality(scale: Float, fps: Int, q: Int) {
         renderScale = scale; maxFps = fps; quality = q
+        intervaloTroca = -1  // recalcula o ritmo da tela
         if (width > 0 && height > 0) holder.setFixedSize((width * scale).toInt().coerceAtLeast(1), (height * scale).toInt().coerceAtLeast(1))
         queueEvent { NativeBridge.nativeSetQuality(q) }
     }
@@ -33,6 +41,23 @@ class EngineView(activity: Activity, private val shaderDir: String, private val 
         setRenderer(object : Renderer {
             private var last = 0L
             private var frame = 0
+            private var usaTroca = false     // limite de quadros pela própria tela (vsync): quadros sempre iguais
+            private var contaQuadros = 0
+            private var inicioSegundo = 0L
+            private var somaMs = 0f
+            private var piorMs = 0f
+
+            // Limite de quadros sem engasgo: se o limite divide a taxa da tela (30 numa tela de 60 Hz), a tela mostra
+            // um quadro do jogo a cada 2 atualizações (eglSwapInterval 2): os quadros saem sempre com o mesmo
+            // intervalo. O "dorme até dar o tempo" de antes errava alguns ms e alternava quadros curtos e longos, o
+            // que aparecia como travadinhas ao correr.
+            private fun ajustarRitmo() {
+                if (intervaloTroca >= 0) return
+                val passo = Math.round(telaHz / maxFps.coerceAtLeast(1))
+                usaTroca = maxFps < 60 && passo >= 2 && Math.abs(telaHz / passo - maxFps) <= 3f
+                intervaloTroca = if (usaTroca) passo else 1
+                try { EGL14.eglSwapInterval(EGL14.eglGetCurrentDisplay(), intervaloTroca) } catch (_: Exception) { usaTroca = false }
+            }
 
             // Criar o motor demora (no Galaxy A14, mais de 10 s). Enquanto isso a tela principal do Android fica
             // esperando o 1º desenho (o GLSurfaceView segura a thread da tela no resize até um quadro terminar) e
@@ -45,6 +70,7 @@ class EngineView(activity: Activity, private val shaderDir: String, private val 
             override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
                 // Contexto novo (1ª vez ou contexto perdido): o motor e a cena serão recriados
                 criar = 2
+                intervaloTroca = -1
                 last = System.nanoTime()
             }
             override fun onSurfaceChanged(gl: GL10?, w: Int, h: Int) {
@@ -74,13 +100,20 @@ class EngineView(activity: Activity, private val shaderDir: String, private val 
                     return
                 }
                 if (criar == 1) { criar = 0; criarMotor(); requestRender(); return }
-                if (maxFps < 60) {  // limite de quadros: espera o resto do intervalo
+                ajustarRitmo()
+                if (maxFps < 60 && !usaTroca) {  // limite de quadros: espera o resto do intervalo
                     val wait = 1_000_000_000L / maxFps - (System.nanoTime() - last)
                     if (wait > 1_000_000L) Thread.sleep(wait / 1_000_000L)
                 }
                 val now = System.nanoTime()
                 val dt = ((now - last) / 1e9f).coerceIn(0f, 0.1f)
                 last = now
+                val ms = dt * 1000f
+                contaQuadros++; somaMs += ms; if (ms > piorMs) piorMs = ms
+                if (now - inicioSegundo >= 1_000_000_000L) {
+                    medidorFps = contaQuadros; medidorMs = if (contaQuadros > 0) somaMs / contaQuadros else 0f; medidorPior = piorMs
+                    contaQuadros = 0; somaMs = 0f; piorMs = 0f; inicioSegundo = now
+                }
                 NativeBridge.nativeFrame(dt)
                 afterFrame?.invoke(frame++)   // sons, tiro, olhar e o que a página lê (thread GL)
             }

@@ -356,11 +356,13 @@ function telaConfig(aba = 'sens') {
       ajusteHtml('sensLuneta', 'Luneta', 0.1, 1.5, 0.05, 'olhando pela luneta da M4 Colt') +
       `<div class="ajuste"><span class="nome">Inverter o eixo vertical<small>arrastar para cima olha para baixo</small></span><span class="cresce"></span><button class="chave ${config.inverterY ? 'ligada' : ''}" id="c-inv"></button></div>
        <div class="ajuste"><span class="nome">Vibrar ao levar tiro</span><span class="cresce"></span><button class="chave ${config.vibrar ? 'ligada' : ''}" id="c-vib"></button></div>
+       <div class="ajuste"><span class="nome">Medidor (FPS, ms e ping)</span><span class="cresce"></span><button class="chave ${config.medidor ? 'ligada' : ''}" id="c-med"></button></div>
        <button class="btn btn-fraco" id="c-padrao" style="align-self:flex-start">Voltar ao padrão</button>`;
     ligarAjustes(c);
     $('#c-inv', c).onclick = (e) => { config.inverterY = !config.inverterY; e.target.classList.toggle('ligada', config.inverterY); salvarConfig(); };
     $('#c-vib', c).onclick = (e) => { config.vibrar = !config.vibrar; e.target.classList.toggle('ligada', config.vibrar); salvarConfig(); };
-    $('#c-padrao', c).onclick = () => { for (const k of ['sens', 'sensMira', 'sensLuneta', 'inverterY', 'vibrar']) config[k] = CONFIG_PADRAO[k]; salvarConfig(); telaConfig('sens'); };
+    $('#c-med', c).onclick = (e) => { config.medidor = !config.medidor; e.target.classList.toggle('ligada', config.medidor); salvarConfig(); };
+    $('#c-padrao', c).onclick = () => { for (const k of ['sens', 'sensMira', 'sensLuneta', 'inverterY', 'vibrar', 'medidor']) config[k] = CONFIG_PADRAO[k]; salvarConfig(); telaConfig('sens'); };
   } else if (aba === 'graficos') {
     const atual = motor.nivel();
     c.innerHTML = `<div class="niveis">${NIVEIS.map((n, i) => `<button class="nivel ${i === atual ? 'sel' : ''}" data-n="${i}"><span class="n">${n.nome}</span><small>${esc(n.info)}</small></button>`).join('')}</div>

@@ -120,6 +120,11 @@ int main(int argc, char** argv) {
         engine_set_play(e, 1);
         frames(e, 60);
         save(out, ("skin_fp_" + arma + ".png").c_str());
+        if (std::getenv("CORRER")) {  // correndo e atirando: o clarão tem que ficar na boca do cano
+            for (int k = 0; k < 40; ++k) { engine_player_input(e, 0.f, 1.f, 1); frames(e, 1); }
+            for (int k = 0; k < 3; ++k) { engine_player_input(e, 0.f, 1.f, 1); engine_player_fire(e); frames(e, 1); }
+            save(out, ("correndo_" + arma + ".png").c_str());
+        }
         std::printf(g_fail ? "FALHOU\n" : "OK\n");
         return g_fail ? 1 : 0;
     }

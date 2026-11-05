@@ -42,6 +42,7 @@ void ParticleSystem::emit(const ParticleSpawn& s) {
     seed_ = seed_ * 1664525u + 1013904223u;
     p.seed = (seed_ >> 8) / float(1 << 24);
     p.shape = s.shape; p.additive = s.additive; p.occlusion = s.occlusion;
+    p.carry = s.carry;
 }
 
 void ParticleSystem::update(float dt) {
@@ -51,7 +52,7 @@ void ParticleSystem::update(float dt) {
         if (p.age >= p.life) { parts_[i] = parts_[--count_]; continue; }  // remove trocando com o último
         p.vel *= 1.f / (1.f + p.drag * dt);
         p.vel.y -= p.gravity * dt;
-        p.pos += p.vel * dt;
+        p.pos += (p.vel + p.carry) * dt;
         p.rot += p.rotVel * dt;
         ++i;
     }

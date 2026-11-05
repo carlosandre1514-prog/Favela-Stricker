@@ -118,6 +118,7 @@ async function iniciarPartida(time, roupa, sala, armaPrincipal) {
   clearInterval(lacoHud);
   lacoHud = setInterval(() => {
     if (!partida) return;
+    atualizarMedidor();
     const j = motor.hud();
     if (!j.ativo) return;
     if ((j.armas || []).length) { const en = document.getElementById('entrando'); if (en) en.remove(); }
@@ -166,6 +167,7 @@ function montarHud(online) {
       <div class="relogio" id="relogio">10:00</div><div class="ban"><span class="num" id="pt-ban">0</span><span class="rot">BANDIDOS</span></div></div>
       <span class="meta" id="meta">até 50 abates</span></div>
     <div id="rede" style="display:${online ? '' : 'none'}"></div>
+    <div id="medidor" aria-hidden="true"></div>
     <div id="abates"></div>
     <button id="pausar" aria-label="Pausar">${ICONE.pausa}</button>
     <div id="centro"></div>
@@ -694,8 +696,24 @@ function abrirEditorHud(aoSair) {
   $('#ed-salvar', ed).onclick = () => { salvarLayout(); aviso('HUD salvo'); aoSair(); };
 }
 
+// ---------------- medidor: FPS, tempo do quadro (média e o pior do último segundo) e ping ----------------
+let pingMs = null, ultimoMedidor = 0;
+function atualizarMedidor() {
+  const el = partida && partida.hud && $('#medidor', partida.hud);
+  if (!el) return;
+  el.style.display = config.medidor ? '' : 'none';
+  if (!config.medidor || Date.now() - ultimoMedidor < 500) return;
+  ultimoMedidor = Date.now();
+  const d = motor.desempenho && motor.desempenho();
+  if (!d) return;
+  const cor = d.fps >= 28 ? '#86EFAC' : d.fps >= 20 ? '#FCD34D' : '#F87171';
+  const corPior = d.pior > 60 ? '#F87171' : d.pior > 45 ? '#FCD34D' : '#D1D5DB';
+  const ping = partida.sala ? ` · <span style="color:${pingMs == null ? '#9CA3AF' : pingMs < 120 ? '#86EFAC' : pingMs < 250 ? '#FCD34D' : '#F87171'}">ping ${pingMs == null ? '—' : Math.round(pingMs) + ' ms'}</span>` : '';
+  el.innerHTML = `<b style="color:${cor}">${d.fps} FPS</b> · ${d.ms.toFixed(1)} ms · <span style="color:${corPior}">pior ${Math.round(d.pior)} ms</span>${ping}`;
+}
+
 // ---------------- partida ao vivo (servidor) + chat de voz ----------------
-let ws = null, enviandoTimer = null, voz = null, viaFirebase = null;
+let ws = null, enviandoTimer = null, voz = null, viaFirebase = null, pingTimer = null;
 function ligarAoVivo(s, time) {
   const rede = () => partida && partida.hud && $('#rede', partida.hud);
   const status = (txt, ok) => { const r = rede(); if (r) { r.textContent = '● ' + txt; r.style.color = ok ? '#86EFAC' : '#FCD34D'; } };
@@ -710,9 +728,12 @@ function ligarAoVivo(s, time) {
     ws = new WebSocket(url);
     ws.binaryType = 'arraybuffer';
     ws.onopen = () => { tentativas = 0; abriuUmaVez = true; status('ao vivo', true); };
+    // ping: o servidor devolve só para quem mandou ({"k":"pg"}); mede ida e volta
+    clearInterval(pingTimer);
+    pingTimer = setInterval(() => { if (ws && ws.readyState === 1) ws.send(JSON.stringify({ k: 'pg', t: performance.now(), de: fb.uid })); }, 2000);
     ws.onmessage = (ev) => {
       if (typeof ev.data !== 'string') { const b = new Uint8Array(ev.data); if (b.length > 1 && voz) voz.receber(b[0], b.subarray(1)); return; }
-      try { const j = JSON.parse(ev.data); if (j.k === 'st') motor.redeAplicar(JSON.stringify(j.d)); else if (j.k === 'ev') motor.redeEvento(JSON.stringify(j.d)); } catch (_) {}
+      try { const j = JSON.parse(ev.data); if (j.k === 'pg') { if (j.de === fb.uid) pingMs = performance.now() - j.t; return; } if (j.k === 'st') motor.redeAplicar(JSON.stringify(j.d)); else if (j.k === 'ev') motor.redeEvento(JSON.stringify(j.d)); } catch (_) {}
     };
     ws.onclose = () => {
       if (!partida || viaFirebase) return;
@@ -758,6 +779,8 @@ function usarFirebase(s) {
 
 function desligarAoVivo() {
   clearInterval(enviandoTimer);
+  clearInterval(pingTimer);
+  pingMs = null;
   enviandoTimer = null;
   if (ws) { try { ws.close(1000, 'saiu'); } catch (_) {} ws = null; }
   if (viaFirebase) { for (const o of viaFirebase.ouvintes) o.fechar(); viaFirebase = null; }

@@ -29,6 +29,26 @@ const entrada = { dx: 0, dy: 0, atirando: false, girando: false };
 const modoMenu = (on) => document.body.classList.toggle('menu-fundo', !!on);
 let projetoPartida = null, mapaCarregado = false;
 
+// Medidor no navegador: conta os quadros desenhados (requestAnimationFrame) no último segundo
+const medWeb = { n: 0, soma: 0, pior: 0, ini: 0, ult: 0, saida: null, ligado: false };
+function medidorWeb() {
+  if (!medWeb.ligado) {
+    medWeb.ligado = true;
+    const passo = (t) => {
+      if (medWeb.ult) { const ms = t - medWeb.ult; medWeb.n++; medWeb.soma += ms; medWeb.pior = Math.max(medWeb.pior, ms); }
+      medWeb.ult = t;
+      if (!medWeb.ini) medWeb.ini = t;
+      if (t - medWeb.ini >= 1000) {
+        medWeb.saida = { fps: medWeb.n, ms: medWeb.n ? medWeb.soma / medWeb.n : 0, pior: medWeb.pior };
+        medWeb.n = 0; medWeb.soma = 0; medWeb.pior = 0; medWeb.ini = t;
+      }
+      requestAnimationFrame(passo);
+    };
+    requestAnimationFrame(passo);
+  }
+  return medWeb.saida;
+}
+
 const motor = ANDROID ? {
   pronto: () => Nativo.pronto(),
   girarMenu: (on) => { modoMenu(on); Nativo.girarMenu(false); Nativo.desenhar(!on); },
@@ -53,6 +73,7 @@ const motor = ANDROID ? {
   recarregar: () => Nativo.recarregar(),
   interagir: () => Nativo.interagir(),
   hud: () => lerJson(Nativo.hud(), {}),
+  desempenho: () => { try { const [f, m, p] = Nativo.desempenho().split('|').map(Number); return { fps: f, ms: m, pior: p }; } catch (_) { return null; } },
   loja: () => lerJson(Nativo.loja(), null),
   lojaComprar: (id) => Nativo.lojaComprar(id),
   lojaFechar: () => Nativo.lojaFechar(),
@@ -94,6 +115,7 @@ const motor = ANDROID ? {
   recarregar: () => wasm('web_recarregar', null, [], []),
   interagir: () => wasm('web_interagir', 'number', [], []),
   hud: () => lerJson(wasm('web_hud', 'string', [], []), {}),
+  desempenho: () => medidorWeb(),
   loja: () => lerJson(wasm('web_loja', 'string', [], []), null),
   lojaComprar: (id) => wasm('web_loja_comprar', 'string', ['number'], [id]),
   lojaFechar: () => wasm('web_loja_fechar', null, [], []),

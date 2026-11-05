@@ -28,6 +28,8 @@ struct ParticleSpawn {
     uint8_t shape = PS_Glow;
     bool additive = true;      // aditivo (brilha) ou alfa (fumaça escura)
     float occlusion = 0.f;     // aditivo que também escurece um pouco o fundo (cor saturada mesmo de dia)
+    glm::vec3 carry{0.f};      // velocidade de quem soltou (ex.: a arma correndo): somada sempre, sem freio, para o
+                               // clarão do tiro continuar na boca do cano enquanto a pessoa anda
 };
 
 // Partículas com capacidade fixa, simuladas na CPU sem alocação e desenhadas num único draw call instanciado.
@@ -49,6 +51,7 @@ private:
         glm::vec3 vel; float life;
         glm::vec4 c0, c1;
         float s0, s1, rot, rotVel, drag, gravity, stretch, seed, occlusion;
+        glm::vec3 carry;
         uint8_t shape; bool additive;
     };
     struct GpuInstance { glm::vec4 posSize, color, velStretch, misc; };
