@@ -299,6 +299,73 @@ FxLight fxRaios(ParticleSystem& ps, Rng& r, const glm::mat4& world, glm::vec3 a,
     return {mundo((a + b) * 0.5f), cor, 1.6f * flick, 2.5f};
 }
 
+FxLight fxAuraArma(ParticleSystem& ps, Rng& r, const glm::mat4& world, glm::vec3 a, glm::vec3 b, float raio, glm::vec3 cor, float dt,
+                   float& accFumaca, float& accBrasa, float& accEstalo, float& accHalo, glm::vec3 velArma) {
+    auto mundo = [&](glm::vec3 p) { return glm::vec3(world * glm::vec4(p, 1.f)); };
+    // direções da arma no mundo: comprimento (para trás: a aura escorre para a coronha) e "para fora"
+    const glm::vec3 atras = glm::normalize(glm::vec3(world * glm::vec4(a - b, 0.f)) + glm::vec3(1e-5f));
+    auto pontoNaArma = [&]() {
+        glm::vec3 p = glm::mix(a, b, r.f());
+        return p + glm::vec3(r.range(-1.f, 1.f), r.range(-1.f, 1.f), 0.f) * raio;
+    };
+    const glm::vec3 quente = glm::mix(cor, glm::vec3(1.f, 0.75f, 0.35f), 0.45f);  // brasa: mais amarelada
+    // fumaça de energia: nuvens que crescem, sobem e escorrem para trás (saturada mesmo de dia: escurece o fundo)
+    for (int n = count(accFumaca, 90.f, dt); n > 0; --n) {
+        ParticleSpawn p;
+        p.pos = mundo(pontoNaArma());
+        glm::vec3 fora = randDir(r);
+        p.vel = fora * r.range(0.04f, 0.14f) + atras * r.range(0.12f, 0.32f) + velArma;
+        p.life = r.range(0.4f, 0.7f); p.size0 = r.range(0.018f, 0.03f); p.size1 = r.range(0.05f, 0.08f);
+        p.color0 = glm::vec4(cor * 1.7f, 0.6f); p.color1 = glm::vec4(cor * 0.4f, 0.f);
+        p.shape = r.chance(0.6f) ? PS_Flame : PS_Glow; p.rot = r.range(0.f, 6.28f); p.rotVel = r.range(-2.5f, 2.5f);
+        p.gravity = -0.25f; p.drag = 1.2f; p.occlusion = 0.45f;
+        if (p.shape == PS_Flame) p.stretch = 0.12f;  // labaredas esticadas, escorrendo para trás
+        ps.emit(p);
+    }
+    // brilho colado na arma (névoa contínua em volta)
+    for (int n = count(accHalo, 60.f, dt); n > 0; --n) {
+        ParticleSpawn p;
+        p.pos = mundo(pontoNaArma());
+        p.vel = randDir(r) * 0.03f + velArma;
+        p.life = r.range(0.25f, 0.4f); p.size0 = r.range(0.045f, 0.07f); p.size1 = 0.03f;
+        p.color0 = glm::vec4(cor * 1.3f, 0.5f); p.color1 = glm::vec4(cor * 0.6f, 0.f);
+        p.shape = PS_Glow; p.occlusion = 0.35f;
+        ps.emit(p);
+    }
+    // brasas que sobem
+    for (int n = count(accBrasa, 28.f, dt); n > 0; --n) {
+        ParticleSpawn p;
+        p.pos = mundo(pontoNaArma());
+        p.vel = randDir(r) * r.range(0.2f, 0.55f) + atras * 0.15f + velArma;
+        p.life = r.range(0.4f, 0.85f); p.size0 = 0.008f; p.size1 = 0.003f;
+        p.color0 = glm::vec4(quente * 3.f, 1.f); p.color1 = glm::vec4(cor * 1.5f, 0.f);
+        p.shape = PS_Spark; p.stretch = 0.03f; p.gravity = -0.6f; p.drag = 1.f;
+        ps.emit(p);
+    }
+    // estalos de energia (zigue-zague curto) de vez em quando
+    for (int n = count(accEstalo, 5.f, dt); n > 0; --n) {
+        glm::vec3 p0 = mundo(pontoNaArma());
+        glm::vec3 dir = randDir(r);
+        const int segs = 4 + int(r.f() * 3.f);
+        const float vida = r.range(0.08f, 0.14f);
+        for (int k = 0; k < segs; ++k) {
+            glm::vec3 d = glm::normalize(dir + randDir(r) * 0.9f);
+            float len = r.range(0.02f, 0.04f);
+            glm::vec3 p1 = p0 + d * len;
+            ParticleSpawn s;
+            const float v = 0.02f, tam = 0.005f;
+            s.pos = (p0 + p1) * 0.5f; s.vel = d * v;
+            s.stretch = std::max(0.f, (len * 0.5f - tam) / v);
+            s.life = vida; s.size0 = s.size1 = tam;
+            s.color0 = glm::vec4(quente * 3.5f, 1.f); s.color1 = glm::vec4(cor * 2.f, 0.f);
+            s.shape = PS_Spark;
+            ps.emit(s);
+            p0 = p1;
+        }
+    }
+    return {mundo((a + b) * 0.5f), cor, 1.6f, 2.5f};
+}
+
 FxLight fxMuzzleFlash(ParticleSystem& ps, Rng& r, glm::vec3 pos, glm::vec3 dir) {
     ParticleSpawn f;
     f.pos = pos + dir * 0.05f; f.life = 0.05f; f.size0 = 0.22f; f.size1 = 0.12f;

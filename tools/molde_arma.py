@@ -44,11 +44,55 @@ def ler_glb(p):
         raw = np.frombuffer(binario, dtype=np.uint8, count=st * (n - 1) + np.dtype(tipo).itemsize * comp, offset=o)
         return np.lib.stride_tricks.as_strided(raw.view(tipo), shape=(n, comp), strides=(st, np.dtype(tipo).itemsize)).copy()
 
-    prim = js['meshes'][0]['primitives'][0]
-    pos = acc(prim['attributes']['POSITION'])
-    uv = acc(prim['attributes']['TEXCOORD_0'])
-    idx = acc(prim['indices']).reshape(-1, 3).astype(np.int64)
-    mat = js['materials'][prim['material']]
+    # todas as malhas da cena, com as transformações dos nós (algumas armas vêm em várias peças e giradas na raiz);
+    # só as partes com o material principal (o da textura que a skin troca)
+    def mat_no(n):
+        if 'matrix' in n:
+            return np.array(n['matrix'], float).reshape(4, 4).T
+        m = np.eye(4)
+        if 'scale' in n:
+            m = np.diag(list(n['scale']) + [1.0]) @ m
+        if 'rotation' in n:
+            x, y, z, w = n['rotation']
+            r = np.array([[1 - 2 * (y * y + z * z), 2 * (x * y - z * w), 2 * (x * z + y * w)],
+                          [2 * (x * y + z * w), 1 - 2 * (x * x + z * z), 2 * (y * z - x * w)],
+                          [2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 * (x * x + y * y)]])
+            rm = np.eye(4)
+            rm[:3, :3] = r
+            m = rm @ m
+        if 'translation' in n:
+            t = np.eye(4)
+            t[:3, 3] = n['translation']
+            m = t @ m
+        return m
+
+    P, U, I, mat_principal = [], [], [], None
+    base = 0
+
+    def visita(ni, pai):
+        nonlocal base, mat_principal
+        n = js['nodes'][ni]
+        m = pai @ mat_no(n)
+        if 'mesh' in n:
+            for prim in js['meshes'][n['mesh']]['primitives']:
+                if mat_principal is None:
+                    mat_principal = prim.get('material', 0)
+                if prim.get('material', 0) != mat_principal:
+                    continue
+                pp = acc(prim['attributes']['POSITION']).astype(float)
+                pp = (np.c_[pp, np.ones(len(pp))] @ m.T)[:, :3]
+                P.append(pp)
+                U.append(acc(prim['attributes']['TEXCOORD_0']))
+                I.append(acc(prim['indices']).reshape(-1, 3).astype(np.int64) + base)
+                base += len(pp)
+        for c in n.get('children', []):
+            visita(c, m)
+
+    cena = js.get('scenes', [{'nodes': [0]}])[js.get('scene', 0)]
+    for r in cena['nodes']:
+        visita(r, np.eye(4))
+    pos, uv, idx = np.concatenate(P), np.concatenate(U), np.concatenate(I)
+    mat = js['materials'][mat_principal]
     ti = mat['pbrMetallicRoughness']['baseColorTexture']['index']
     img = js['images'][js['textures'][ti]['source']]
     bv = js['bufferViews'][img['bufferView']]

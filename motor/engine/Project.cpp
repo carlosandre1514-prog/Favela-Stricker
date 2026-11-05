@@ -199,7 +199,7 @@ int charIndexOf(Engine* e, GameObject* root) {
 
 // Raios da skin (FX_Raios) presos na arma: do cabo (origem da arma do kit) até a boca do cano (+z), pelo meio da
 // altura. As medidas saem das peças da arma no espaço dela.
-void anexarRaios(Engine* e, GameObject& g, glm::vec3 cor) {
+void anexarRaios(Engine* e, GameObject& g, glm::vec3 cor, int estilo) {
     AABB b{glm::vec3(1e30f), glm::vec3(-1e30f)};
     bool algum = false;
     Scene::forEachInSubtree(g, [&](GameObject& o) {
@@ -225,6 +225,14 @@ void anexarRaios(Engine* e, GameObject& g, glm::vec3 cor) {
     em.kind = FX_Raios;
     em.customColor = true;
     em.color = cor;
+    em.estilo = estilo;
+    if (estilo == 1) {  // aura: a arma toda, da soleira da coronha à boca do cano, pelo meio da altura
+        const float y = b.min.y + (b.max.y - b.min.y) * 0.6f;
+        em.a = glm::vec3((b.min.x + b.max.x) * 0.5f, y, b.min.z);
+        em.b = glm::vec3((b.min.x + b.max.x) * 0.5f, y, b.max.z);
+        em.raio = std::max(0.02f, (b.max.y - b.min.y) * 0.3f);
+        return;
+    }
     const float y = b.min.y + (b.max.y - b.min.y) * 0.76f;  // altura do cano
     em.a = glm::vec3((b.min.x + b.max.x) * 0.5f, y, std::max(b.min.z, -0.04f));
     em.b = glm::vec3((b.min.x + b.max.x) * 0.5f, y, b.max.z);
@@ -276,6 +284,7 @@ void applyMaterialTo(Engine* e, GameObject& g, bool subtree, const json& spec) {
         float forcaEmi = 1.f;
         glm::vec4 aura(0.f);
         glm::vec3 raios(-1.f);
+        int estiloRaios = 0;
         if (existe(base + "_efeito.json")) {
             std::ifstream in(base + "_efeito.json");
             json ef = json::parse(in, nullptr, false);
@@ -285,6 +294,10 @@ void applyMaterialTo(Engine* e, GameObject& g, bool subtree, const json& spec) {
                     for (int k = 0; k < 4; ++k) aura[k] = ef["aura"][k].is_number() ? ef["aura"][k].get<float>() : 0.f;
                 if (ef.contains("raios") && ef["raios"].is_array() && ef["raios"].size() == 3)
                     for (int k = 0; k < 3; ++k) raios[k] = ef["raios"][k].is_number() ? ef["raios"][k].get<float>() : 0.f;
+                if (ef.contains("aura_particulas") && ef["aura_particulas"].is_array() && ef["aura_particulas"].size() == 3) {
+                    for (int k = 0; k < 3; ++k) raios[k] = ef["aura_particulas"][k].is_number() ? ef["aura_particulas"][k].get<float>() : 0.f;
+                    estiloRaios = 1;
+                }
             }
         }
         if (tex) {
@@ -316,7 +329,7 @@ void applyMaterialTo(Engine* e, GameObject& g, bool subtree, const json& spec) {
                 remap.push_back({mr.material, id});
                 mr.material = id;
             });
-            if (raios.x >= 0.f) anexarRaios(e, g, raios);
+            if (raios.x >= 0.f) anexarRaios(e, g, raios, estiloRaios);
         } else {
             e->lastError = "não consegui ler a imagem " + it->get<std::string>();
         }

@@ -1827,7 +1827,10 @@ void updateEffects(Engine* e, float dt) {
             if (glm::length(vel) > 15.f) vel = glm::vec3(0.f);  // renasceu/teleportou: não é movimento
             em.ultimo = agora;
             em.temUltimo = true;
-            fxRaios(e->particles, e->fxRng, o->transform.world(), em.a, em.b, em.raio, em.color, dt, em.accum, em.accum2, em.accum3, vel);
+            if (em.estilo == 1)
+                fxAuraArma(e->particles, e->fxRng, o->transform.world(), em.a, em.b, em.raio, em.color, dt, em.accum, em.accum2, em.accum3, em.accum4, vel);
+            else
+                fxRaios(e->particles, e->fxRng, o->transform.world(), em.a, em.b, em.raio, em.color, dt, em.accum, em.accum2, em.accum3, vel);
             return;
         }
         glm::vec3 pos = o->transform.worldPosition();
