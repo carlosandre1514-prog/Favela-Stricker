@@ -485,10 +485,10 @@ FxLight fxDisparoSkin(ParticleSystem& ps, Rng& r, glm::vec3 pos, glm::vec3 dir, 
     for (int i = 0; i < 22; ++i) {  // jato principal
         ParticleSpawn p;
         p.pos = pos + dir * r.range(0.f, 0.05f);
-        p.vel = glm::normalize(dir + randDir(r) * 0.18f) * r.range(1.6f, 3.8f);
+        p.vel = glm::normalize(dir + randDir(r) * 0.18f) * r.range(1.2f, 3.f);
         p.life = r.range(0.1f, 0.2f); p.size0 = r.range(0.035f, 0.05f); p.size1 = r.range(0.1f, 0.15f);
         p.color0 = glm::vec4(glm::mix(quente, cor, r.range(0.6f, 0.95f)) * 1.5f, 0.9f); p.color1 = glm::vec4(cor * 0.6f, 0.f);
-        p.shape = PS_Flame; p.stretch = 0.035f; p.drag = 9.f; p.gravity = -1.f; p.occlusion = 0.25f;
+        p.shape = PS_Flame; p.stretch = 0.045f; p.drag = 12.f; p.gravity = -1.f; p.occlusion = 0.25f;
         ps.emit(p);
     }
     for (int i = 0; i < 12; ++i) {  // labaredas de fora: mais abertas, lentas e escuras
