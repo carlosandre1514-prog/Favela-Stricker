@@ -129,12 +129,21 @@ def main():
         def suave(a, b, x):
             k = np.clip((x - a) / (b - a), 0, 1)
             return k * k * (3 - 2 * k)
-        # o que acende: a cor forte da pintura ("cor": "azul" ou "vermelho"; o dourado não entra)
-        ch = {'vermelho': 0, 'verde': 1, 'azul': 2}[brilho.get('cor', 'azul')]
-        outros = [k for k in range(3) if k != ch]
-        azul = out[..., ch] - np.maximum(out[..., outros[0]], out[..., outros[1]])
+        # o que acende: as cores fortes da pintura ("cor": "azul", "vermelho" ou uma lista, ex.: ["azul", "dourado"])
+        cores = brilho.get('cor', 'azul')
+        cores = [cores] if isinstance(cores, str) else cores
         am = brilho.get('azul_min', 35)
-        mask = suave(am, am + 60, azul) * suave(70, 170, out[..., ch])
+        mask = np.zeros(out.shape[:2])
+        for nome in cores:
+            if nome == 'dourado':  # vermelho e verde altos, azul baixo
+                forca = np.minimum(out[..., 0], out[..., 1]) - out[..., 2]
+                m = suave(45, 105, forca) * suave(120, 200, out[..., 0])
+            else:
+                ch = {'vermelho': 0, 'verde': 1, 'azul': 2}[nome]
+                outros = [k for k in range(3) if k != ch]
+                forca = out[..., ch] - np.maximum(out[..., outros[0]], out[..., outros[1]])
+                m = suave(am, am + 60, forca) * suave(70, 170, out[..., ch])
+            mask = np.maximum(mask, m)
         emi = out * mask[..., None]
         base = os.path.splitext(saida)[0]
         Image.fromarray(np.clip(emi, 0, 255).astype(np.uint8)).save(base + '_emi.jpg', quality=88)

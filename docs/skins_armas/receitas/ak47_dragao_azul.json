@@ -152,10 +152,9 @@
    1.1
   ],
   "azul_min": 35,
-  "aura_raios": [
-   0.18,
-   0.5,
-   1.0
+  "cor": [
+   "azul",
+   "dourado"
   ]
  }
 }
