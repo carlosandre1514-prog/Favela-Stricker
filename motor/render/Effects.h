@@ -23,7 +23,7 @@ FxPalette fxPalette(int element);
 FxPalette fxPaletteFromColor(glm::vec3 color);  // cor livre escolhida pelo usuário
 
 // Efeitos contínuos que podem virar objeto na cena
-enum FxKind { FX_Fire, FX_Torch, FX_Smoke, FX_Sparks, FX_Aura, FX_Portal, FX_Explosion, FX_Orb, FX_Pillar, FX_Count };
+enum FxKind { FX_Fire, FX_Torch, FX_Smoke, FX_Sparks, FX_Aura, FX_Portal, FX_Explosion, FX_Orb, FX_Pillar, FX_Raios, FX_Count };
 const char* fxName(int k);
 
 // Componente: emissor preso a um GameObject
@@ -34,6 +34,12 @@ struct Emitter {
     glm::vec3 color{1.f};
     float scale = 1.f;
     float accum = 0.f, timer = 0.f;
+    float accum2 = 0.f, accum3 = 0.f;
+    // FX_Raios (skin de arma): raios e faíscas ao longo do segmento a -> b (espaço do objeto), a até "raio" dele
+    glm::vec3 a{0.f}, b{0.f};
+    float raio = 0.03f;
+    glm::vec3 ultimo{0.f};   // posição no frame anterior (as partículas acompanham a arma quando ela anda)
+    bool temUltimo = false;
     GameObject* owner = nullptr;
     FxPalette palette() const { return customColor ? fxPaletteFromColor(color) : fxPalette(element); }
 };
@@ -47,6 +53,9 @@ FxLight fxContinuous(ParticleSystem& ps, Rng& r, int kind, const FxPalette& pal,
 
 // Efeitos instantâneos
 FxLight fxExplosion(ParticleSystem& ps, Rng& r, const FxPalette& pal, glm::vec3 pos, float scale);
+// Raios elétricos saindo de um objeto (skin de arma): faíscas, brilhos e arcos em zigue-zague ao longo de a -> b
+FxLight fxRaios(ParticleSystem& ps, Rng& r, const glm::mat4& world, glm::vec3 a, glm::vec3 b, float raio, glm::vec3 cor, float dt,
+                float& accFaisca, float& accBrilho, float& accArco, glm::vec3 velArma = glm::vec3(0.f));
 FxLight fxMuzzleFlash(ParticleSystem& ps, Rng& r, glm::vec3 pos, glm::vec3 dir);
 void fxBullet(ParticleSystem& ps, glm::vec3 from, glm::vec3 to);
 void fxImpact(ParticleSystem& ps, Rng& r, glm::vec3 pos, glm::vec3 dir);

@@ -1820,6 +1820,16 @@ void updateEffects(Engine* e, float dt) {
     e->emitters.forEach([&](Emitter& em, EmitterPool::Handle) {
         GameObject* o = em.owner;
         if (!o || !o->active) return;
+        if (em.kind == FX_Raios) {
+            em.timer += dt;
+            const glm::vec3 agora = o->transform.worldPosition();
+            glm::vec3 vel = em.temUltimo && dt > 1e-4f ? (agora - em.ultimo) / dt : glm::vec3(0.f);
+            if (glm::length(vel) > 15.f) vel = glm::vec3(0.f);  // renasceu/teleportou: não é movimento
+            em.ultimo = agora;
+            em.temUltimo = true;
+            fxRaios(e->particles, e->fxRng, o->transform.world(), em.a, em.b, em.raio, em.color, dt, em.accum, em.accum2, em.accum3, vel);
+            return;
+        }
         glm::vec3 pos = o->transform.worldPosition();
         float s = std::max(0.1f, o->transform.scale.x);
         FxLight l = fxContinuous(e->particles, e->fxRng, em.kind, em.palette(), pos, s, dt, em.accum, em.timer);
@@ -1866,6 +1876,11 @@ int gatherLights(Engine* e, PointLight* out, int max) {
     e->emitters.forEach([&](Emitter& em, EmitterPool::Handle) {
         GameObject* o = em.owner;
         if (!o || !o->active || em.kind == FX_Smoke || em.kind == FX_Explosion) return;
+        if (em.kind == FX_Raios) {  // luz azul fraca no meio da arma, piscando como eletricidade
+            const float pisca = 0.65f + 0.35f * std::sin(em.timer * 31.f) * std::sin(em.timer * 11.7f);
+            push({glm::vec3(o->transform.world() * glm::vec4((em.a + em.b) * 0.5f, 1.f)), em.color, 1.4f * pisca, 2.5f});
+            return;
+        }
         float s = std::max(0.1f, o->transform.scale.x);
         float flick = 0.85f + 0.3f * std::sin(em.timer * 23.f) * std::sin(em.timer * 7.3f);
         float inten = (em.kind == FX_Torch ? 2.5f : em.kind == FX_Sparks ? 3.f : 6.f) * s * flick;

@@ -197,6 +197,40 @@ int charIndexOf(Engine* e, GameObject* root) {
     return -1;
 }
 
+// Raios da skin (FX_Raios) presos na arma: do cabo (origem da arma do kit) até a boca do cano (+z), pelo meio da
+// altura. As medidas saem das peças da arma no espaço dela.
+void anexarRaios(Engine* e, GameObject& g, glm::vec3 cor) {
+    AABB b{glm::vec3(1e30f), glm::vec3(-1e30f)};
+    bool algum = false;
+    Scene::forEachInSubtree(g, [&](GameObject& o) {
+        if (!o.meshRenderer || &o == &g) return;
+        const Mesh* m = e->renderer.mesh(o.meshRenderer->mesh);
+        if (!m) return;
+        glm::mat4 rel = o.transform.local();
+        for (Transform3D* p = o.transform.parent; p && p != &g.transform; p = p->parent) rel = p->local() * rel;
+        AABB t = transformAABB(m->bounds, rel);
+        b.min = glm::min(b.min, t.min);
+        b.max = glm::max(b.max, t.max);
+        algum = true;
+    });
+    if (!algum) return;
+    if (!g.emitter) {
+        auto eh = e->emitters.acquire();
+        Emitter* em = e->emitters.get(eh);
+        if (!em) return;
+        em->owner = &g;
+        g.emitter = em;
+    }
+    Emitter& em = *g.emitter;
+    em.kind = FX_Raios;
+    em.customColor = true;
+    em.color = cor;
+    const float y = b.min.y + (b.max.y - b.min.y) * 0.76f;  // altura do cano
+    em.a = glm::vec3((b.min.x + b.max.x) * 0.5f, y, std::max(b.min.z, -0.04f));
+    em.b = glm::vec3((b.min.x + b.max.x) * 0.5f, y, b.max.z);
+    em.raio = std::max(0.012f, (b.max.y - b.min.y) * 0.22f);
+}
+
 void applyMaterialTo(Engine* e, GameObject& g, bool subtree, const json& spec) {
     auto each = [&](auto&& f) {
         if (subtree) Scene::forEachInSubtree(g, [&](GameObject& o) { if (o.meshRenderer) f(*o.meshRenderer); });
@@ -241,6 +275,7 @@ void applyMaterialTo(Engine* e, GameObject& g, bool subtree, const json& spec) {
         if (existe(base + "_emi.jpg")) emi = carregar(base + "_emi.jpg", true);
         float forcaEmi = 1.f;
         glm::vec4 aura(0.f);
+        glm::vec3 raios(-1.f);
         if (existe(base + "_efeito.json")) {
             std::ifstream in(base + "_efeito.json");
             json ef = json::parse(in, nullptr, false);
@@ -248,6 +283,8 @@ void applyMaterialTo(Engine* e, GameObject& g, bool subtree, const json& spec) {
                 if (ef.contains("emissivo") && ef["emissivo"].is_number()) forcaEmi = ef["emissivo"].get<float>();
                 if (ef.contains("aura") && ef["aura"].is_array() && ef["aura"].size() == 4)
                     for (int k = 0; k < 4; ++k) aura[k] = ef["aura"][k].is_number() ? ef["aura"][k].get<float>() : 0.f;
+                if (ef.contains("raios") && ef["raios"].is_array() && ef["raios"].size() == 3)
+                    for (int k = 0; k < 3; ++k) raios[k] = ef["raios"][k].is_number() ? ef["raios"][k].get<float>() : 0.f;
             }
         }
         if (tex) {
@@ -279,6 +316,7 @@ void applyMaterialTo(Engine* e, GameObject& g, bool subtree, const json& spec) {
                 remap.push_back({mr.material, id});
                 mr.material = id;
             });
+            if (raios.x >= 0.f) anexarRaios(e, g, raios);
         } else {
             e->lastError = "não consegui ler a imagem " + it->get<std::string>();
         }

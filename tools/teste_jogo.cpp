@@ -457,6 +457,7 @@ int main(int argc, char** argv) {
         frames(e, 3);
         save(out, "previa_fundo.png");
         engine_set_quality(e, 3);
+        if (std::getenv("HORA")) engine_set_time_of_day(e, std::atof(std::getenv("HORA")));  // ex.: HORA=22 (efeito à noite)
         std::string l = lista;
         size_t a = 0;
         while (a < l.size()) {
@@ -480,7 +481,7 @@ int main(int argc, char** argv) {
                 const float cams[4][3] = {{-1.5708f - 0.18f, 0.12f, d}, {0.7f, 0.55f, d * 0.95f}, {2.4f, 0.35f, d * 0.95f}, {1.5708f + 0.4f, 0.2f, d * 0.55f}};
                 for (int k = 0; k < 4; ++k) {
                     engine_set_camera(e, k == 3 ? -0.15f : 0.f, 1.02f, 0.f, cams[k][0], cams[k][1], cams[k][2]);
-                    frames(e, 3);
+                    frames(e, 20);  // (efeitos de partícula da skin, como os raios, já aparecem)
                     save(out, ("angulo" + std::to_string(k) + "_" + g + (sk.empty() ? "" : "_" + sk) + ".png").c_str());
                 }
             }

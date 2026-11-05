@@ -10,7 +10,7 @@ const char* elementName(int e) {
 }
 
 const char* fxName(int k) {
-    static const char* n[] = {"Fogueira", "Tocha", "Fumaca", "Faiscas", "Aura magica", "Portal", "Explosao", "Orbe magico", "Coluna de luz"};
+    static const char* n[] = {"Fogueira", "Tocha", "Fumaca", "Faiscas", "Aura magica", "Portal", "Explosao", "Orbe magico", "Coluna de luz", "Raios"};
     return k >= 0 && k < FX_Count ? n[k] : "Efeito";
 }
 
@@ -244,6 +244,59 @@ FxLight fxExplosion(ParticleSystem& ps, Rng& r, const FxPalette& pal, glm::vec3 
     flash.color0 = glm::vec4(pal.core * 1.5f, 1.f); flash.color1 = glm::vec4(pal.glow, 0.f); flash.shape = PS_Star;
     ps.emit(flash);
     return {pos, pal.light, 40.f * s, 14.f * s};
+}
+
+FxLight fxRaios(ParticleSystem& ps, Rng& r, const glm::mat4& world, glm::vec3 a, glm::vec3 b, float raio, glm::vec3 cor, float dt,
+                float& accFaisca, float& accBrilho, float& accArco, glm::vec3 velArma) {
+    auto mundo = [&](glm::vec3 p) { return glm::vec3(world * glm::vec4(p, 1.f)); };
+    auto pontoNaArma = [&]() {
+        glm::vec3 p = glm::mix(a, b, r.f());
+        return p + glm::vec3(r.range(-1.f, 1.f), r.range(-1.f, 1.f), 0.f) * raio;
+    };
+    const glm::vec3 branco = glm::mix(cor, glm::vec3(1.f), 0.4f);
+    // faíscas pequenas que pulam da arma
+    for (int n = count(accFaisca, 70.f, dt); n > 0; --n) {
+        ParticleSpawn p;
+        p.pos = mundo(pontoNaArma());
+        p.vel = randDir(r) * r.range(0.3f, 0.9f) + velArma;
+        p.life = r.range(0.15f, 0.35f); p.size0 = 0.011f; p.size1 = 0.005f;
+        p.color0 = glm::vec4(branco * 3.f, 1.f); p.color1 = glm::vec4(cor * 2.f, 0.f);
+        p.shape = PS_Spark; p.stretch = 0.035f; p.drag = 1.2f;
+        ps.emit(p);
+    }
+    // brilho azul em volta (névoa de luz)
+    for (int n = count(accBrilho, 26.f, dt); n > 0; --n) {
+        ParticleSpawn p;
+        p.pos = mundo(pontoNaArma());
+        p.vel = randDir(r) * 0.08f + velArma;
+        p.life = r.range(0.2f, 0.4f); p.size0 = r.range(0.04f, 0.07f); p.size1 = 0.015f;
+        p.color0 = glm::vec4(cor * 1.3f, 0.7f); p.color1 = glm::vec4(cor * 0.8f, 0.f);
+        p.shape = PS_Glow;
+        ps.emit(p);
+    }
+    // arcos: zigue-zague curto saindo da superfície (cada pedaço é uma faísca esticada, quase parada)
+    for (int n = count(accArco, 14.f, dt); n > 0; --n) {
+        glm::vec3 p0 = mundo(pontoNaArma());
+        glm::vec3 dir = randDir(r);
+        const int segs = 5 + int(r.f() * 4.f);
+        const float vida = r.range(0.1f, 0.18f);
+        for (int k = 0; k < segs; ++k) {
+            glm::vec3 d = glm::normalize(dir + randDir(r) * 0.9f);
+            float len = r.range(0.025f, 0.05f);
+            glm::vec3 p1 = p0 + d * len;
+            ParticleSpawn s;
+            const float v = 0.02f, tam = 0.006f;
+            s.pos = (p0 + p1) * 0.5f; s.vel = d * v;
+            s.stretch = std::max(0.f, (len * 0.5f - tam) / v);
+            s.life = vida; s.size0 = s.size1 = tam;
+            s.color0 = glm::vec4(branco * 4.f, 1.f); s.color1 = glm::vec4(cor * 2.5f, 0.f);
+            s.shape = PS_Spark;
+            ps.emit(s);
+            p0 = p1;
+        }
+    }
+    float flick = 0.7f + 0.3f * std::sin(accArco * 40.f);
+    return {mundo((a + b) * 0.5f), cor, 1.6f * flick, 2.5f};
 }
 
 FxLight fxMuzzleFlash(ParticleSystem& ps, Rng& r, glm::vec3 pos, glm::vec3 dir) {
