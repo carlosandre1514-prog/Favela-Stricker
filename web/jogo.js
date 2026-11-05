@@ -215,7 +215,7 @@ function telaRoupa(time, pronto) {
 async function comprarComMoedas(nome, preco, id) {
   const tem = conta.moedas;
   if (tem < preco) {
-    const ir = await janela('Moedas insuficientes', `${nome} custa ${fmt(preco)} moedas e você tem ${fmt(tem)}. Faltam ${fmt(preco - tem)}.\nGanhe jogando (abates e vitórias dão moedas) ou veja a loja de moedas.`,
+    const ir = await janela('Moedas insuficientes', `${nome} custa ${fmt(preco)} moedas e você tem ${fmt(tem)}. Faltam ${fmt(preco - tem)}.\nCompre moedas na loja de moedas.`,
       [{ texto: 'Agora não', classe: 'btn-fraco', valor: false }, { texto: 'Loja de moedas', classe: 'btn-ouro', valor: true }]);
     if (ir) telaMoedas();
     return false;
@@ -494,10 +494,8 @@ function fimDePartida(j) {
   const sc = j.placar || [0, 0];
   const venceu = sc[0] > sc[1] ? 0 : sc[1] > sc[0] ? 1 : -1;
   const time = partida ? partida.time : 0;
-  const ganho = (j.abates | 0) * 25 + (venceu === time ? 150 : venceu < 0 ? 80 : 50);
   const s = partida && partida.sala;
   pararPartida();
-  conta.moedas = conta.moedas + ganho;
   const xpAbates = (j.abates | 0) * XP_ABATE, xpResultado = venceu === time ? XP_VITORIA : venceu < 0 ? XP_EMPATE : XP_DERROTA;
   const xp = conta.ganharXp(xpAbates + xpResultado);
   const subiu = xp.depois.nivel > xp.antes.nivel;
@@ -515,8 +513,7 @@ function fimDePartida(j) {
     <div class="linha" style="align-items:flex-start">
       <div class="coluna cresce" style="gap:6px"><span style="font-size:12px;font-weight:800;letter-spacing:2px;color:${corV}">${venceu < 0 ? 'FIM DE JOGO' : 'VITÓRIA DA'}</span>
         <span class="bebas" style="font-size:46px;line-height:.92;color:${corV}">${venceu < 0 ? 'EMPATE' : venceu === 0 ? 'POLÍCIA' : 'BANDIDOS'}</span></div>
-      <div class="coluna" style="align-items:flex-end;gap:4px"><div class="cartao linha" style="padding:8px 18px;gap:14px"><span class="bebas" style="font-size:46px;color:#60A5FA">${sc[0]}</span><span class="dica">x</span><span class="bebas ouro" style="font-size:46px">${sc[1]}</span></div>
-        <span class="linha" style="gap:6px;font-size:13px;font-weight:800;color:#FCD34D">${ICONE.moeda(13)} +${fmt(ganho)} moedas</span></div>
+      <div class="coluna" style="align-items:flex-end;gap:4px"><div class="cartao linha" style="padding:8px 18px;gap:14px"><span class="bebas" style="font-size:46px;color:#60A5FA">${sc[0]}</span><span class="dica">x</span><span class="bebas ouro" style="font-size:46px">${sc[1]}</span></div></div>
     </div>
     <div class="cartao linha fim-xp">
       <span class="insignia">${insignia(xp.depois.patente, 34)}</span>

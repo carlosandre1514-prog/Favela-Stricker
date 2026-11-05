@@ -31,7 +31,7 @@ async function lojaAoEntrar() {
 async function comprarNoSite(i) {
   if (!fb || fb.anonimo) return janela('Entre na sua conta', 'Para comprar moedas, entre com e-mail e senha (convidado não pode comprar).');
   if (!lojaPronta) await lojaAoEntrar();
-  if (!lojaPronta) return janela('Loja em configuração', 'A compra de moedas pelo site ainda está sendo ligada. Por enquanto, ganhe moedas jogando: cada abate dá 25 e a vitória dá 150.');
+  if (!lojaPronta) return janela('Loja em configuração', 'A compra de moedas pelo site ainda está sendo ligada. Tente de novo daqui a pouco.');
   const url = `${LOJA.site}/jogo/${LOJA.jogo}?id=${encodeURIComponent(fb.uid)}&sku=${SKU_PACOTES[i]}`;
   if (window.Nativo && Nativo.abrirLink) Nativo.abrirLink(url); else window.open(url, '_blank');
   janela('Pagamento aberto no navegador', 'Pague o Pix no site e volte ao jogo: as moedas entram sozinhas em alguns segundos.');

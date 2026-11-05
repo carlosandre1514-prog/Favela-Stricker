@@ -40,6 +40,7 @@ const armaInicial = (time) => (time === 0 ? 'm4a1' : 'ak47');
 
 // Skins de arma (mercado, com moedas): só mudam a pintura, não o dano
 const SKINS_ARMA = [
+  { arma: 'ak47', key: 'dragao_azul', nome: 'AK-47 Dragão Azul', raridade: 'lendaria', preco: 1800 },
   { arma: 'ak47', key: 'dourada', nome: 'AK-47 Dourada', raridade: 'lendaria', preco: 1499 },
   { arma: 'm4colt', key: 'dourada', nome: 'M4 Colt Dourada', raridade: 'lendaria', preco: 1499 },
   { arma: 'tt33', key: 'gold_relic', nome: 'TT-33 Gold Relic', raridade: 'lendaria', preco: 1499 },
@@ -141,8 +142,8 @@ const config = Object.assign({}, CONFIG_PADRAO, guardado.get('config', {}));
 function salvarConfig() { guardado.set('config', config); }
 
 // ---------------- moedas e itens ----------------
-// Jogador novo começa com 500 moedas (dá para a skin mais barata da loja, de 199)
-const MOEDAS_INICIAIS = 500;
+// Moedas só entram compradas na loja (site): ninguém ganha moedas de graça, nem ao criar a conta nem jogando
+const MOEDAS_INICIAIS = 0;
 const conta = {
   get moedas() { return guardado.get('moedas', MOEDAS_INICIAIS); },
   set moedas(v) { guardado.set('moedas', Math.max(0, Math.round(v))); salvarConta(); },
@@ -260,7 +261,7 @@ async function carregarConta() {
   try {
     const r = await fb.get('usuarios/' + fb.uid);
     if (!r.ok) return;
-    if (!r.dado) {  // conta nova: começa do zero (500 moedas, sem itens, sem XP), mesmo num aparelho que já tinha outra conta
+    if (!r.dado) {  // conta nova: começa do zero (sem moedas, sem itens, sem XP), mesmo num aparelho que já tinha outra conta
       guardado.set('moedas', MOEDAS_INICIAIS);
       guardado.set('itens', []);
       guardado.set('xp', 0);
