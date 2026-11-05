@@ -76,6 +76,7 @@ int ParticleSystem::draw(const Camera& cam) {
             g.velStretch = glm::vec4(p.vel, p.stretch);
             g.misc = glm::vec4(p.rot, float(p.shape), p.seed, 0.f);
         }
+    if (n == 0) return 0;  // nada vivo (tudo apagou neste quadro)
     glm::mat3 r = glm::mat3_cast(cam.rotation);
     glm::vec3 right = r[0], up = r[1];
     glUseProgram(prog_);
@@ -83,8 +84,8 @@ int ParticleSystem::draw(const Camera& cam) {
     glUniform3fv(uUp_, 1, &up[0]);
     glBindVertexArray(vao_);
     glBindBuffer(GL_ARRAY_BUFFER, vbo_);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(GpuInstance) * kMax, nullptr, GL_STREAM_DRAW);  // orphaning
-    glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(GpuInstance) * n, gpu_);
+    // só o que está vivo neste quadro (antes reservava as 6 mil vagas, ~384 KB, a cada quadro)
+    glBufferData(GL_ARRAY_BUFFER, sizeof(GpuInstance) * n, gpu_, GL_STREAM_DRAW);
     glEnable(GL_BLEND);
     glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
     glDepthMask(GL_FALSE);

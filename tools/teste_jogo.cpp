@@ -121,6 +121,17 @@ int main(int argc, char** argv) {
         frames(e, 60);
         std::printf("  hora no começo da partida: %.2f h\n", engine_get_time_of_day(e));
         save(out, ("skin_fp_" + arma + ".png").c_str());
+        if (std::getenv("PERFIL")) {  // tempo de CPU por quadro na partida (média de 300 quadros, correndo)
+            double w = 0, sb = 0, rd = 0;
+            const int nq = std::max(1, std::atoi(std::getenv("PERFIL")));
+            for (int k = 0; k < nq; ++k) {
+                engine_player_input(e, std::sin(k * 0.02f), 1.f, 1);
+                frames(e, 1, 1.f / 30.f);
+                float pr[3]; engine_get_profile(e, pr);
+                w += pr[0]; sb += pr[1]; rd += pr[2];
+            }
+            std::printf("  CPU por quadro: mundo %.2f ms · preparar desenho %.2f ms · desenhar %.2f ms\n", w / nq, sb / nq, rd / nq);
+        }
         if (std::getenv("HORAS")) {  // o dia passando: um quadro de 0,5 s por vez
             for (int min = 1; min <= (std::getenv("HORAS") ? std::atoi(std::getenv("HORAS")) : 1); ++min) {
                 for (int k = 0; k < 120; ++k) engine_frame(e, 0.5f);

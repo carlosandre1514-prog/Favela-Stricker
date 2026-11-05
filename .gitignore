@@ -9,3 +9,4 @@ shaders/cache/
 servidor/node_modules/
 /build*/
 __pycache__/
+shaders/qualidade.txt

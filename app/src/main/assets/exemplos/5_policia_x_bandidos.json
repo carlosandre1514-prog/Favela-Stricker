@@ -1,6 +1,6 @@
 {
  "ambiente": {
-  "chuva": "nunca",
+  "chuva": "automatica",
   "ciclo_min": 10.0,
   "exposicao": 1.0,
   "grade": true,

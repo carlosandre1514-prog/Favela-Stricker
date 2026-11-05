@@ -88,7 +88,7 @@ void weatherUpdate(Engine* e, float dt) {
     const float rajada = 1.f + 0.55f * std::sin(e->windClock * 0.7f) + 0.3f * std::sin(e->windClock * 2.3f + 1.f);
     const glm::vec3 wind = glm::vec3(1.6f, 0.f, 0.8f) * rajada * (0.5f + 0.5f * e->rain);
     const float speed = 17.f;
-    int n = int(e->rain * (e->quality == 0 ? 500.f : 1400.f) * dt + e->fxRng.f());
+    int n = int(e->rain * 1400.f * dt + e->fxRng.f());  // 1400 gotas por segundo em todos os gráficos
     // gota mais clara de dia, mais apagada à noite (só reflete o pouco de luz)
     const float luz = 1.f - 0.55f * e->night;
     for (int k = 0; k < n; ++k) {
