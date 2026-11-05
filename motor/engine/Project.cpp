@@ -206,17 +206,35 @@ void applyMaterialTo(Engine* e, GameObject& g, bool subtree, const json& spec) {
         if (m >= 0) each([&](MeshRenderer& mr) { mr.material = e->mats[m]; });
     }
     if (auto it = spec.find("textura"); it != spec.end() && it->is_string()) {
-        int w, h, comp;
-        std::string file = it->get<std::string>();
-        if (file.rfind("kit:", 0) == 0) file = kitPath(e, file.substr(4));  // textura do kit (ex.: skin de arma)
-        // a mesma imagem já enviada (skin de arma a cada renascer) não ocupa memória de novo
         TextureManager& tm = TextureManager::instance();
-        GLuint tex = tm.named(file + "#s");
-        unsigned char* px = tex ? nullptr : stbi_load(file.c_str(), &w, &h, &comp, 4);
-        if (px) {
-            tex = tm.fromPixels(px, w, h, 4, true, tm.modelMax);
-            tm.setNamed(file + "#s", tex);
-            stbi_image_free(px);
+        auto carregar = [&](std::string file, bool srgb) -> GLuint {
+            if (file.rfind("kit:", 0) == 0) file = kitPath(e, file.substr(4));  // textura do kit (ex.: skin de arma)
+            // a mesma imagem já enviada (skin de arma a cada renascer) não ocupa memória de novo
+            const std::string chave = file + (srgb ? "#s" : "#l");
+            GLuint t = tm.named(chave);
+            int w, h, comp;
+            unsigned char* px = t ? nullptr : stbi_load(file.c_str(), &w, &h, &comp, 4);
+            if (px) {
+                t = tm.fromPixels(px, w, h, 4, srgb, tm.modelMax);
+                tm.setNamed(chave, t);
+                stbi_image_free(px);
+            }
+            return t;
+        };
+        GLuint tex = carregar(it->get<std::string>(), true);
+        // metal/brilho por pixel (G = rugosidade, B = metal, como no glTF): partes metálicas e outras foscas na skin
+        // (sozinha: a imagem <nome>_orm.jpg ao lado da textura, se existir)
+        GLuint orm = 0;
+        if (auto o = spec.find("textura_orm"); o != spec.end() && o->is_string()) {
+            orm = carregar(o->get<std::string>(), false);
+        } else {
+            std::string f = it->get<std::string>();
+            if (f.rfind("kit:", 0) == 0) f = kitPath(e, f.substr(4));
+            const size_t ponto = f.rfind('.');
+            if (ponto != std::string::npos) {
+                f = f.substr(0, ponto) + "_orm.jpg";
+                if (FILE* fp = std::fopen(f.c_str(), "rb")) { std::fclose(fp); orm = carregar(f, false); }
+            }
         }
         if (tex) {
             const bool metal = spec.contains("metal") && spec["metal"].is_number();
@@ -230,9 +248,14 @@ void applyMaterialTo(Engine* e, GameObject& g, bool subtree, const json& spec) {
                 copy.albedo = tex;
                 copy.albedoFactor = glm::vec4(1.f);
                 copy.mode = 0;
-                if (metal || rough) copy.orm = TextureManager::instance().white();  // metal/brilho iguais na arma toda
-                if (metal) copy.metallic = spec["metal"].get<float>();
-                if (rough) copy.roughness = spec["rugosidade"].get<float>();
+                if (orm) {
+                    copy.orm = orm;
+                    copy.metallic = copy.roughness = 1.f;
+                } else {
+                    if (metal || rough) copy.orm = TextureManager::instance().white();  // metal/brilho iguais na arma toda
+                    if (metal) copy.metallic = spec["metal"].get<float>();
+                    if (rough) copy.roughness = spec["rugosidade"].get<float>();
+                }
                 MaterialId id = e->renderer.createMaterial(copy);
                 remap.push_back({mr.material, id});
                 mr.material = id;
