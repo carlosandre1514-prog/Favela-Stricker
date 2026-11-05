@@ -415,7 +415,19 @@ function telaConfig(aba = 'sens') {
 
 // ---------------- multiplayer ----------------
 let sala = null;
+// O servidor da partida ao vivo (e do chat de voz) dorme quando ninguém usa e leva até 1 minuto para acordar; se
+// a partida começar com ele dormindo, ela vai pelo Firebase, sem voz. Então ele é acordado já no Multiplayer e
+// mantido acordado enquanto a pessoa está na sala.
+let ultimoToqueServidor = 0;
+function acordarServidor() {
+  if (Date.now() - ultimoToqueServidor < 60000) return;
+  ultimoToqueServidor = Date.now();
+  try { fetch(SERVIDOR + '/saude', { cache: 'no-store', mode: 'no-cors' }).catch(() => {}); } catch (_) {}
+}
+setInterval(() => { const t = telaAtual(); if (t === 'multiplayer' || t === 'sala') acordarServidor(); }, 120000);
+
 function telaMultiplayer() {
+  acordarServidor();
   motor.girarMenu(true);
   const t = mostrar(html(`<div class="tela">
     <div class="linha"><span class="dica" style="font-weight:700">Seu nome:</span><input type="text" id="mp-nome" maxlength="16" style="max-width:260px"></div>
@@ -463,6 +475,7 @@ function ligarSala(s) {
 function sairDaSala() { const s = sala; sala = null; if (s) s.sair().catch(() => {}); }
 
 function telaSala() {
+  acordarServidor();
   const s = sala;
   if (!s) { telaInicio(); return; }
   motor.girarMenu(true);
