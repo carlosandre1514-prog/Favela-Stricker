@@ -300,36 +300,47 @@ FxLight fxRaios(ParticleSystem& ps, Rng& r, const glm::mat4& world, glm::vec3 a,
 }
 
 FxLight fxAuraArma(ParticleSystem& ps, Rng& r, const glm::mat4& world, glm::vec3 a, glm::vec3 b, float raio, glm::vec3 cor, float dt,
-                   float& accFumaca, float& accBrasa, float& accEstalo, float& accHalo, glm::vec3 velArma) {
+                   float& accFumaca, float& accBrasa, float& accEstalo, float& accHalo, float& accNevoa, glm::vec3 velArma) {
     auto mundo = [&](glm::vec3 p) { return glm::vec3(world * glm::vec4(p, 1.f)); };
     // direções da arma no mundo: comprimento (para trás: a aura escorre para a coronha) e "para fora"
     const glm::vec3 atras = glm::normalize(glm::vec3(world * glm::vec4(a - b, 0.f)) + glm::vec3(1e-5f));
-    auto pontoNaArma = [&]() {
+    auto pontoNaArma = [&](float f = 1.f) {
         glm::vec3 p = glm::mix(a, b, r.f());
-        return p + glm::vec3(r.range(-1.f, 1.f), r.range(-1.f, 1.f), 0.f) * raio;
+        return p + glm::vec3(r.range(-1.f, 1.f), r.range(-1.f, 1.f), 0.f) * raio * f;
     };
     const glm::vec3 quente = glm::mix(cor, glm::vec3(1.f, 0.75f, 0.35f), 0.45f);  // brasa: mais amarelada
+    const glm::vec3 nucleo = glm::mix(cor, glm::vec3(1.f), 0.45f);                 // centro: quase branco
+    // núcleo: luz intensa colada na arma (o centro do efeito brilha forte; as camadas de fora são mais fracas)
+    for (int n = count(accHalo, 110.f, dt); n > 0; --n) {
+        ParticleSpawn p;
+        p.pos = mundo(pontoNaArma(0.35f));
+        p.vel = randDir(r) * 0.02f + velArma;
+        p.life = r.range(0.15f, 0.26f); p.size0 = r.range(0.028f, 0.042f); p.size1 = 0.02f;
+        p.color0 = glm::vec4(nucleo * 2.6f, 0.95f); p.color1 = glm::vec4(cor * 1.6f, 0.f);
+        p.shape = PS_Glow; p.occlusion = 0.25f;
+        ps.emit(p);
+    }
     // fumaça de energia: nuvens que crescem, sobem e escorrem para trás (saturada mesmo de dia: escurece o fundo)
-    for (int n = count(accFumaca, 90.f, dt); n > 0; --n) {
+    for (int n = count(accFumaca, 110.f, dt); n > 0; --n) {
         ParticleSpawn p;
         p.pos = mundo(pontoNaArma());
         glm::vec3 fora = randDir(r);
         p.vel = fora * r.range(0.04f, 0.14f) + atras * r.range(0.12f, 0.32f) + velArma;
         p.life = r.range(0.4f, 0.7f); p.size0 = r.range(0.018f, 0.03f); p.size1 = r.range(0.05f, 0.08f);
-        p.color0 = glm::vec4(cor * 1.7f, 0.6f); p.color1 = glm::vec4(cor * 0.4f, 0.f);
+        p.color0 = glm::vec4(glm::mix(cor, nucleo, 0.35f) * 2.f, 0.7f); p.color1 = glm::vec4(cor * 0.3f, 0.f);
         p.shape = r.chance(0.6f) ? PS_Flame : PS_Glow; p.rot = r.range(0.f, 6.28f); p.rotVel = r.range(-2.5f, 2.5f);
         p.gravity = -0.25f; p.drag = 1.2f; p.occlusion = 0.45f;
         if (p.shape == PS_Flame) p.stretch = 0.12f;  // labaredas esticadas, escorrendo para trás
         ps.emit(p);
     }
-    // brilho colado na arma (névoa contínua em volta)
-    for (int n = count(accHalo, 60.f, dt); n > 0; --n) {
+    // névoa de fora: maior e mais fraca (a borda do efeito)
+    for (int n = count(accNevoa, 45.f, dt); n > 0; --n) {
         ParticleSpawn p;
-        p.pos = mundo(pontoNaArma());
-        p.vel = randDir(r) * 0.03f + velArma;
-        p.life = r.range(0.25f, 0.4f); p.size0 = r.range(0.045f, 0.07f); p.size1 = 0.03f;
-        p.color0 = glm::vec4(cor * 1.3f, 0.5f); p.color1 = glm::vec4(cor * 0.6f, 0.f);
-        p.shape = PS_Glow; p.occlusion = 0.35f;
+        p.pos = mundo(pontoNaArma(1.4f));
+        p.vel = randDir(r) * 0.05f + velArma;
+        p.life = r.range(0.3f, 0.5f); p.size0 = r.range(0.06f, 0.09f); p.size1 = 0.1f;
+        p.color0 = glm::vec4(cor * 0.9f, 0.3f); p.color1 = glm::vec4(cor * 0.4f, 0.f);
+        p.shape = PS_Glow; p.occlusion = 0.3f;
         ps.emit(p);
     }
     // brasas que sobem
@@ -363,7 +374,7 @@ FxLight fxAuraArma(ParticleSystem& ps, Rng& r, const glm::mat4& world, glm::vec3
             p0 = p1;
         }
     }
-    return {mundo((a + b) * 0.5f), cor, 1.6f, 2.5f};
+    return {mundo((a + b) * 0.5f), cor, 2.2f, 2.8f};
 }
 
 FxLight fxMuzzleFlash(ParticleSystem& ps, Rng& r, glm::vec3 pos, glm::vec3 dir) {

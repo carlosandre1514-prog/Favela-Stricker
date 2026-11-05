@@ -34,7 +34,7 @@ struct Emitter {
     glm::vec3 color{1.f};
     float scale = 1.f;
     float accum = 0.f, timer = 0.f;
-    float accum2 = 0.f, accum3 = 0.f, accum4 = 0.f;
+    float accum2 = 0.f, accum3 = 0.f, accum4 = 0.f, accum5 = 0.f;
     // FX_Raios (skin de arma): raios e faíscas ao longo do segmento a -> b (espaço do objeto), a até "raio" dele
     glm::vec3 a{0.f}, b{0.f};
     float raio = 0.03f;
@@ -59,7 +59,7 @@ FxLight fxRaios(ParticleSystem& ps, Rng& r, const glm::mat4& world, glm::vec3 a,
                 float& accFaisca, float& accBrilho, float& accArco, glm::vec3 velArma = glm::vec3(0.f));
 // Aura de energia envolvendo um objeto (skin de arma): fumaça brilhante subindo, brasas e estalos ao longo de a -> b
 FxLight fxAuraArma(ParticleSystem& ps, Rng& r, const glm::mat4& world, glm::vec3 a, glm::vec3 b, float raio, glm::vec3 cor, float dt,
-                   float& accFumaca, float& accBrasa, float& accEstalo, float& accHalo, glm::vec3 velArma = glm::vec3(0.f));
+                   float& accFumaca, float& accBrasa, float& accEstalo, float& accHalo, float& accNevoa, glm::vec3 velArma = glm::vec3(0.f));
 FxLight fxMuzzleFlash(ParticleSystem& ps, Rng& r, glm::vec3 pos, glm::vec3 dir);
 void fxBullet(ParticleSystem& ps, glm::vec3 from, glm::vec3 to);
 void fxImpact(ParticleSystem& ps, Rng& r, glm::vec3 pos, glm::vec3 dir);
