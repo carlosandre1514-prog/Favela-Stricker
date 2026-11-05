@@ -45,23 +45,38 @@ def main():
     receita = json.load(open(receita_p))
     mats = materiais_glb(glb)
     if len(mats) <= 1:
-        pos, uv, idx, tex = ler_glb(glb)
-        projetar(pos, uv, idx, tex, ref, receita, receita['partes'], pos.min(0), pos.max(0), saida, True)
+        pos, uv, idx, tex, nor, orm0 = ler_glb(glb, extra=True)
+        projetar(pos, uv, idx, tex, ref, receita, receita['partes'], pos.min(0), pos.max(0), saida, True, nor, orm0)
         return
     # arma de várias peças (cada uma com a sua textura): a medida é a da arma inteira; a 1ª peça grava <saida>, as
     # outras <saida>_<peça>.jpg (o jogo pinta cada peça com a sua). Partes por peça em "pecas": {"<peça>": {...}}
-    pecas = [(mi, nome.lower(), ler_glb(glb, mi)) for mi, nome in mats]
+    pecas = [(mi, nome.lower(), ler_glb(glb, mi, extra=True)) for mi, nome in mats]
     todos = np.concatenate([d[0] for _, _, d in pecas])
     mn, mx = todos.min(0), todos.max(0)
     raiz_saida = os.path.splitext(saida)[0]
-    for k, (mi, nome, (pos, uv, idx, tex)) in enumerate(pecas):
+    for k, (mi, nome, (pos, uv, idx, tex, nor, orm0)) in enumerate(pecas):
         partes = receita.get('pecas', {}).get(nome, {}).get('partes', receita.get('partes'))
         out = saida if k == 0 else f'{raiz_saida}_{nome}.jpg'
-        projetar(pos, uv, idx, tex, ref, receita, partes, mn, mx, out, k == 0)
+        projetar(pos, uv, idx, tex, ref, receita, partes, mn, mx, out, k == 0, nor, orm0)
 
 
-def projetar(pos, uv, idx, tex, ref, receita, partes, mn, mx, saida, efeito):
+def projetar(pos, uv, idx, tex, ref, receita, partes, mn, mx, saida, efeito, nor=None, orm0=None):
     H, W = ref.shape[:2]
+    # "realismo" (opcional): detalhes da textura original por baixo (gravações, riscos, textura do cabo), metal por
+    # cor (pintura colorida = metal pintado brilhante; escuro = grafite), arranhões do metal original na rugosidade e
+    # faces de cima/baixo (que a foto de lado não mostra) na sombra da cor em vez de faixas esticadas
+    real = receita.get('realismo')
+    if real:
+        from PIL import ImageFilter
+        lum0 = tex.resize((TAM, TAM), Image.LANCZOS).convert('L')
+        borr = np.asarray(lum0.filter(ImageFilter.GaussianBlur(6)), float)
+        detalhe = np.clip((np.asarray(lum0, float) + 8) / (borr + 8), 0.55, 1.5) ** real.get('detalhe', 0.8)
+        if orm0 is not None:
+            g0 = orm0.resize((TAM, TAM), Image.LANCZOS).split()[1]
+            arr = (np.asarray(g0, float) - np.asarray(g0.filter(ImageFilter.GaussianBlur(10)), float)) / 255.0
+        else:
+            arr = np.zeros((TAM, TAM))
+        mc, me = real.get('metal_cor', {'metal': 0.7, 'rugosidade': 0.28}), real.get('metal_escuro', {'metal': 0.9, 'rugosidade': 0.4})
     zonas = receita.get('zonas', {})
     acab = receita.get('acabamento')
     preto = np.array(receita.get('preto_minimo', [0, 0, 0]), float)
@@ -131,12 +146,29 @@ def projetar(pos, uv, idx, tex, ref, receita, partes, mn, mx, saida, efeito):
         cor = np.where(lum < preto.mean(), cor + (preto - lum), cor)
         met = np.full(len(cor), base_m)
         rug = np.full(len(cor), base_r)
+        iy, ix = gy.astype(int), gx.astype(int)
+        if real:
+            mxc, mnc = cor.max(1), cor.min(1)
+            sat = (mxc - mnc) / np.maximum(mxc, 1)
+
+            def sv(a, b, x):
+                k = np.clip((x - a) / (b - a), 0, 1)
+                return k * k * (3 - 2 * k)
+            colorido = sv(0.3, 0.6, sat) * sv(40, 90, mxc)
+            met = me['metal'] + (mc['metal'] - me['metal']) * colorido
+            rug = me['rugosidade'] + (mc['rugosidade'] - me['rugosidade']) * colorido
+            rug = np.clip(rug + arr[iy, ix] * real.get('arranhoes', 0.6), 0.12, 0.9)
+            if nor is not None:  # faces de lado mostram a foto; de cima/baixo ficam na sombra da cor
+                nn = w0[:, None] * nor[tri[0]] + w1[:, None] * nor[tri[1]] + w2[:, None] * nor[tri[2]]
+                lado = np.abs(nn[:, 0]) / np.maximum(np.linalg.norm(nn, axis=1), 1e-6)
+                k = real.get('lados', 0.55)
+                cor = cor * (k + (1 - k) * sv(0.2, 0.65, lado))[:, None]
+            cor = cor * detalhe[iy, ix][:, None]
         for z in zonas.values():
             m = (tt >= z['t'][0]) & (tt <= z['t'][1]) & (yy >= z['y'][0]) & (yy <= z['y'][1])
             cor[m] = z['cor']
             met[m] = z.get('metal', base_m)
             rug[m] = z.get('rugosidade', base_r)
-        iy, ix = gy.astype(int), gx.astype(int)
         out[iy, ix] = cor
         orm[iy, ix, 1] = rug * 255
         orm[iy, ix, 2] = met * 255

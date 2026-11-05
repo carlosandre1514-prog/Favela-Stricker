@@ -25,7 +25,7 @@ PARTES = [('cano', (230, 60, 60)), ('guarda-mão', (245, 160, 40)), ('corpo', (6
           ('carregador', (170, 90, 230)), ('cabo', (60, 200, 110)), ('coronha', (240, 220, 60))]
 
 
-def ler_glb(p, material=None):
+def ler_glb(p, material=None, extra=False):
     """material: índice do material (armas com várias texturas, ex.: corpo, carregador e luneta); None = o primeiro."""
     d = open(p, 'rb').read()
     l = struct.unpack('<I', d[12:16])[0]
@@ -67,7 +67,7 @@ def ler_glb(p, material=None):
             m = t @ m
         return m
 
-    P, U, I, mat_principal = [], [], [], material
+    P, U, I, N, mat_principal = [], [], [], [], material
     base = 0
 
     def visita(ni, pai):
@@ -83,6 +83,11 @@ def ler_glb(p, material=None):
                 pp = acc(prim['attributes']['POSITION']).astype(float)
                 pp = (np.c_[pp, np.ones(len(pp))] @ m.T)[:, :3]
                 P.append(pp)
+                if 'NORMAL' in prim['attributes']:
+                    nn = acc(prim['attributes']['NORMAL']).astype(float) @ m[:3, :3].T
+                    N.append(nn / np.maximum(np.linalg.norm(nn, axis=1, keepdims=True), 1e-9))
+                else:
+                    N.append(np.zeros_like(pp))
                 U.append(acc(prim['attributes']['TEXCOORD_0']))
                 I.append(acc(prim['indices']).reshape(-1, 3).astype(np.int64) + base)
                 base += len(pp)
@@ -98,7 +103,16 @@ def ler_glb(p, material=None):
     img = js['images'][js['textures'][ti]['source']]
     bv = js['bufferViews'][img['bufferView']]
     textura = Image.open(io.BytesIO(binario[bv.get('byteOffset', 0):bv.get('byteOffset', 0) + bv['byteLength']])).convert('RGB')
-    return pos, uv, idx, textura
+    if not extra:
+        return pos, uv, idx, textura
+    # também as normais e o mapa de metal/rugosidade original (G = rugosidade, B = metal), se tiver
+    orm = None
+    mr = mat['pbrMetallicRoughness'].get('metallicRoughnessTexture')
+    if mr:
+        im2 = js['images'][js['textures'][mr['index']]['source']]
+        bv2 = js['bufferViews'][im2['bufferView']]
+        orm = Image.open(io.BytesIO(binario[bv2.get('byteOffset', 0):bv2.get('byteOffset', 0) + bv2['byteLength']])).convert('RGB')
+    return pos, uv, idx, textura, np.concatenate(N), orm
 
 
 def materiais_glb(p):

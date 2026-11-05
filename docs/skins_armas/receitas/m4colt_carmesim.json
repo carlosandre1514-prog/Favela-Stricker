@@ -138,12 +138,12 @@
  "brilho": {
   "cor": "vermelho",
   "emissivo": 1.5,
-  "azul_min": 45,
+  "azul_min": 70,
   "aura": [
    1.0,
    0.12,
    0.06,
-   0.9
+   0.5
   ]
  },
  "zonas": {
@@ -163,6 +163,19 @@
    ],
    "metal": 0.9,
    "rugosidade": 0.3
+  }
+ },
+ "realismo": {
+  "detalhe": 0.85,
+  "lados": 0.55,
+  "arranhoes": 0.6,
+  "metal_cor": {
+   "metal": 0.7,
+   "rugosidade": 0.28
+  },
+  "metal_escuro": {
+   "metal": 0.9,
+   "rugosidade": 0.42
   }
  }
 }
