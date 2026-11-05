@@ -226,7 +226,7 @@ void anexarRaios(Engine* e, GameObject& g, glm::vec3 cor, int estilo) {
     em.customColor = true;
     em.color = cor;
     em.estilo = estilo;
-    if (estilo == 1) {  // aura: a arma toda, da soleira da coronha à boca do cano, pelo meio da altura
+    if (estilo >= 1) {  // aura: a arma toda, da soleira da coronha à boca do cano, pelo meio da altura
         const float y = b.min.y + (b.max.y - b.min.y) * 0.6f;
         em.a = glm::vec3((b.min.x + b.max.x) * 0.5f, y, b.min.z);
         em.b = glm::vec3((b.min.x + b.max.x) * 0.5f, y, b.max.z);
@@ -297,6 +297,10 @@ void applyMaterialTo(Engine* e, GameObject& g, bool subtree, const json& spec) {
                 if (ef.contains("aura_particulas") && ef["aura_particulas"].is_array() && ef["aura_particulas"].size() == 3) {
                     for (int k = 0; k < 3; ++k) raios[k] = ef["aura_particulas"][k].is_number() ? ef["aura_particulas"][k].get<float>() : 0.f;
                     estiloRaios = 1;
+                }
+                if (ef.contains("aura_raios") && ef["aura_raios"].is_array() && ef["aura_raios"].size() == 3) {
+                    for (int k = 0; k < 3; ++k) raios[k] = ef["aura_raios"][k].is_number() ? ef["aura_raios"][k].get<float>() : 0.f;
+                    estiloRaios = 2;
                 }
             }
         }

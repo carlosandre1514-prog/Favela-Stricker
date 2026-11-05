@@ -19,7 +19,7 @@ Com acabamento ou zonas, grava também <saida>_orm.jpg (G = rugosidade, B = meta
   "brilho": {"emissivo": 1.6, "aura": [r, g, b, força], "azul_min": 35}: o azul forte da pintura acende sozinho
      (<saida>_emi.jpg) e as bordas da arma ganham um brilho que pulsa (<saida>_efeito.json); "raios": [r, g, b]
      solta raios e faíscas dessa cor do cabo até a boca do cano; "aura_particulas": [r, g, b] envolve a arma toda numa
-     aura de fumaça brilhante, brasas e faíscas dessa cor; "cor": "azul" ou "vermelho" (o que acende)
+     aura de fumaça brilhante, brasas e faíscas dessa cor; "aura_raios": [r, g, b] a mesma aura com raios no lugar da fumaça; "cor": "azul" ou "vermelho" (o que acende)
 
 Uso: python3 tools/projetar_skin_arma.py ak47 referencia.png receita.json saida.jpg
 """
@@ -138,7 +138,7 @@ def main():
         emi = out * mask[..., None]
         base = os.path.splitext(saida)[0]
         Image.fromarray(np.clip(emi, 0, 255).astype(np.uint8)).save(base + '_emi.jpg', quality=88)
-        ef = {k: brilho[k] for k in ('emissivo', 'aura', 'raios', 'aura_particulas') if k in brilho}
+        ef = {k: brilho[k] for k in ('emissivo', 'aura', 'raios', 'aura_particulas', 'aura_raios') if k in brilho}
         json.dump(ef, open(base + '_efeito.json', 'w'))
     if acab or zonas:
         Image.fromarray(np.clip(orm, 0, 255).astype(np.uint8)).save(os.path.splitext(saida)[0] + '_orm.jpg', quality=92)

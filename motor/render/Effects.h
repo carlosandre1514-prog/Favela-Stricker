@@ -38,7 +38,7 @@ struct Emitter {
     // FX_Raios (skin de arma): raios e faíscas ao longo do segmento a -> b (espaço do objeto), a até "raio" dele
     glm::vec3 a{0.f}, b{0.f};
     float raio = 0.03f;
-    int estilo = 0;          // FX_Raios: 0 raios elétricos, 1 aura de fumaça brilhante com brasas (arma toda)
+    int estilo = 0;          // FX_Raios: 0 faíscas, 1 aura de fumaça brilhante com brasas, 2 aura de raios (arma toda)
     glm::vec3 ultimo{0.f};   // posição no frame anterior (as partículas acompanham a arma quando ela anda)
     bool temUltimo = false;
     GameObject* owner = nullptr;
@@ -59,7 +59,8 @@ FxLight fxRaios(ParticleSystem& ps, Rng& r, const glm::mat4& world, glm::vec3 a,
                 float& accFaisca, float& accBrilho, float& accArco, glm::vec3 velArma = glm::vec3(0.f));
 // Aura de energia envolvendo um objeto (skin de arma): fumaça brilhante subindo, brasas e estalos ao longo de a -> b
 FxLight fxAuraArma(ParticleSystem& ps, Rng& r, const glm::mat4& world, glm::vec3 a, glm::vec3 b, float raio, glm::vec3 cor, float dt,
-                   float& accFumaca, float& accBrasa, float& accEstalo, float& accHalo, float& accNevoa, glm::vec3 velArma = glm::vec3(0.f));
+                   float& accFumaca, float& accBrasa, float& accEstalo, float& accHalo, float& accNevoa, glm::vec3 velArma = glm::vec3(0.f),
+                   bool eletrico = false);  // eletrico: raios em zigue-zague no lugar das labaredas
 FxLight fxMuzzleFlash(ParticleSystem& ps, Rng& r, glm::vec3 pos, glm::vec3 dir);
 void fxBullet(ParticleSystem& ps, glm::vec3 from, glm::vec3 to);
 void fxImpact(ParticleSystem& ps, Rng& r, glm::vec3 pos, glm::vec3 dir);

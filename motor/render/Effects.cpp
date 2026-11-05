@@ -1,3 +1,4 @@
+#include <functional>
 #include "render/Effects.h"
 #include <algorithm>
 #include <cmath>
@@ -300,7 +301,7 @@ FxLight fxRaios(ParticleSystem& ps, Rng& r, const glm::mat4& world, glm::vec3 a,
 }
 
 FxLight fxAuraArma(ParticleSystem& ps, Rng& r, const glm::mat4& world, glm::vec3 a, glm::vec3 b, float raio, glm::vec3 cor, float dt,
-                   float& accFumaca, float& accBrasa, float& accEstalo, float& accHalo, float& accNevoa, glm::vec3 velArma) {
+                   float& accFumaca, float& accBrasa, float& accEstalo, float& accHalo, float& accNevoa, glm::vec3 velArma, bool eletrico) {
     auto mundo = [&](glm::vec3 p) { return glm::vec3(world * glm::vec4(p, 1.f)); };
     // direções da arma no mundo: comprimento (para trás: a aura escorre para a coronha) e "para fora"
     const glm::vec3 atras = glm::normalize(glm::vec3(world * glm::vec4(a - b, 0.f)) + glm::vec3(1e-5f));
@@ -315,13 +316,44 @@ FxLight fxAuraArma(ParticleSystem& ps, Rng& r, const glm::mat4& world, glm::vec3
         ParticleSpawn p;
         p.pos = mundo(pontoNaArma(0.35f));
         p.vel = randDir(r) * 0.02f + velArma;
-        p.life = r.range(0.15f, 0.26f); p.size0 = r.range(0.028f, 0.042f); p.size1 = 0.02f;
-        p.color0 = glm::vec4(nucleo * 2.6f, 0.95f); p.color1 = glm::vec4(cor * 1.6f, 0.f);
+        p.life = r.range(0.15f, 0.26f); p.size0 = r.range(0.018f, 0.028f); p.size1 = 0.014f;
+        p.color0 = glm::vec4(nucleo * 2.2f, 0.8f); p.color1 = glm::vec4(cor * 1.4f, 0.f);
         p.shape = PS_Glow; p.occlusion = 0.25f;
         ps.emit(p);
     }
+    // raio em zigue-zague: cada pedaço é um traço fino bem claro com um brilho largo em volta; às vezes abre um galho
+    std::function<void(glm::vec3, glm::vec3, int, float, float, bool)> zigue =
+        [&](glm::vec3 p0, glm::vec3 dir, int segs, float torto, float vida, bool galhos) {
+            for (int k = 0; k < segs; ++k) {
+                glm::vec3 d = glm::normalize(dir + randDir(r) * torto);
+                const float len = r.range(0.014f, 0.028f);
+                const glm::vec3 p1 = p0 + d * len;
+                const float v = 0.02f;
+                for (int camada = 0; camada < 2; ++camada) {
+                    ParticleSpawn s;
+                    const float tam = camada ? 0.012f : 0.0035f;
+                    s.pos = (p0 + p1) * 0.5f; s.vel = d * v;
+                    s.stretch = (len * 0.65f) / v;  // pedaços se sobrepõem: o raio sai como uma linha contínua
+                    s.life = vida; s.size0 = s.size1 = tam;
+                    if (camada) { s.color0 = glm::vec4(cor * 1.4f, 0.4f); s.color1 = glm::vec4(cor, 0.f); s.shape = PS_Glow; }
+                    else { s.color0 = glm::vec4(nucleo * 4.f, 1.f); s.color1 = glm::vec4(cor * 2.5f, 0.f); s.shape = PS_Spark; }
+                    ps.emit(s);
+                }
+                if (galhos && k > 1 && r.chance(0.22f)) zigue(p1, glm::normalize(d + randDir(r)), 2 + int(r.f() * 3.f), torto, vida * 0.8f, false);
+                p0 = p1;
+            }
+        };
+    if (eletrico) {
+        // raios saindo da arma para fora (mais para trás, como a aura)
+        for (int n = count(accFumaca, 40.f, dt); n > 0; --n)
+            zigue(mundo(pontoNaArma(0.5f)), glm::normalize(randDir(r) + atras * 0.6f), 5 + int(r.f() * 5.f), 0.7f,
+                 r.range(0.07f, 0.14f), true);
+        // raios correndo pela arma, rentes a ela (de um lado para o outro)
+        for (int n = count(accEstalo, 18.f, dt); n > 0; --n)
+            zigue(mundo(pontoNaArma(0.6f)), r.chance(0.5f) ? atras : -atras, 6 + int(r.f() * 5.f), 0.45f, r.range(0.08f, 0.15f), true);
+    }
     // fumaça de energia: nuvens que crescem, sobem e escorrem para trás (saturada mesmo de dia: escurece o fundo)
-    for (int n = count(accFumaca, 110.f, dt); n > 0; --n) {
+    for (int n = eletrico ? 0 : count(accFumaca, 110.f, dt); n > 0; --n) {
         ParticleSpawn p;
         p.pos = mundo(pontoNaArma());
         glm::vec3 fora = randDir(r);
@@ -349,12 +381,12 @@ FxLight fxAuraArma(ParticleSystem& ps, Rng& r, const glm::mat4& world, glm::vec3
         p.pos = mundo(pontoNaArma());
         p.vel = randDir(r) * r.range(0.2f, 0.55f) + atras * 0.15f + velArma;
         p.life = r.range(0.4f, 0.85f); p.size0 = 0.008f; p.size1 = 0.003f;
-        p.color0 = glm::vec4(quente * 3.f, 1.f); p.color1 = glm::vec4(cor * 1.5f, 0.f);
-        p.shape = PS_Spark; p.stretch = 0.03f; p.gravity = -0.6f; p.drag = 1.f;
+        p.color0 = glm::vec4((eletrico ? nucleo : quente) * 3.f, 1.f); p.color1 = glm::vec4(cor * 1.5f, 0.f);
+        p.shape = PS_Spark; p.stretch = 0.03f; p.gravity = eletrico ? 0.f : -0.6f; p.drag = 1.f;
         ps.emit(p);
     }
     // estalos de energia (zigue-zague curto) de vez em quando
-    for (int n = count(accEstalo, 5.f, dt); n > 0; --n) {
+    for (int n = eletrico ? 0 : count(accEstalo, 5.f, dt); n > 0; --n) {
         glm::vec3 p0 = mundo(pontoNaArma());
         glm::vec3 dir = randDir(r);
         const int segs = 4 + int(r.f() * 3.f);
