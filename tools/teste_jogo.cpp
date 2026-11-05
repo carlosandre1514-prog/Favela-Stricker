@@ -475,6 +475,15 @@ int main(int argc, char** argv) {
             engine_set_quality(e, 0);  // sem sombra na foto (a arma já foi carregada no nível do arquivo)
             frames(e, 3);
             save(out, ("previa_" + g + (sk.empty() ? "" : "_" + sk) + ".png").c_str());
+            if (std::getenv("ANGULOS")) {  // mais fotos: o outro lado, de cima na diagonal e de perto (conferir a skin)
+                const float d = g == "tt33" ? 0.6f : 1.05f;
+                const float cams[4][3] = {{-1.5708f - 0.18f, 0.12f, d}, {0.7f, 0.55f, d * 0.95f}, {2.4f, 0.35f, d * 0.95f}, {1.5708f + 0.4f, 0.2f, d * 0.55f}};
+                for (int k = 0; k < 4; ++k) {
+                    engine_set_camera(e, k == 3 ? -0.15f : 0.f, 1.02f, 0.f, cams[k][0], cams[k][1], cams[k][2]);
+                    frames(e, 3);
+                    save(out, ("angulo" + std::to_string(k) + "_" + g + (sk.empty() ? "" : "_" + sk) + ".png").c_str());
+                }
+            }
             engine_set_quality(e, 3);
             engine_remove_object(e, id);
         }
