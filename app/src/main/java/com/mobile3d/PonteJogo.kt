@@ -54,6 +54,13 @@ class PonteJogo(private val jogo: JogoActivity) {
         jogo.desenhar(true)
         gl { jogo.abrirMapaDaPartida() }
     }
+    // o mesmo carregamento, mas por trás das telas do menu (sem desenhar): quando a pessoa aperta Jogar, o mapa
+    // muitas vezes já está pronto. Se apertar antes de terminar, a tela de carregando só espera o que falta.
+    @JavascriptInterface fun prepararMapa() {
+        if (mapaPronto || carregandoMapa || !pronto) return
+        carregandoMapa = true
+        gl { jogo.abrirMapaDaPartida() }
+    }
     @JavascriptInterface fun mapaPronto(): Boolean = mapaPronto
     @JavascriptInterface fun desenhar(on: Boolean) = jogo.desenhar(on)
     @JavascriptInterface fun girarMenu(on: Boolean) { girando = on }

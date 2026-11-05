@@ -1,3 +1,4 @@
+#include "assets/CacheDisco.h"
 #include "platform/engine_c_api.h"
 #include "procgen/Mocap.h"
 #include <algorithm>
@@ -78,6 +79,7 @@ void applyQualityLevel(Engine* e, int nivel) {
 }  // namespace eng
 
 Engine* engine_create(const char* shader_dir) {
+    eng::CacheDisco::instance().configurar(std::string(shader_dir ? shader_dir : "") + "/cache");  // armas já prontas guardadas
     eng::TextureManager::instance().forgetAll();  // contexto GL novo: ids antigos não valem
     Engine* e = new Engine();
     // qualidade.txt: 0 = Leve, 1 = Padrão, 2 = Intermediária, 3 = Ultra (gravada pelo app antes de abrir)

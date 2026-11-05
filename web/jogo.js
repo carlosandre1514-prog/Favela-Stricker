@@ -116,8 +116,16 @@ function cartaoConta() {
       <span class="xp">${n.precisa ? `${fmt(n.noNivel)} / ${fmt(n.precisa)} XP` : 'NÍVEL MÁXIMO'}</span></span>
   </button>`;
 }
+let mapaAdiantado = false;
 function telaInicio() {
   motor.girarMenu(true);
+  // já vai carregando o mapa da partida por trás do menu (o celular monta a favela enquanto a pessoa escolhe)
+  // (espera o motor ficar pronto: no celular ele demora a abrir)
+  if (!mapaAdiantado) {
+    mapaAdiantado = true;
+    const tentar = () => { if (motor.pronto()) motor.prepararMapa(); else setTimeout(tentar, 1000); };
+    setTimeout(tentar, 1500);
+  }
   const d = destaqueDoMercado();
   const t = mostrar(html(`<div class="tela sobre-mapa" id="inicio" style="padding:0">
     <div class="esquerda">

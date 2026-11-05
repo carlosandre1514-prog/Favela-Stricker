@@ -52,6 +52,14 @@ public:
         return t;
     }
 
+    // reduz pela metade até caber no limite (o mesmo que fromPixels faz), para guardar a imagem já no tamanho final
+    static void reduzirAte(std::vector<uint8_t>& px, int& w, int& h, int comp, int limite) {
+        while (limite > 0 && std::max(w, h) > limite && w >= 2 && h >= 2) {
+            px = halve(px.data(), w, h, comp);
+            w /= 2; h /= 2;
+        }
+    }
+
     int modelMax = 0;    // tamanho máximo das texturas de modelos (armas, objetos); 0 = sem limite
     int charMax = 0;     // o mesmo para personagens (vistos mais de longe: dá para usar menor)
     float anisotropia = 1.f;  // filtro anisotrópico das texturas (1 = desligado)

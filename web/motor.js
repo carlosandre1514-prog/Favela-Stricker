@@ -33,6 +33,7 @@ const motor = ANDROID ? {
   pronto: () => Nativo.pronto(),
   girarMenu: (on) => { modoMenu(on); Nativo.girarMenu(false); Nativo.desenhar(!on); },
   prepararPartida: () => Nativo.prepararPartida(),
+  prepararMapa: () => { try { Nativo.prepararMapa(); } catch (_) {} },  // por trás do menu (thread do motor)
   mapaPronto: () => Nativo.mapaPronto(),
   visaoGeral: () => Nativo.visaoGeral(),
   play: (on) => Nativo.play(!!on),
@@ -73,6 +74,7 @@ const motor = ANDROID ? {
     M.ccall('web_abrir_projeto', 'number', ['string'], [JSON.stringify(projetoPartida)]);
     mapaCarregado = true;
   },
+  prepararMapa: () => {},  // no site o carregamento trava a página: fica para quando a partida começa
   mapaPronto: () => mapaCarregado,
   visaoGeral: () => wasm('web_camera', null, ['number', 'number', 'number', 'number', 'number', 'number'], [0, 8, 20, 3.6, 0.42, 115]),
   play: (on) => wasm('web_play', null, ['number'], [on ? 1 : 0]),

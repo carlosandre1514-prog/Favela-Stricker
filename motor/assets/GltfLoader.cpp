@@ -4,6 +4,7 @@
 #include <cctype>
 #include <cstdlib>
 #include <tiny_gltf.h>
+#include "assets/CacheDisco.h"
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
@@ -169,6 +170,51 @@ bool loadGltf(const char* path, LoadContext& ctx, LoadedModel& out) {
     baseDir = baseDir.substr(0, baseDir.find_last_of("/\\") == std::string::npos ? 0 : baseDir.find_last_of("/\\"));
     tinygltf::Model model;
     std::string err, warn;
+    // Imagem dentro do .glb que já virou textura (o mesmo arquivo aberto de novo: a versão de longe das armas, o
+    // próximo lutador com a mesma roupa): não decodifica de novo; texOf pega a textura pronta pelo nome
+    // Imagens das armas e roupas: decodificar o JPEG e reduzir ao tamanho do nível é a parte mais demorada do
+    // carregamento; a imagem já reduzida fica guardada no celular (CacheDisco) e nas próximas vezes só é lida.
+    {
+        TextureManager& tm = TextureManager::instance();
+        const std::string arquivo = path;
+        const int limite = std::strstr(path, "/personagens/") ? tm.charMax : tm.modelMax;
+        loader.SetImageLoader([&tm, arquivo, limite](tinygltf::Image* im, const int idx, std::string* e, std::string* w, int rw, int rh,
+                                                     const unsigned char* bytes, int size, void* ud) {
+            const std::string nome = arquivo + "#img" + std::to_string(idx);
+            if (!im->uri.empty()) return tinygltf::LoadImageData(im, idx, e, w, rw, rh, bytes, size, ud);
+            if (tm.named(nome + "#s") || tm.named(nome + "#l")) {
+                im->width = im->height = im->component = 0;
+                im->image.clear();
+                return true;
+            }
+            CacheDisco& cache = CacheDisco::instance();
+            const std::string chave = nome + "#" + std::to_string(limite);
+            std::vector<uint8_t> dados;
+            if (cache.ler(chave, arquivo, dados) && dados.size() > 12) {
+                int32_t cab[3];
+                std::memcpy(cab, dados.data(), sizeof(cab));
+                if (cab[0] > 0 && cab[1] > 0 && cab[2] > 0 && size_t(cab[0]) * cab[1] * cab[2] + 12 == dados.size()) {
+                    im->width = cab[0]; im->height = cab[1]; im->component = cab[2];
+                    im->bits = 8; im->pixel_type = TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE;
+                    im->image.assign(dados.begin() + 12, dados.end());
+                    return true;
+                }
+            }
+            if (!tinygltf::LoadImageData(im, idx, e, w, rw, rh, bytes, size, ud)) return false;
+            if (im->image.empty() || im->bits != 8 || im->component <= 0) return true;
+            int iw = im->width, ih = im->height;
+            TextureManager::reduzirAte(im->image, iw, ih, im->component, limite);
+            im->width = iw; im->height = ih;
+            if (cache.ligado()) {
+                std::vector<uint8_t> out(12 + im->image.size());
+                const int32_t cab[3] = {iw, ih, im->component};
+                std::memcpy(out.data(), cab, sizeof(cab));
+                std::memcpy(out.data() + 12, im->image.data(), im->image.size());
+                cache.gravar(chave, arquivo, out.data(), out.size());
+            }
+            return true;
+        }, nullptr);
+    }
     bool ok = endsWithNoCase(path, ".glb") ? loader.LoadBinaryFromFile(&model, &err, &warn, path)
                                            : loader.LoadASCIIFromFile(&model, &err, &warn, path);
     if (!ok) { out.error = err.empty() ? "falha ao ler o arquivo" : err; std::fprintf(stderr, "glTF: %s\n", out.error.c_str()); return false; }
@@ -191,6 +237,10 @@ bool loadGltf(const char* path, LoadContext& ctx, LoadedModel& out) {
         // imagem dentro do .glb: a mesma do mesmo arquivo também (10 lutadores com a mesma roupa = 1 textura)
         std::string named = (im.uri.empty() ? std::string(path) + "#img" + std::to_string(src) : baseDir + "/" + im.uri) + (srgb ? "#s" : "#l");
         if (GLuint id = named.empty() ? 0 : tex.named(named)) return texCache[key] = id;
+        if (im.image.empty() && im.uri.empty()) {  // não decodificada (já existia): usa a outra versão (cor/linear)
+            const std::string outra = named.substr(0, named.size() - 2) + (srgb ? "#l" : "#s");
+            if (GLuint id = tex.named(outra)) return texCache[key] = id;
+        }
         GLuint id = im.image.empty() ? fallback : tex.fromPixels(im.image.data(), im.width, im.height, im.component, srgb, personagem ? tex.charMax : tex.modelMax);
         if (!named.empty() && !im.image.empty()) tex.setNamed(named, id);
         texCache[key] = id;
@@ -297,6 +347,24 @@ bool loadGltf(const char* path, LoadContext& ctx, LoadedModel& out) {
             MeshId id = cached != renderer.meshCache.end() ? cached->second : kInvalidId;
             if (id == kInvalidId) {
                 std::vector<Vertex> v; std::vector<uint32_t> idx; bool skinned = false;
+                // malha já simplificada guardada no celular (CacheDisco): pula a leitura e a simplificação
+                const std::string chaveMalha = cacheKey + (renderer.simplifyOverride > 0.f ? "#c" : "#s");
+                std::vector<uint8_t> guardada;
+                if (CacheDisco::instance().ler(chaveMalha, path, guardada) && guardada.size() >= 12) {
+                    uint32_t cab[3];
+                    std::memcpy(cab, guardada.data(), sizeof(cab));
+                    if (12 + size_t(cab[0]) * sizeof(Vertex) + size_t(cab[1]) * 4 == guardada.size()) {
+                        v.resize(cab[0]); idx.resize(cab[1]); skinned = cab[2] != 0;
+                        std::memcpy(v.data(), guardada.data() + 12, v.size() * sizeof(Vertex));
+                        std::memcpy(idx.data(), guardada.data() + 12 + v.size() * sizeof(Vertex), idx.size() * 4);
+                        id = renderer.createMesh(v.data(), uint32_t(v.size()), idx.data(), uint32_t(idx.size()), skinned);
+                        if (id != kInvalidId) renderer.meshCache[cacheKey] = id;
+                    }
+                }
+            }
+            if (id == kInvalidId) {
+                std::vector<Vertex> v; std::vector<uint32_t> idx; bool skinned = false;
+                const std::string chaveMalha = cacheKey + (renderer.simplifyOverride > 0.f ? "#c" : "#s");
                 if (!readPrimitive(model, prim, v, idx, skinned)) continue;
                 if (skinned && meshSkin[mi] >= 0) {
                     const auto& remap = skinRemap[meshSkin[mi]];
@@ -308,6 +376,14 @@ bool loadGltf(const char* path, LoadContext& ctx, LoadedModel& out) {
                     clusterSimplify(v, idx, grid, modelSize > 0.f ? modelSize / float(grid) : 0.f);
                 }
                 else if (fracao < 1.f) simplifyMesh(v, idx, fracao);
+                if (CacheDisco::instance().ligado() && (fracao < 1.f || renderer.simplifyOverride > 0.f)) {
+                    std::vector<uint8_t> out(12 + v.size() * sizeof(Vertex) + idx.size() * 4);
+                    const uint32_t cab[3] = {uint32_t(v.size()), uint32_t(idx.size()), skinned ? 1u : 0u};
+                    std::memcpy(out.data(), cab, sizeof(cab));
+                    std::memcpy(out.data() + 12, v.data(), v.size() * sizeof(Vertex));
+                    std::memcpy(out.data() + 12 + v.size() * sizeof(Vertex), idx.data(), idx.size() * 4);
+                    CacheDisco::instance().gravar(chaveMalha, path, out.data(), out.size());
+                }
                 id = renderer.createMesh(v.data(), uint32_t(v.size()), idx.data(), uint32_t(idx.size()), skinned);
                 if (id == kInvalidId) continue;
                 renderer.meshCache[cacheKey] = id;
