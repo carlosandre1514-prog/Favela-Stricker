@@ -28,7 +28,8 @@ const SkinDef kSkins[2][5] = {
      {"Polícia Civil", 0, R"({"camisa":"#1C1C20","calca":"#2E4A78","tenis":"#3A2A20","chapeu":"bone","cor_chapeu":"#1C1C20","colete":true,"cor_colete":"#2A2A2E","estampa":"gola","cor2":"#D9B24A"})"},
      {"Exército", 0, R"({"camisa":"#5C6B3A","calca":"#4A5530","tenis":"#3B2E22","chapeu":"capacete","cor_chapeu":"#4E5A32","colete":true,"cor_colete":"#6B7A45","manga_comprida":true,"luvas":"#2E2A22"})"},
      {"Choque", 0, R"({"camisa":"#16181C","calca":"#16181C","tenis":"#0E0E10","chapeu":"viseira","cor_chapeu":"#202228","colete":true,"cor_colete":"#2B2E34","manga_comprida":true,"luvas":"#0E0E10"})"},
-     {"BOPE", 0, R"({"camisa":"#1E1F22","calca":"#1E1F22","tenis":"#121214","manga_comprida":true,"luvas":"#141416","colete":true,"cor_colete":"#1A1B1E"})"}},
+     // BOPE: a skin pintada já tem o colete (com a placa "BOPE"); o colete 3D por cima a esconderia
+     {"BOPE", 0, R"({"camisa":"#1E1F22","calca":"#1E1F22","tenis":"#121214","manga_comprida":true,"luvas":"#141416","colete":false})"}},
     {{"Rubro", 0, R"({"camisa":"#C8202A","calca":"#18181C","tenis":"#F2F2F2","estampa":"listras","cor2":"#18181C","bermuda":true,"chapeu":"bone","cor_chapeu":"#F2F2F2","colete":true,"cor_colete":"#33382C"})"},
      {"Alvinegro", 0, R"({"camisa":"#F2F2F2","calca":"#18181C","tenis":"#18181C","estampa":"listras_em_pe","cor2":"#18181C","bermuda":true,"chapeu":"bone","cor_chapeu":"#18181C","colete":true,"cor_colete":"#33382C"})"},
      {"Tricolor", 0, R"({"camisa":"#1E7A3C","calca":"#F2F2F2","tenis":"#F2F2F2","estampa":"tres_cores","cor2":"#F2F2F2","cor3":"#8E1B2E","bermuda":true,"chapeu":"bone","cor_chapeu":"#F2F2F2","colete":true,"cor_colete":"#33382C"})"},
