@@ -450,6 +450,75 @@ int main(int argc, char** argv) {
         std::printf(g_fail ? "FALHOU\n" : "OK\n");
         return g_fail ? 1 : 0;
     }
+    // Personagem da tela inicial (SO_LOBBY=1): em duas camadas para combinar qualquer roupa com qualquer arma/skin.
+    //   previa_p_<roupa>.png    o personagem segurando a arma, mas com a arma escondida (a pose fica)
+    //   previa_a_<arma>[_<skin>] só a arma: o que muda entre a foto com e sem a arma (a mão por cima fica de fora)
+    // Depois: python3 tools/recortar_lobby.py <saida> web/lobby
+    if (std::getenv("SO_LOBBY")) {
+        using nlohmann::json;
+        eng::Engine* E = reinterpret_cast<eng::Engine*>(e);
+        static const char* keys[2][6] = {{"pm", "civil", "exercito", "choque", "especial", "bope_caveira"}, {"rubro", "alvinegro", "tricolor", "canarinho", "faixa", ""}};
+        const float cam[6] = {0.f, 1.0f, 0.f, std::getenv("CAM_YAW") ? float(std::atof(std::getenv("CAM_YAW"))) : -0.62f, 0.05f,
+                              std::getenv("CAM_DIST") ? float(std::atof(std::getenv("CAM_DIST"))) : 2.4f};
+        auto camera = [&] { engine_set_camera(e, cam[0], cam[1], cam[2], cam[3], cam[4], cam[5]); };
+        // um personagem com a arma na mão; devolve o objeto da arma (ou nulo)
+        auto montar = [&](int t, int k, const std::string& arma, const std::string& skin) -> eng::GameObject* {
+            engine_new_scene(e);
+            engine_set_time_of_day(e, 13.f);
+            engine_set_quality(e, 0);
+            camera();
+            json look = json::parse(jogo_aparencia_roupa(t, k));
+            const int id = engine_add_spec(e, json{{"tipo", "personagem"}, {"aparencia", look}, {"semente", 7}, {"pos", {0, 0, 0}},
+                                                   {"arma", arma}}.dump().c_str());
+            if (id < 0) { std::printf("  [ERRO] %s: %s\n", arma.c_str(), engine_last_error(e)); ++g_fail; return nullptr; }
+            frames(e, 40);  // a pose assenta (sempre o mesmo número de quadros: a mesma pose em todas as fotos)
+            for (const eng::CharacterInfo& c : E->characters)
+                if (eng::GameObject* w = E->scene.get(c.weapon)) {
+                    if (!skin.empty()) {
+                        float metal = -1.f, rough = -1.f;
+                        eng::gunSkinFinish(arma, skin, metal, rough);
+                        eng::applyKitTexture(E, *w, "armas/skins/" + arma + "_" + skin + ".jpg", metal, rough);
+                    }
+                    return w;
+                }
+            return nullptr;
+        };
+        auto esconder = [&](eng::GameObject* w) { if (w) eng::Scene::forEachInSubtree(*w, [](eng::GameObject& o) { o.active = false; }); };
+        engine_new_scene(e);
+        engine_set_time_of_day(e, 13.f);
+        engine_set_quality(e, 0);
+        camera();
+        frames(e, 3);
+        save(out, "previa_fundo.png");
+        for (int t = 0; t < 2; ++t)
+            for (int k = 0; k < 6; ++k) {
+                if (!keys[t][k][0]) continue;
+                eng::GameObject* w = montar(t, k, "m4a1", "");
+                esconder(w);
+                frames(e, 1, 0.f);
+                save(out, (std::string("previa_p_") + keys[t][k] + ".png").c_str());
+            }
+        // armas (e as skins de cada uma): com a arma e sem ela, na mesma pose
+        std::string lista = std::getenv("ARMAS_LOBBY") ? std::getenv("ARMAS_LOBBY") : "m4a1,m4colt,ak47,ak74,ak74_tatica";
+        size_t a = 0;
+        while (a < lista.size()) {
+            size_t b = lista.find(',', a); if (b == std::string::npos) b = lista.size();
+            std::string item = lista.substr(a, b - a); a = b + 1;
+            size_t c = item.find(':');
+            std::string arma = item.substr(0, c), skin = c == std::string::npos ? "" : item.substr(c + 1);
+            eng::GameObject* w = montar(0, 0, arma, skin);
+            if (!w) continue;
+            const std::string nome = arma + (skin.empty() ? "" : "_" + skin);
+            frames(e, 1, 0.f);
+            save(out, ("lobby_com_" + nome + ".png").c_str());
+            esconder(w);
+            frames(e, 1, 0.f);
+            save(out, ("lobby_sem_" + nome + ".png").c_str());
+        }
+        engine_destroy(e);
+        std::printf(g_fail ? "FALHOU\n" : "OK\n");
+        return g_fail ? 1 : 0;
+    }
     if (std::getenv("SO_RETRATOS_BLOCO")) {
         using nlohmann::json;
         static const char* keys[2][6] = {{"pm", "civil", "exercito", "choque", "especial", "bope_caveira"}, {"rubro", "alvinegro", "tricolor", "canarinho", "faixa", ""}};
@@ -580,6 +649,75 @@ int main(int argc, char** argv) {
                 engine_player_input(e, 0.f, 0.f, 0);
             }
             engine_set_play(e, 0);
+        }
+        // parado perto da janela, de frente (1) ou de lado (2): só o botão de pular, sem andar
+        for (int modo = 1; modo <= 2; ++modo) {
+            engine_new_scene(e);
+            engine_add_spec(e, json{{"tipo", "modulo"}, {"pos", {0, 0, -3.3}}, {"paredes", {"janela", "lisa", "lisa", "lisa"}}, {"escada", "nenhuma"}}.dump().c_str());
+            const int ch = engine_create_random_character(e, 7, 1);
+            engine_set_first_person(e, 1);
+            engine_set_play(e, 1);
+            engine_set_camera(e, 0.f, 1.f, 0.f, 0.f, 0.f, 4.f);
+            frames(e, 30);
+            float p[3], r[3], sc[3];
+            engine_player_input(e, 0.f, 1.f, 0);
+            for (int k = 0; k < 120; ++k) {
+                frames(e, 1);
+                engine_get_transform(e, ch, p, r, sc);
+                if (p[2] < -0.3f) break;
+            }
+            engine_player_input(e, 0.f, 0.f, 0);
+            if (modo == 2) engine_set_camera(e, p[0], 1.f, p[2], 1.5708f, 0.f, 4.f);  // vira de lado para a janela
+            frames(e, 10);
+            engine_player_jump(e);
+            for (int k = 0; k < 50; ++k) {
+                frames(e, 1);
+                if (k % 10 == 0) save(out, ("janela_" + std::string(modo == 1 ? "parado_" : "lado_") + std::to_string(k) + ".png").c_str());
+            }
+            frames(e, 20);
+            engine_get_transform(e, ch, p, r, sc);
+            std::printf("  janela (%s, só pular): depois do pulo z=%.2f y=%.2f\n", modo == 1 ? "parado de frente" : "de lado", p[2], p[1]);
+            if (p[2] > -1.75f || p[1] < 0.05f || p[1] > 0.5f) { std::printf("  [ERRO] não entrou pela janela\n"); ++g_fail; }
+            engine_set_play(e, 0);
+        }
+        engine_destroy(e);
+        std::printf(g_fail ? "FALHOU\n" : "OK\n");
+        return g_fail ? 1 : 0;
+    }
+    // Porta levando tiro (SO_PORTA=1): de um lado abre para o outro (o lado para onde a bala ia), e ao contrário
+    if (std::getenv("SO_PORTA")) {
+        using nlohmann::json;
+        eng::Engine* E = reinterpret_cast<eng::Engine*>(e);
+        engine_new_scene(e);
+        engine_add_spec(e, json{{"tipo", "modulo"}, {"pos", {0, 0, -3.3}}, {"paredes", {"porta", "lisa", "lisa", "lisa"}}, {"escada", "nenhuma"}}.dump().c_str());
+        engine_create_random_character(e, 7, 1);
+        engine_set_first_person(e, 1);
+        engine_set_play(e, 1);
+        engine_set_camera(e, 6.f, 1.f, 6.f, 0.f, 0.f, 4.f);
+        frames(e, 30);
+        if (E->doors.empty()) { std::printf("  [ERRO] módulo sem porta\n"); ++g_fail; }
+        else {
+            eng::DoorRT& d = E->doors[0];
+            eng::GameObject* o = E->scene.get(d.h);
+            const glm::vec3 n = d.base * glm::vec3(0, 0, 1);
+            const glm::vec3 c = glm::vec3(o->transform.world() * glm::vec4(0.5f, 0.5f, 0.f, 1.f));
+            for (float lado : {1.f, -1.f}) {  // atira de +n para -n e depois de -n para +n
+                const glm::vec3 de = c + n * (3.f * lado), ate = c - n * (3.f * lado);
+                const bool acertou = eng::tiroNasPortas(E, de, ate);
+                frames(e, 90);
+                const glm::vec3 dob = glm::vec3(o->transform.world() * glm::vec4(0.f, 0.5f, 0.f, 1.f));
+                const glm::vec3 meio = glm::vec3(o->transform.world() * glm::vec4(0.5f, 0.5f, 0.f, 1.f));
+                const float para = glm::dot(meio - dob, -n * lado);  // > 0: a folha foi para o lado da bala
+                std::printf("  porta: tiro %s, acertou=%d, ângulo %.2f, folha para o lado da bala %.2f m\n",
+                            lado > 0 ? "de fora (+n)" : "de dentro (-n)", acertou, d.angle, para);
+                if (!acertou || para < 0.3f) { std::printf("  [ERRO] a porta não abriu para o lado do tiro\n"); ++g_fail; }
+                save(out, lado > 0 ? "porta_tiro_1.png" : "porta_tiro_2.png");
+            }
+            // tiro que passa longe da porta: não mexe
+            const float antes = d.tiroTempo;
+            if (eng::tiroNasPortas(E, c + glm::vec3(10, 0, 10), c + glm::vec3(10, 0, -10)) || d.tiroTempo > antes) {
+                std::printf("  [ERRO] tiro longe abriu a porta\n"); ++g_fail;
+            }
         }
         engine_destroy(e);
         std::printf(g_fail ? "FALHOU\n" : "OK\n");

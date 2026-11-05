@@ -87,7 +87,7 @@ bool knownGun(const std::string& key) {
     return false;
 }
 // arma pedida para o jogador: qualquer arma conhecida (a arma com skin comprada vale para os dois lados);
-// desconhecida, a padrão do lado (polícia M4A1, bandidos AK-47). A loja da base continua vendendo só as do lado.
+// desconhecida, a padrão do lado (polícia M4A1, bandidos AK-47). A loja da base vende todas para os dois lados.
 std::string gunForTeam(const std::string& key, int team) {
     for (const GunDef& g : kGuns) if (key == g.key) return key;
     return team ? "ak47" : "m4a1";
@@ -976,7 +976,7 @@ std::string shopJson(Engine* e) {
     if (sh.kind == 0) {
         for (int g = 0; g < kGunCount; ++g) {
             const GunDef& d = kGuns[g];
-            if (d.team >= 0 && d.team != sh.team) continue;
+            // qualquer arma nos dois lados (a loja da polícia também vende AK; a dos bandidos, M4)
             const bool tem = d.price == 0 || owned(g) || f.primary == d.key || f.secondary == d.key;
             // ficha da arma para a loja: dano, cadência e precisão (0 a 1) e tiros para abater (vida 100)
             items.push_back({{"id", g}, {"arma", d.key}, {"nome", d.name}, {"preco", d.price}, {"tem", tem}, {"usando", f.weapon == d.key},
@@ -1018,7 +1018,7 @@ std::string shopBuy(Engine* e, int item) {
         if (sh.kind != 1 || k < 0 || k >= kSkinCount[sh.team]) return "Item inválido";
         price = kSkins[sh.team][k].price; name = kSkins[sh.team][k].name;
     } else {
-        if (sh.kind != 0 || item < 0 || item >= kGunCount || (kGuns[item].team >= 0 && kGuns[item].team != sh.team)) return "Item inválido";
+        if (sh.kind != 0 || item < 0 || item >= kGunCount) return "Item inválido";
         price = kGuns[item].price; name = kGuns[item].name;
     }
     bool has = price == 0 || std::find(f.owned.begin(), f.owned.end(), item) != f.owned.end();

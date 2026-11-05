@@ -116,6 +116,18 @@ function cartaoConta() {
       <span class="xp">${n.precisa ? `${fmt(n.noNivel)} / ${fmt(n.precisa)} XP` : 'NÍVEL MÁXIMO'}</span></span>
   </button>`;
 }
+// Personagem da tela inicial: o da última partida (lado, roupa e arma com a skin equipada). Duas camadas do
+// mesmo tamanho (tools/recortar_lobby.py): o personagem na pose de segurar e a arma por cima.
+function bonecoInicio() {
+  const u = guardado.get('ultimo', null) || { time: guardado.get('lado', 0) };
+  const time = u.time === 1 ? 1 : 0;
+  const roupa = ROUPAS.find((r) => r.key === u.roupa && r.time === time) || conta.roupa(time);
+  const arma = ARMAS.some((a) => a.key === u.arma && a.key !== 'tt33') ? u.arma : armaPadrao(time);
+  const skin = conta.skinArma(arma);
+  const base = `lobby/a_${arma}.png`;
+  return `<div class="boneco-inicio" aria-hidden="true"><img src="lobby/p_${roupa.key}.png" alt="">
+    <img src="${skin ? `lobby/a_${arma}_${skin}.png` : base}" alt="" onerror="this.onerror=null;this.src='${base}'"></div>`;
+}
 let mapaAdiantado = false;
 function telaInicio() {
   motor.girarMenu(true);
@@ -146,6 +158,7 @@ function telaInicio() {
       <button class="chip engrenagem" data-ir="config" aria-label="Configurações">${ICONE.engrenagem}</button>
       ${cartaoConta()}
     </div>
+    ${bonecoInicio()}
     <span class="versao">Favela Strike ${esc(VERSAO)}</span>
     <button class="destaque" data-ir="mercado">
       <div class="linha" style="gap:8px"><span class="etiqueta fundo-${d.raridade}">${RARIDADES[d.raridade].toUpperCase()}</span><span class="dica" style="color:#D1D5DB">Destaque do mercado</span></div>
@@ -194,7 +207,8 @@ function telaRoupa(time, pronto) {
     <div class="linha cresce" style="align-items:stretch;gap:14px">
       <div class="grade-itens cresce" id="r-grade" style="grid-template-columns:repeat(${minhas.length},minmax(0,1fr));grid-auto-rows:1fr;align-content:stretch;overflow:hidden"></div>
     </div>
-    <div class="linha"><span class="dica cresce">Você começa com a ${esc(armaPorKey(armaInicial(time)).nome)} e a TT-33. As outras armas compra na base, com o $ dos abates.</span>
+    <div class="linha" style="gap:8px;flex-wrap:wrap"><span class="dica">Arma inicial:</span><span id="r-armas" class="linha" style="gap:6px;flex-wrap:wrap"></span>
+      <span class="dica cresce">+ TT-33 · qualquer arma serve nos dois lados; as outras compra na base com o $ dos abates</span>
       <button class="btn btn-ouro btn-grande" id="r-ir" style="height:48px;font-size:24px;width:200px">${pronto ? 'PRONTO' : `${ICONE.play} COMEÇAR`}</button></div>
   </div>`), 'roupa');
   t.prepend(topo(time ? 'SUA ROUPA · BANDIDOS' : 'SUA FARDA · POLÍCIA', () => (pronto ? telaSala() : telaLado())));
@@ -213,6 +227,13 @@ function telaRoupa(time, pronto) {
     };
   };
   desenhar();
+  const desenharArmas = () => {
+    const atual = armaInicial(time);
+    $('#r-armas', t).innerHTML = opcoesArmaInicial().map((a) => `<button class="chip ${a.key === atual ? 'sel' : ''}" data-arma="${a.key}"
+      style="${a.key === atual ? 'background:#FCD34D;color:#111827;font-weight:800' : ''}">${esc(a.nome)}${conta.skinArma(a.key) ? ' ★' : ''}</button>`).join('');
+    for (const b of $$('[data-arma]', t)) b.onclick = () => { guardado.set('arma_inicial', b.dataset.arma); desenharArmas(); };
+  };
+  desenharArmas();
   $('#r-ir', t).onclick = () => {
     conta.usarRoupa(time, sel.key);
     guardado.set('lado', time);
@@ -236,16 +257,16 @@ async function comprarComMoedas(nome, preco, id) {
 }
 
 // ---------------- mercado de skins (moedas) ----------------
+// categorias: todas, armas (skins de arma) e personagem (roupas da polícia e dos bandidos)
 function itensMercado(aba) {
-  const lado = (time) => aba === 'todas' || (aba === 'policia' ? time !== 1 : time !== 0);
-  const armas = SKINS_ARMA.filter((s) => lado(armaPorKey(s.arma).time)).map((s) => ({
+  const armas = aba === 'personagem' ? [] : SKINS_ARMA.map((s) => ({
     id: `skin_arma:${s.arma}:${s.key}`, nome: s.nome, raridade: s.raridade, preco: s.preco, img: `armas/${s.arma}_${s.key}.png`,
     tem: conta.temSkinArma(s), usando: conta.skinArma(s.arma) === s.key, arma: s.arma, key: s.key,
-    desc: armaPorKey(s.arma).time === 0 ? 'Arma da polícia' : armaPorKey(s.arma).time === 1 ? 'Arma dos bandidos' : 'Pistola dos dois lados',
+    desc: s.arma === 'tt33' ? 'Skin de pistola' : 'Skin de arma · vale nos dois lados',
   }));
-  const roupas = ROUPAS.filter((r) => r.preco > 0 && lado(r.time)).map((r) => ({
+  const roupas = aba === 'armas' ? [] : ROUPAS.map((r) => ({
     id: 'skin:' + r.key, nome: r.nome, raridade: r.raridade, preco: r.preco, img: `retratos/${r.key}.png`, tem: conta.temRoupa(r),
-    usando: guardado.get('lado', 0) === r.time && conta.roupa(r.time) === r, roupa: r, desc: r.time ? 'Roupa dos bandidos' : 'Farda da polícia',
+    usando: conta.roupa(r.time) === r, roupa: r, desc: r.time ? 'Personagem · bandidos' : 'Personagem · polícia',
   }));
   const ordem = { lendaria: 0, epica: 1, rara: 2, comum: 3 };
   return [...armas, ...roupas].sort((a, b) => ordem[a.raridade] - ordem[b.raridade] || b.preco - a.preco);
@@ -259,7 +280,7 @@ function telaMercado(aba = 'todas', selId = null) {
       <div class="grade-itens cresce" id="m-grade"></div>
       <div class="detalhe" id="m-det" style="width:340px;border-color:rgba(252,211,77,.45)"></div>
     </div></div>`), 'mercado');
-  const abas = `<div class="abas">${[['todas', 'Todas'], ['policia', 'Polícia'], ['bandidos', 'Bandidos']].map(([k, n]) => `<button class="aba ${k === aba ? 'sel' : ''}" data-aba="${k}">${n}</button>`).join('')}</div>`;
+  const abas = `<div class="abas">${[['todas', 'Todas'], ['armas', 'Armas'], ['personagem', 'Personagem']].map(([k, n]) => `<button class="aba ${k === aba ? 'sel' : ''}" data-aba="${k}">${n}</button>`).join('')}</div>`;
   const tp = topo('MERCADO DE SKINS', telaInicio, abas, chipMoedas());
   t.prepend(tp);
   ligarAtalhos(tp);
@@ -267,7 +288,7 @@ function telaMercado(aba = 'todas', selId = null) {
   const desenhar = () => {
     $('#m-grade', t).innerHTML = itens.map((it) => `<button class="item ${it === sel ? 'sel' : ''}" data-id="${it.id}">
       <img src="${it.img}" alt=""><span class="n">${esc(it.nome)}</span><span class="r raridade-${it.raridade}">${RARIDADES[it.raridade]}</span>
-      <span class="p ${it.tem ? 'azul' : 'amarelo'}">${it.usando ? 'usando' : it.tem ? '✓ sua' : `${ICONE.moeda(12)} ${fmt(it.preco)}`}</span></button>`).join('');
+      <span class="p ${it.tem ? 'azul' : 'amarelo'}">${it.usando ? 'usando' : it.tem ? (it.preco ? '✓ sua' : 'grátis') : `${ICONE.moeda(12)} ${fmt(it.preco)}`}</span></button>`).join('');
     for (const d of $$('.item', t)) d.onclick = () => { sel = itens.find((i) => i.id === d.dataset.id); desenhar(); };
     const det = $('#m-det', t);
     let botao;
@@ -277,7 +298,7 @@ function telaMercado(aba = 'todas', selId = null) {
     det.innerHTML = `<div class="linha" style="gap:8px"><span class="etiqueta fundo-${sel.raridade}">${RARIDADES[sel.raridade].toUpperCase()}</span><span class="dica">${esc(sel.desc)}</span></div>
       <span class="bebas" style="font-size:30px">${esc(sel.nome.toUpperCase())}</span>
       <div class="previa"><img src="${sel.img}" alt="${esc(sel.nome)}"></div>
-      <span class="dica" style="font-size:11px">${sel.arma ? 'Só visual, não muda o dano · a skin é da sua arma: no online os outros veem ela na sua mão e nas suas costas' : 'Roupa só do seu lado · quantos quiserem podem usar a mesma'}</span>${botao}`;
+      <span class="dica" style="font-size:11px">${sel.arma ? 'Só visual, não muda o dano · a skin é da sua arma: no online os outros veem ela na sua mão e nas suas costas' : (sel.roupa.time ? 'Usada quando você joga de bandido' : 'Usada quando você joga de polícia') + ' · quantos quiserem podem usar a mesma'}</span>${botao}`;
     const acao = $('#m-acao', det);
     if (!acao) return;
     acao.onclick = async () => {

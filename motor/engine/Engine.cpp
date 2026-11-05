@@ -1307,13 +1307,24 @@ void updateDoors(Engine* e, float dt) {
         GameObject* o = e->scene.get(d.h);
         if (!o) continue;
         float target = 0.f;
-        if (e->playing) {
+        if (e->playing && d.tiroTempo > 0.f) {  // levou tiro: aberta para o lado da bala por um tempo
+            d.tiroTempo -= dt;
+            target = 1.65f * d.tiroLado;
+        } else if (e->playing) {
+            // a folha gira para -n (ângulo positivo) ou para +n (negativo); n = frente da porta (eixo Z dela)
+            const glm::vec3 n = d.base * glm::vec3(0, 0, 1);
             glm::vec3 c = glm::vec3(o->transform.world() * glm::vec4(0.5f, 0.5f, 0.f, 1.f));
             for (const CharacterInfo& ch : e->characters) {
                 GameObject* g = e->scene.get(ch.root);
                 if (!g || !g->active) continue;
                 glm::vec3 p = g->transform.position;
-                if (glm::length(glm::vec2(p.x - c.x, p.z - c.z)) < 1.6f + d.w * 0.5f && std::abs(p.y + ch.height * 0.5f - c.y) < 2.2f) { target = 1.65f; break; }
+                if (glm::length(glm::vec2(p.x - c.x, p.z - c.z)) < 1.6f + d.w * 0.5f && std::abs(p.y + ch.height * 0.5f - c.y) < 2.2f) {
+                    // já aberta: continua para o mesmo lado; fechada: abre para longe de quem chega
+                    const float lado = std::abs(d.angle) > 0.05f ? (d.angle > 0.f ? 1.f : -1.f)
+                                                                 : (glm::dot(p - c, n) >= 0.f ? 1.f : -1.f);
+                    target = 1.65f * lado;
+                    break;
+                }
             }
         }
         float step = 3.5f * dt;
@@ -1323,6 +1334,43 @@ void updateDoors(Engine* e, float dt) {
             o->transform.setRotation(d.base * glm::angleAxis(d.angle, glm::vec3(0, 1, 0)));
         }
     }
+}
+
+// Tiro que passa por uma porta (a folha não tem colisão: o teste é contra a caixa dela): a porta abre para o lado
+// para onde a bala ia. De fora da casa abre para dentro; de dentro, para fora.
+bool tiroNasPortas(Engine* e, glm::vec3 de, glm::vec3 ate) {
+    if (!e->playing) return false;
+    bool alguma = false;
+    for (DoorRT& d : e->doors) {
+        GameObject* o = e->scene.get(d.h);
+        if (!o) continue;
+        const glm::mat4 W = o->transform.world();
+        const glm::vec3 centro = glm::vec3(W * glm::vec4(0.5f, 0.5f, 0.f, 1.f));
+        // longe da linha do tiro: nem testa (a maioria das portas)
+        const glm::vec3 seg = ate - de;
+        const float L2 = glm::dot(seg, seg);
+        const float t0 = L2 > 1e-6f ? std::clamp(glm::dot(centro - de, seg) / L2, 0.f, 1.f) : 0.f;
+        if (glm::length(de + seg * t0 - centro) > 2.5f) continue;
+        // raio na caixa da folha (local: [0,1] x [0,1] x [-0,5; 0,5])
+        const glm::mat4 inv = glm::inverse(W);
+        const glm::vec3 a = glm::vec3(inv * glm::vec4(de, 1.f)), b = glm::vec3(inv * glm::vec4(ate, 1.f)), v = b - a;
+        float tmin = 0.f, tmax = 1.f;
+        const glm::vec3 lo(0.f, 0.f, -0.5f), hi(1.f, 1.f, 0.5f);
+        bool dentro = true;
+        for (int k = 0; k < 3 && dentro; ++k) {
+            if (std::abs(v[k]) < 1e-8f) { if (a[k] < lo[k] || a[k] > hi[k]) dentro = false; continue; }
+            float t1 = (lo[k] - a[k]) / v[k], t2 = (hi[k] - a[k]) / v[k];
+            if (t1 > t2) std::swap(t1, t2);
+            tmin = std::max(tmin, t1); tmax = std::min(tmax, t2);
+            if (tmin > tmax) dentro = false;
+        }
+        if (!dentro) continue;
+        const glm::vec3 n = d.base * glm::vec3(0, 0, 1);
+        d.tiroLado = glm::dot(seg, n) < 0.f ? 1.f : -1.f;  // bala indo para -n: a folha vai para -n (ângulo positivo)
+        d.tiroTempo = 8.f;
+        alguma = true;
+    }
+    return alguma;
 }
 
 // Elevador: perto de uma ponta aparece o botão que leva à outra
@@ -1493,7 +1541,9 @@ void playDeath(CharacterInfo& c) {
 // Pular janela (ou mureta): pulando de frente para uma parede com um vão em cima (peitoril de 45 cm a 1,35 m acima
 // do pé, vão livre por cima) e chão do outro lado, o boneco passa encolhido por cima do peitoril e cai do outro lado.
 // Durante o pulo a cápsula não bate em nada (a janela é mais baixa que o boneco) e o caminho é conduzido aqui.
-static bool tryVault(Engine* e, CharacterInfo& c, GameObject& go, btRigidBody* b, glm::vec3 f) {
+// alcance: até onde a parede pode estar; exigeVerga: só vale janela (parede de novo acima do vão), não mureta de laje
+static bool tryVault(Engine* e, CharacterInfo& c, GameObject& go, btRigidBody* b, glm::vec3 f, float alcance = 0.85f,
+                     bool exigeVerga = false) {
     f.y = 0.f;
     if (glm::length(f) < 1e-3f) return false;
     f = glm::normalize(f);
@@ -1503,8 +1553,8 @@ static bool tryVault(Engine* e, CharacterInfo& c, GameObject& go, btRigidBody* b
     auto ray = [&](glm::vec3 a, glm::vec3 z) { return e->physics.raycastIgnoring(a, z, b, hit, o, fr); };
     // 1) parede bem na frente, na altura da cintura
     const glm::vec3 w0 = feet + up * (0.5f * sc);
-    if (!ray(w0, w0 + f * 0.85f)) return false;
-    const float dWall = 0.85f * fr;
+    if (!ray(w0, w0 + f * alcance)) return false;
+    const float dWall = alcance * fr;
     // 2) vão livre por cima do peitoril (duas alturas)
     for (float y : {1.3f, 1.6f}) {
         const glm::vec3 p = feet + up * (y * sc);
@@ -1515,6 +1565,10 @@ static bool tryVault(Engine* e, CharacterInfo& c, GameObject& go, btRigidBody* b
     if (!ray(top, top - up * (1.85f * sc))) return false;
     const float sillY = hit.y, rel = sillY - feet.y;
     if (rel < 0.45f * sc || rel > 1.35f * sc) return false;
+    if (exigeVerga) {  // janela: em cima do vão a parede continua (a ~2,1 m do chão da casa)
+        const glm::vec3 v = glm::vec3(feet.x, sillY + 1.25f, feet.z);
+        if (!ray(v, v + f * (dWall + 0.4f))) return false;
+    }
     // 4) espessura da parede (raio de volta, do outro lado)
     float thick = 0.15f;
     const glm::vec3 far = feet + f * (dWall + 1.2f) + up * (rel - 0.08f);
@@ -1538,6 +1592,23 @@ static bool tryVault(Engine* e, CharacterInfo& c, GameObject& go, btRigidBody* b
     b->setGravity(btVector3(0, 0, 0));
     b->setLinearVelocity(btVector3(0, 0, 0));
     return true;
+}
+
+// Botão de pular perto de uma janela: pula a janela de frente, de lado ou de costas. Tenta primeiro para onde anda
+// (aí vale mureta também), depois para onde olha e por fim em volta (só janela: pulo perto da mureta da laje
+// continua sendo pulo normal).
+static bool tryVaultAround(Engine* e, CharacterInfo& c, GameObject& go, btRigidBody* b, glm::vec3 move, glm::vec3 fwd) {
+    if (glm::length(move) > 0.3f && tryVault(e, c, go, b, move)) return true;
+    if (glm::length(move) > 0.3f && tryVault(e, c, go, b, move, 1.1f, true)) return true;
+    if (tryVault(e, c, go, b, fwd, 1.1f, true)) return true;
+    const float a0 = std::atan2(fwd.x, fwd.z);
+    for (int k = 1; k <= 8; ++k)  // em volta, das direções mais perto do olhar para as de trás
+        for (int s : {1, -1}) {
+            if (k == 8 && s < 0) continue;
+            const float a = a0 + s * k * (3.14159265f / 8.f);
+            if (tryVault(e, c, go, b, glm::vec3(std::sin(a), 0.f, std::cos(a)), 1.1f, true)) return true;
+        }
+    return false;
 }
 
 static void updateVault(Engine* e, CharacterInfo& c, GameObject& go, btRigidBody* b, float dt) {
@@ -1589,8 +1660,8 @@ void updatePlayer(Engine* e, float dt) {
     float speed = c.crouch ? 1.6f : e->runInput && !c.aimHold ? 6.5f : 2.6f;  // mirando: anda devagar; agachado mais ainda
     if (fp && c.weaponKind == WK_Pistol) c.aimTimer = std::max(c.aimTimer, 0.1f);  // primeira pessoa: pistola sempre à frente
     if (c.vaultT >= 0.f) updateVault(e, c, *go, b, dt);  // pulando janela: o caminho manda
-    // só andando na direção da janela (pulo parado perto da mureta da laje continua sendo pulo normal)
-    else if (alive && e->jumpRequest && glm::length(move) > 0.3f && tryVault(e, c, *go, b, move)) updateVault(e, c, *go, b, dt);
+    // pulo perto de janela: andando na direção dela (vale mureta também) ou, parado/de lado, a janela mais perto
+    else if (alive && e->jumpRequest && tryVaultAround(e, c, *go, b, move, fwd)) updateVault(e, c, *go, b, dt);
     else driveCharacter(e, c, move, speed, alive && e->jumpRequest, dt, face);
     e->jumpRequest = false;
     if (fp) {  // primeira pessoa: o corpo vira junto com o olhar, sem atraso (a arma fica no centro da tela)
@@ -1868,6 +1939,7 @@ void muzzleFx(Engine* e, Scene::Handle weapon, glm::vec3 muzzle, glm::vec3 dir) 
     e->particles.ancoraAtual = -1;
 }
 void bulletFx(Engine* e, Scene::Handle weapon, glm::vec3 from, glm::vec3 to) {
+    tiroNasPortas(e, from, to);  // todo tiro (meu, dos robôs e de quem joga online) passa por aqui
     Emitter* em = skinShot(e, weapon);
     fxBullet(e->particles, from, to, em ? &em->corDisparo : nullptr);
 }

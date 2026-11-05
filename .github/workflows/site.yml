@@ -51,7 +51,7 @@ jobs:
           cp -r web/. dist/web/
           rm -f dist/web/exportadas.txt
           cp build-web/favela.js build-web/favela.wasm build-web/favela.data dist/web/
-          cp -r app/src/main/assets/armas app/src/main/assets/retratos app/src/main/assets/sons app/src/main/assets/exemplos dist/web/
+          cp -r app/src/main/assets/armas app/src/main/assets/retratos app/src/main/assets/lobby app/src/main/assets/sons app/src/main/assets/exemplos dist/web/
           cp -r servidor dist/servidor
           rm -rf dist/servidor/node_modules
           cp render.yaml dist/
@@ -74,6 +74,7 @@ jobs:
           curl -sf -o /dev/null -w "index %{http_code}\n" http://localhost:10000/
           curl -sf -H 'Accept-Encoding: gzip' -o /dev/null -w "data %{http_code} %{size_download} bytes\n" http://localhost:10000/favela.data
           curl -sf -H 'Accept-Encoding: gzip' -o /dev/null -w "wasm %{http_code} %{content_type}\n" http://localhost:10000/favela.wasm
+          (cd servidor && node teste_partida.js 10000)
           kill %1
           rm -rf servidor/node_modules
 

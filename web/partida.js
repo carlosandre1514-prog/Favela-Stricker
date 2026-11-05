@@ -108,7 +108,10 @@ async function iniciarPartida(time, roupa, sala, armaPrincipal) {
   montarHud(!!sala);
   motor.redeSala(sala ? sala.host : false, sala ? fb.uid : '', sala ? sala.roster() : '');
   for (const a of ARMAS) motor.skinArma(a.key, conta.skinArma(a.key));
-  motor.escolhas(time, roupa.i, armaPrincipal || armaInicial(time), 'tt33');
+  const arma = armaPrincipal || armaInicial(time);
+  motor.escolhas(time, roupa.i, arma, 'tt33');
+  // a tela inicial mostra o personagem desta partida (lado, roupa e arma), mesmo depois de fechar o jogo
+  guardado.set('ultimo', { time, roupa: roupa.key, arma });
   motor.primeiraPessoa(true);
   motor.play(true);
   // polícia olha para o morro; bandidos, para a rua de baixo
@@ -718,9 +721,10 @@ function ligarAoVivo(s, time) {
   const rede = () => partida && partida.hud && $('#rede', partida.hud);
   const status = (txt, ok) => { const r = rede(); if (r) { r.textContent = '● ' + txt; r.style.color = ok ? '#86EFAC' : '#FCD34D'; } };
   status('conectando ao servidor…', false);
-  voz = new ChatDeVoz((pcm) => { if (ws && ws.readyState === 1) ws.send(pcm); });
+  voz = new ChatDeVoz((pcm) => { if (ws && ws.readyState === 1 && ws.bufferedAmount < 32768) ws.send(PROTO.codificarVoz(pcm)); });
   const base = SERVIDOR.replace(/^http/, 'ws');
-  const url = `${base}/partida?sala=${encodeURIComponent(s.codigo)}&id=${encodeURIComponent(fb.uid)}&time=${time}&nome=${encodeURIComponent(conta.nome())}`;
+  const url = `${base}/partida?sala=${encodeURIComponent(s.codigo)}&id=${encodeURIComponent(fb.uid)}&time=${time}&v=${PROTO.VERSAO}`;
+  let vagas = {};  // número da vaga no pacote -> id da pessoa (o servidor manda quando alguém entra ou sai)
   let tentativas = 0, abriuUmaVez = false;
   const inicio = Date.now();
   const conectar = () => {
@@ -732,22 +736,45 @@ function ligarAoVivo(s, time) {
     clearInterval(pingTimer);
     pingTimer = setInterval(() => { if (ws && ws.readyState === 1) ws.send(JSON.stringify({ k: 'pg', t: performance.now(), de: fb.uid })); }, 2000);
     ws.onmessage = (ev) => {
-      if (typeof ev.data !== 'string') { const b = new Uint8Array(ev.data); if (b.length > 1 && voz) voz.receber(b[0], b.subarray(1)); return; }
-      try { const j = JSON.parse(ev.data); if (j.k === 'pg') { if (j.de === fb.uid) pingMs = performance.now() - j.t; return; } if (j.k === 'st') motor.redeAplicar(JSON.stringify(j.d)); else if (j.k === 'ev') motor.redeEvento(JSON.stringify(j.d)); } catch (_) {}
+      if (typeof ev.data !== 'string') {
+        const b = new Uint8Array(ev.data);
+        if (b[0] === PROTO.T_ESTADO && b.length > 2) {  // os lutadores da sala que mudaram, num pacote só
+          const out = PROTO.decodificarEstados(b, vagas);
+          for (const k in out) { motor.redeAplicar(JSON.stringify(out)); break; }
+        } else if (b[0] === PROTO.T_VOZ && b.length > 2 && voz) voz.receber(b[1], b.subarray(2));
+        return;
+      }
+      try {
+        const j = JSON.parse(ev.data);
+        if (j.k === 'pg') { if (j.de === fb.uid) pingMs = performance.now() - j.t; return; }
+        if (j.k === 'vagas') vagas = j.d || {};
+        else if (j.k === 'ev') motor.redeEvento(JSON.stringify(j.d));
+      } catch (_) {}
     };
-    ws.onclose = () => {
+    ws.onclose = (ev) => {
       if (!partida || viaFirebase) return;
+      if (ev.code === 4003) { status('atualize o jogo para jogar online', false); aviso('Atualize o Favela Strike para jogar online'); return; }
+      if (ev.code === 4004) { status('servidores cheios, tentando de novo…', false); setTimeout(conectar, 8000); return; }
       status('reconectando…', false);
       if (!abriuUmaVez && Date.now() - inicio > 25000) { usarFirebase(s); return; }  // servidor dormindo/fora: Firebase
       if (++tentativas <= 12) setTimeout(conectar, Math.min(5000, 800 * tentativas));
     };
   };
   conectar();
-  // 20 vezes por segundo: o meu estado e os eventos (tiros que acertaram, abates, granadas)
+  // 20 vezes por segundo: o meu estado (22 bytes; parado não manda de novo, só a cada 250 ms) e os eventos
+  // (tiros que acertaram, abates, granadas)
+  let ultimoEstado = null, ultimoEnvio = 0;
   enviandoTimer = setInterval(() => {
     if (!ws || ws.readyState !== 1) return;
-    const st = motor.redeColetar();
-    if (st && st.length > 2) ws.send(`{"k":"st","d":${st}}`);
+    try {
+      const st = JSON.parse(motor.redeColetar() || '{}');
+      const meu = st[fb.uid] || Object.values(st)[0];
+      if (meu) {
+        const b = PROTO.codificarEstado(meu), agora = Date.now();
+        const igual = ultimoEstado && ultimoEstado.length === b.length && ultimoEstado.every((x, i) => x === b[i]);
+        if ((!igual || agora - ultimoEnvio >= 250) && ws.bufferedAmount < 32768) { ws.send(b); ultimoEstado = b; ultimoEnvio = agora; }
+      }
+    } catch (_) {}
     try { for (const e of JSON.parse(motor.redeEventos() || '[]')) ws.send(JSON.stringify({ k: 'ev', d: e })); } catch (_) {}
   }, 50);
 }

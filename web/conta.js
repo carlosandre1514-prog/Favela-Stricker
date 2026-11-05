@@ -28,23 +28,28 @@ const ROUPAS = [
   { key: 'faixa', nome: 'Faixa', time: 1, i: 4, preco: 0, raridade: 'comum' },
 ];
 
-// Armas (compradas na partida com o $ dos abates). Os números são os do motor (Game.cpp kGuns).
+// Armas (compradas na partida com o $ dos abates). Os números são os do motor (Partida.cpp kGuns).
+// Todas valem para os dois lados: policial pode usar AK e bandido pode usar M4.
 const ARMAS = [
-  { key: 'tt33', nome: 'TT-33', time: -1, dano: 25, cadencia: 3, pente: 8, cai: 20, inicial: true },
-  { key: 'm4a1', nome: 'M4A1', time: 0, dano: 24, cadencia: 10, pente: 30, cai: 40, inicial: true },
-  { key: 'm4colt', nome: 'M4 Colt', time: 0, dano: 26, cadencia: 9, pente: 30, cai: 45, luneta: true },
-  { key: 'ak47', nome: 'AK-47', time: 1, dano: 30, cadencia: 8, pente: 30, cai: 35, inicial: true },
-  { key: 'ak74', nome: 'AK-74', time: 1, dano: 27, cadencia: 9, pente: 30, cai: 40 },
-  { key: 'ak74_tatica', nome: 'AK-74 tática', time: 1, dano: 28, cadencia: 9.5, pente: 30, cai: 45 },
+  { key: 'tt33', nome: 'TT-33', dano: 25, cadencia: 3, pente: 8, cai: 20, inicial: true },
+  { key: 'm4a1', nome: 'M4A1', dano: 24, cadencia: 10, pente: 30, cai: 40, inicial: true },
+  { key: 'm4colt', nome: 'M4 Colt', dano: 26, cadencia: 9, pente: 30, cai: 45, luneta: true },
+  { key: 'ak47', nome: 'AK-47', dano: 30, cadencia: 8, pente: 30, cai: 35, inicial: true },
+  { key: 'ak74', nome: 'AK-74', dano: 27, cadencia: 9, pente: 30, cai: 40 },
+  { key: 'ak74_tatica', nome: 'AK-74 tática', dano: 28, cadencia: 9.5, pente: 30, cai: 45 },
 ];
 const armaPorKey = (k) => ARMAS.find((a) => a.key === k) || ARMAS[0];
-// Arma com que o jogador começa: a do lado com skin equipada (a skin comprada aparece na mão); se a skin for de
-// uma arma do outro lado (ex.: AK-47 na Polícia), começa com ela assim mesmo; sem skin, a padrão do lado
+// Armas para começar a partida (o resto compra na base com o $ dos abates): as grátis (M4A1 e AK-47) e as que têm
+// skin equipada (a skin comprada aparece na mão), de qualquer lado
 const armaPadrao = (time) => (time === 0 ? 'm4a1' : 'ak47');
+const opcoesArmaInicial = () => ARMAS.filter((a) => a.key !== 'tt33' && (a.inicial || conta.skinArma(a.key)));
+// a escolhida na tela antes da partida; sem escolha: a que tem skin equipada, ou a padrão do lado
 const armaInicial = (time) => {
-  const comSkin = ARMAS.filter((a) => a.key !== 'tt33' && conta.skinArma(a.key));
-  const doLado = comSkin.find((a) => a.time === time) || comSkin.find((a) => a.time !== time);
-  return doLado ? doLado.key : armaPadrao(time);
+  const opcoes = opcoesArmaInicial();
+  const escolhida = guardado.get('arma_inicial', '');
+  if (opcoes.some((a) => a.key === escolhida)) return escolhida;
+  const comSkin = opcoes.find((a) => conta.skinArma(a.key));
+  return comSkin ? comSkin.key : armaPadrao(time);
 };
 
 // Skins de arma (mercado, com moedas): só mudam a pintura, não o dano

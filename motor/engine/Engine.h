@@ -164,7 +164,8 @@ struct GameModule {
 };
 
 // Porta em jogo: abre sozinha quando alguém chega perto
-struct DoorRT { Scene::Handle h; glm::quat base{1, 0, 0, 0}; float angle = 0.f, w = 1.f; };
+// porta: abre para longe de quem chega; levando tiro, abre para o lado para onde a bala ia e fica aberta um tempo
+struct DoorRT { Scene::Handle h; glm::quat base{1, 0, 0, 0}; float angle = 0.f, w = 1.f, tiroLado = 0.f, tiroTempo = 0.f; };
 // Abertura cortada numa parede/muro (porta, janela, vão): caixa local (centro e tamanho) em relação à raiz
 struct Opening { Scene::Handle root; glm::vec3 center, size; };
 // Elevador/passagem: pontos em coordenadas locais do objeto `root` (acompanha se a construção for movida)
@@ -439,7 +440,8 @@ bool attachGear(Engine* e, int character, const std::string& name);
 std::string gameStatusText(Engine* e);
 // Efeitos do tiro de uma arma: o da skin dela (se tiver "disparo") ou o padrão. Chame no lugar de fxMuzzleFlash/fxBullet.
 void muzzleFx(Engine* e, Scene::Handle weapon, glm::vec3 muzzle, glm::vec3 dir);
-void atualizarAncoras(Engine* e, float dt);  // depois de posicionar as armas, antes de desenhar
+void atualizarAncoras(Engine* e, float dt);
+bool tiroNasPortas(Engine* e, glm::vec3 de, glm::vec3 ate);  // bala que passa por uma porta: ela abre para o lado do tiro  // depois de posicionar as armas, antes de desenhar
 void bulletFx(Engine* e, Scene::Handle weapon, glm::vec3 from, glm::vec3 to);
 void applyKitTexture(Engine* e, GameObject& g, const std::string& kitName, float metal = -1.f, float rough = -1.f);  // textura de cor do kit no objeto
 
