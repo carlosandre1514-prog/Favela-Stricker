@@ -88,6 +88,7 @@ public:
     void updateMesh(MeshId id, const Vertex* v, uint32_t vcount, const uint32_t* idx, uint32_t icount);
     const Material* material(MaterialId id) const { return id < materialCount_ ? &materials_[id] : nullptr; }
     void setEmissive(MaterialId id, glm::vec3 f) { if (id < materialCount_) materials_[id].emissive_factor = f; }
+    void setRim(MaterialId id, glm::vec4 r) { if (id < materialCount_) materials_[id].rim = r; }
     uint32_t materialCount() const { return materialCount_; }
     const Mesh* mesh(MeshId id) const { return id < meshCount_ ? &meshes_[id] : nullptr; }
     // memória das malhas na placa de vídeo (vértices + índices), para medir

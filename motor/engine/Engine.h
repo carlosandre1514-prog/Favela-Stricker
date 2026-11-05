@@ -434,6 +434,9 @@ int loadModelFile(Engine* e, const char* path); // .glb/.gltf/.fbx -> id da raiz
 // Equipamento do personagem (shaders/kit/personagens/equip/<nome>.glb, osso em equipamento.txt): preso ao osso
 bool attachGear(Engine* e, int character, const std::string& name);
 std::string gameStatusText(Engine* e);
+// Efeitos do tiro de uma arma: o da skin dela (se tiver "disparo") ou o padrão. Chame no lugar de fxMuzzleFlash/fxBullet.
+void muzzleFx(Engine* e, Scene::Handle weapon, glm::vec3 muzzle, glm::vec3 dir);
+void bulletFx(Engine* e, Scene::Handle weapon, glm::vec3 from, glm::vec3 to);
 void applyKitTexture(Engine* e, GameObject& g, const std::string& kitName, float metal = -1.f, float rough = -1.f);  // textura de cor do kit no objeto
 
 // ---- mundo (World.cpp)

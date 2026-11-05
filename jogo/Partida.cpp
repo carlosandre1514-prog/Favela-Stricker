@@ -304,6 +304,14 @@ void regenerate(Engine* e, float dt) {
     }
 }
 
+// skin da arma que o lutador está usando agora ("" = sem skin): a minha, a de outra pessoa da sala; robô não tem
+std::string skinNaMao(const TeamMatch& M, const Fighter& f) {
+    const std::map<std::string, std::string>* skins = f.remote ? &f.gunSkins : !f.bot ? &M.gunSkins : nullptr;
+    if (!skins) return "";
+    auto it = skins->find(gunOf(f.weapon).key);
+    return it == skins->end() ? "" : it->second;
+}
+
 void killFighter(Engine* e, int vi, int ai) {
     TeamMatch& M = matchOf(e);
     Fighter& v = M.f[vi];
@@ -322,6 +330,15 @@ void killFighter(Engine* e, int vi, int ai) {
         if (ai >= 0 && ai != vi && M.f[ai].team != v.team) {
             fd.killer = M.f[ai].name; fd.kt = M.f[ai].team; fd.you = fd.you || !M.f[ai].bot;
             fd.weapon = g_killWeapon.empty() ? gunOf(M.f[ai].weapon).name : g_killWeapon;
+            // abate com a arma (não granada) de skin: a tela usa a mensagem própria dela, se tiver
+            const bool deTiro = g_killWeapon.empty() || g_killWeapon == gunOf(M.f[ai].weapon).name;  // (granada não)
+            const std::string sk = deTiro ? skinNaMao(M, M.f[ai]) : "";
+            if (!sk.empty()) fd.skin = std::string(gunOf(M.f[ai].weapon).key) + ":" + sk;
+            if (!fd.skin.empty() && !M.f[ai].bot && !M.f[ai].remote) {
+                ++M.abateSkinN;
+                M.abateSkin = fd.skin;
+                M.abateSkinVitima = v.name;
+            }
         }
         M.feed.push_back(fd);
         if (M.feed.size() > 5) M.feed.erase(M.feed.begin());
@@ -421,8 +438,8 @@ void botShoot(Engine* e, int fi, int ti) {
         glm::vec3 hit; GameObject* obj = nullptr; float frac;
         bool any = e->physics.raycastIgnoring(from, from + dir * (dist + 25.f), self, hit, obj, frac);
         glm::vec3 end = any ? hit : from + dir * (dist + 25.f);
-        if (p == 0) addFlash(e, fxMuzzleFlash(e->particles, e->fxRng, muzzle, glm::normalize(end - muzzle)), 0.06f);
-        fxBullet(e->particles, muzzle, end);
+        if (p == 0) muzzleFx(e, c.weapon, muzzle, glm::normalize(end - muzzle));
+        bulletFx(e, c.weapon, muzzle, end);
         if (any) {
             fxImpact(e->particles, e->fxRng, hit, dir);
             M.attacker = fi;
@@ -683,8 +700,8 @@ void remoteShotFx(Engine* e, Fighter& f, CharacterInfo& c, GameObject& g) {
     btRigidBody* self = g.rigidBody ? g.rigidBody->body : nullptr;
     bool any = e->physics.raycastIgnoring(from, from + dir * 200.f, self, hit, obj, frac);
     glm::vec3 end = any ? hit : from + dir * 200.f;
-    addFlash(e, fxMuzzleFlash(e->particles, e->fxRng, muzzle, glm::normalize(end - muzzle)), 0.06f);
-    fxBullet(e->particles, muzzle, end);
+    muzzleFx(e, c.weapon, muzzle, glm::normalize(end - muzzle));
+    bulletFx(e, c.weapon, muzzle, end);
     if (any) fxImpact(e->particles, e->fxRng, hit, dir);
     playSound(e, c.shotSound.empty() ? "tiro_m4" : c.shotSound.c_str(), muzzle, 1.f);
     c.fireAnim = 0.3f;
@@ -1132,8 +1149,10 @@ std::string hudJson(Engine* e) {
     }
     json feed = json::array();
     for (const auto& fd : M.feed)
-        if (fd.age < 7.f) feed.push_back({{"a", fd.killer}, {"at", fd.kt}, {"v", fd.victim}, {"vt", fd.vt}, {"arma", fd.weapon}, {"voce", fd.you}});
+        if (fd.age < 7.f)
+            feed.push_back({{"a", fd.killer}, {"at", fd.kt}, {"v", fd.victim}, {"vt", fd.vt}, {"arma", fd.weapon}, {"voce", fd.you}, {"skin", fd.skin}});
     j["abatidos"] = feed;
+    j["abateSkin"] = {{"n", M.abateSkinN}, {"skin", M.abateSkin}, {"vitima", M.abateSkinVitima}};
     json players = json::array();
     for (const Fighter& f : M.f) players.push_back({{"nome", f.name}, {"time", f.team}, {"abates", f.kills}, {"mortes", f.deaths}, {"voce", !f.bot}});
     j["jogadores"] = players;

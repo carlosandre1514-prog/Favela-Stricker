@@ -68,6 +68,7 @@ void    engine_set_camera(Engine*, float tx, float ty, float tz, float yaw, floa
 
 int     engine_import_project(Engine*, const char* json);       // 0 se inválido (ver engine_last_error)
 int     engine_add_spec(Engine*, const char* spec_json);        // cria um objeto pela receita JSON e seleciona
+void    engine_test_shot(Engine*, int id);                      // teste: tiro da arma (efeito da skin, se tiver)
 void    engine_set_time_of_day(Engine*, float hour);
 float   engine_get_time_of_day(Engine*);
 

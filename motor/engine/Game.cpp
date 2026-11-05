@@ -184,9 +184,9 @@ void enemyAttack(Engine* e, CharacterInfo& c, GameObject& go, Behavior& b, Chara
     btRigidBody* self = go.rigidBody ? go.rigidBody->body : nullptr;
     bool any = e->physics.raycastIgnoring(chest, chest + dir * (dist + 30.f), self, hit, obj, frac);
     glm::vec3 end = any ? hit : chest + dir * (dist + 30.f);
-    addFlash(e, fxMuzzleFlash(e->particles, e->fxRng, muzzle, glm::normalize(end - muzzle)), 0.06f);
+    muzzleFx(e, c.weapon, muzzle, glm::normalize(end - muzzle));
     playSound(e, c.shotSound.empty() ? "tiro_pistola" : c.shotSound.c_str(), muzzle, 1.f);
-    fxBullet(e->particles, muzzle, end);
+    bulletFx(e, c.weapon, muzzle, end);
     if (any) fxImpact(e->particles, e->fxRng, hit, dir);
     if (any && rootOf(e, obj) == &pg) hurtPlayer(e, b.dano);
 }

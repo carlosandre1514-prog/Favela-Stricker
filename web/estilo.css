@@ -203,6 +203,30 @@ input[type=range]::-moz-range-thumb { width: 18px; height: 18px; border-radius: 
 #placar .meta { font-size: 11px; padding: 1px 8px; border-radius: 6px; background: rgba(11, 15, 23, 0.6); }
 #abates { position: absolute; right: 66px; top: 10px; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
 #abates span { font-size: 12px; padding: 3px 9px; border-radius: 7px; background: var(--escuro); }
+/* abate com a AK-47 Dragão Azul: linha azul e dourada no quadro e faixa grande no meio da tela */
+#abates span.abate-dragao { background: linear-gradient(90deg, rgba(12, 32, 84, 0.92), rgba(20, 60, 140, 0.88)); border: 1px solid rgba(232, 182, 72, 0.75);
+  box-shadow: 0 0 10px rgba(60, 140, 255, 0.55); }
+#abates span.abate-dragao i { color: #7cc0ff; font-style: normal; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; }
+#abates span.abate-dragao em { color: #f2c464; font-style: normal; font-weight: 700; }
+#abate-skin { position: absolute; left: 50%; top: 24%; transform: translateX(-50%); display: none; flex-direction: column; align-items: center; gap: 2px;
+  padding: 10px 26px 12px; border-radius: 14px; pointer-events: none; text-align: center; white-space: nowrap; }
+#abate-skin.mostrar { display: flex; animation: abateSkin 2.6s ease-out forwards; }
+#abate-skin.abate-dragao { background: radial-gradient(ellipse at center, rgba(25, 70, 170, 0.92), rgba(6, 16, 44, 0.9) 70%);
+  border: 1px solid rgba(232, 182, 72, 0.85); box-shadow: 0 0 24px rgba(70, 150, 255, 0.75), inset 0 0 18px rgba(120, 190, 255, 0.35); }
+#abate-skin small { font-size: 11px; font-weight: 800; letter-spacing: 0.16em; text-transform: uppercase; color: #f2c464; }
+#abate-skin strong { font-size: 26px; font-weight: 900; letter-spacing: 0.04em; text-transform: uppercase; color: #e8f3ff;
+  text-shadow: 0 0 12px rgba(90, 170, 255, 0.95), 0 0 2px #fff; }
+#abate-skin span { font-size: 14px; font-weight: 700; color: #a9d2ff; }
+#abate-skin span b { color: #fff; }
+@keyframes abateSkin {
+  0% { opacity: 0; transform: translateX(-50%) scale(1.35); filter: brightness(2.2); }
+  12% { opacity: 1; transform: translateX(-50%) scale(0.96); filter: brightness(1.4); }
+  20% { transform: translateX(-50%) scale(1); filter: brightness(1); }
+  80% { opacity: 1; transform: translateX(-50%) scale(1); }
+  100% { opacity: 0; transform: translateX(-50%) translateY(-12px) scale(1); }
+}
+@media (prefers-reduced-motion: reduce) { #abate-skin.mostrar { animation: abateSkinCalmo 2.6s linear forwards; } }
+@keyframes abateSkinCalmo { 0%, 85% { opacity: 1; } 100% { opacity: 0; } }
 #pausar { position: absolute; right: 14px; top: 10px; width: 44px; height: 44px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.25);
   background: var(--escuro); display: flex; align-items: center; justify-content: center; }
 #rede { position: absolute; left: 50%; top: 66px; transform: translateX(-50%); font-size: 11px; font-weight: 800; padding: 2px 8px; border-radius: 6px; background: rgba(11, 15, 23, 0.6); }

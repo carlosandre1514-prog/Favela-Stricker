@@ -39,6 +39,12 @@ struct Emitter {
     glm::vec3 a{0.f}, b{0.f};
     float raio = 0.03f;
     int estilo = 0;          // FX_Raios: 0 faíscas, 1 aura de fumaça brilhante com brasas, 2 aura de raios (arma toda)
+    // tiro personalizado da skin ("disparo" no _efeito.json): sopro de dragão na boca do cano, bala colorida e a
+    // pintura acendendo forte a cada tiro (pulso)
+    bool disparo = false;
+    glm::vec3 corDisparo{0.2f, 0.55f, 1.f}, corDisparo2{1.f, 0.75f, 0.3f};
+    float pulso = 0.f, emiBase = 1.f;
+    glm::vec4 rimBase{0.f};
     glm::vec3 ultimo{0.f};   // posição no frame anterior (as partículas acompanham a arma quando ela anda)
     bool temUltimo = false;
     GameObject* owner = nullptr;
@@ -62,7 +68,9 @@ FxLight fxAuraArma(ParticleSystem& ps, Rng& r, const glm::mat4& world, glm::vec3
                    float& accFumaca, float& accBrasa, float& accEstalo, float& accHalo, float& accNevoa, glm::vec3 velArma = glm::vec3(0.f),
                    bool eletrico = false, float tempo = 0.f);  // eletrico: raios em zigue-zague no lugar das labaredas
 FxLight fxMuzzleFlash(ParticleSystem& ps, Rng& r, glm::vec3 pos, glm::vec3 dir);
-void fxBullet(ParticleSystem& ps, glm::vec3 from, glm::vec3 to);
+void fxBullet(ParticleSystem& ps, glm::vec3 from, glm::vec3 to, const glm::vec3* cor = nullptr);  // cor: bala colorida (skin)
+// Tiro de skin com efeito próprio: sopro de fogo azul (cor) com faíscas douradas (cor2), anel de choque e clarão
+FxLight fxDisparoSkin(ParticleSystem& ps, Rng& r, glm::vec3 pos, glm::vec3 dir, glm::vec3 cor, glm::vec3 cor2);
 void fxImpact(ParticleSystem& ps, Rng& r, glm::vec3 pos, glm::vec3 dir);
 void fxSpellTrail(ParticleSystem& ps, Rng& r, const FxPalette& pal, glm::vec3 pos, glm::vec3 vel, float dt);
 

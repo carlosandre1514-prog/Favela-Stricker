@@ -456,7 +456,7 @@ FxLight fxMuzzleFlash(ParticleSystem& ps, Rng& r, glm::vec3 pos, glm::vec3 dir) 
     return {pos, {1.f, 0.7f, 0.35f}, 14.f, 6.f};
 }
 
-void fxBullet(ParticleSystem& ps, glm::vec3 from, glm::vec3 to) {
+void fxBullet(ParticleSystem& ps, glm::vec3 from, glm::vec3 to, const glm::vec3* cor) {
     glm::vec3 d = to - from;
     float dist = glm::length(d);
     if (dist < 0.5f) return;
@@ -465,8 +465,49 @@ void fxBullet(ParticleSystem& ps, glm::vec3 from, glm::vec3 to) {
     b.pos = from; b.vel = d / dist * speed; b.life = std::min(dist / speed, 1.5f);
     b.size0 = b.size1 = 0.025f; b.stretch = 0.025f;
     b.color0 = glm::vec4(1.f, 0.9f, 0.6f, 1.f) * 2.f; b.color1 = glm::vec4(1.f, 0.8f, 0.4f, 0.6f);
+    if (cor) {  // bala da skin: miolo quase branco puxado para a cor, rastro mais longo
+        const glm::vec3 c = glm::mix(*cor, glm::vec3(1.f), 0.5f);
+        b.size0 = b.size1 = 0.03f; b.stretch = 0.035f;
+        b.color0 = glm::vec4(c * 2.6f, 1.f); b.color1 = glm::vec4(*cor * 1.8f, 0.7f);
+    }
     b.shape = PS_Spark;
     ps.emit(b);
+}
+
+FxLight fxDisparoSkin(ParticleSystem& ps, Rng& r, glm::vec3 pos, glm::vec3 dir, glm::vec3 cor, glm::vec3 cor2) {
+    const glm::vec3 branco = glm::mix(cor, glm::vec3(1.f), 0.35f);
+    // clarão em estrela
+    ParticleSpawn f;
+    f.pos = pos + dir * 0.05f; f.life = 0.06f; f.size0 = 0.24f; f.size1 = 0.12f;
+    f.color0 = glm::vec4(branco * 1.9f, 1.f); f.color1 = glm::vec4(cor, 0.f);
+    f.shape = PS_Star; f.rot = r.range(0.f, 6.28f);
+    ps.emit(f);
+    // sopro do dragão: labaredas azuis saindo pela frente, apagando em dourado
+    for (int i = 0; i < 16; ++i) {
+        ParticleSpawn p;
+        p.pos = pos + dir * 0.04f;
+        p.vel = glm::normalize(dir + randDir(r) * 0.22f) * r.range(3.f, 7.f);
+        p.life = r.range(0.07f, 0.15f); p.size0 = r.range(0.03f, 0.045f); p.size1 = r.range(0.1f, 0.14f);
+        p.color0 = glm::vec4(glm::mix(branco, cor, 0.3f + 0.7f * r.f()) * 1.6f, 0.8f); p.color1 = glm::vec4(cor2 * 1.2f, 0.f);
+        p.shape = r.chance(0.6f) ? PS_Flame : PS_Glow; p.rot = r.range(0.f, 6.28f); p.drag = 9.f; p.occlusion = 0.08f;
+        ps.emit(p);
+    }
+    // faíscas douradas espirrando
+    for (int i = 0; i < 10; ++i) {
+        ParticleSpawn p;
+        p.pos = pos;
+        p.vel = glm::normalize(dir + randDir(r) * 0.6f) * r.range(4.f, 10.f);
+        p.life = r.range(0.1f, 0.25f); p.size0 = p.size1 = 0.012f;
+        p.color0 = glm::vec4(glm::mix(cor2, glm::vec3(1.f), 0.3f) * 3.f, 1.f); p.color1 = glm::vec4(cor2, 0.f);
+        p.shape = PS_Spark; p.stretch = 0.02f; p.gravity = 4.f;
+        ps.emit(p);
+    }
+    // anel de choque
+    ParticleSpawn a;
+    a.pos = pos + dir * 0.06f; a.life = 0.12f; a.size0 = 0.04f; a.size1 = 0.28f;
+    a.color0 = glm::vec4(branco * 2.f, 0.8f); a.color1 = glm::vec4(cor, 0.f); a.shape = PS_Ring;
+    ps.emit(a);
+    return {pos, glm::mix(cor, cor2, 0.25f), 18.f, 7.f};
 }
 
 void fxImpact(ParticleSystem& ps, Rng& r, glm::vec3 pos, glm::vec3 dir) {

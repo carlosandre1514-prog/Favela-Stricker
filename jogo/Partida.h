@@ -63,7 +63,10 @@ struct TeamMatch {
     std::map<std::string, std::string> gunSkins;   // skin escolhida de cada arma do jogador
     struct Nade { Scene::Handle h; glm::vec3 pos{0.f}, vel{0.f}; float t = 3.f; int owner = -1; bool visual = false; };
     std::vector<Nade> nades;                   // granadas no ar/no chão (explodem em 3 s)
-    struct Feed { std::string killer, victim, weapon; int kt = 0, vt = 0; bool you = false; float age = 0.f; };
+    struct Feed { std::string killer, victim, weapon, skin; int kt = 0, vt = 0; bool you = false; float age = 0.f; };
+    // abate do jogador com skin que tem mensagem própria (a tela mostra a faixa quando o número muda)
+    int abateSkinN = 0;
+    std::string abateSkin, abateSkinVitima;
     std::vector<Feed> feed;                    // últimos abates (quadro do HUD)
     float lastDamage = 0.f;                    // tempo desde o último dano no jogador
     // munição que o inimigo abatido derruba (offline): caixinha girando no chão; passando por cima, pega

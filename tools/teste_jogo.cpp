@@ -255,12 +255,22 @@ int main(int argc, char** argv) {
         h = hud();
         std::printf("  depois do tiro do amigo: morto=%d placar %s, aviso de abate %s\n", int(h.value("morto", false)), h["placar"].dump().c_str(), abate ? "sim" : "não");
         if (!abate || h["placar"][1] != 1) { std::printf("  [ERRO] abate do jogador local\n"); ++g_fail; }
-        // eu abato o amigo (aviso que chegou do celular dele)
+        // eu abato o amigo (aviso que chegou do celular dele), com skin na minha M4A1: o abate sai com a skin
+        jogo_skin_arma(e, "m4a1", "neon");
         jogo_rede_evento(e, json{{"t", "abate"}, {"v", "amigo"}, {"a", "eu"}, {"arma", "M4A1"}}.dump().c_str());
         frames(e, 2);
         h = hud();
         std::printf("  depois de abater o amigo: placar %s, meus abates %d\n", h["placar"].dump().c_str(), int(h["abates"]));
         if (h["placar"][0] != 1 || h["abates"] != 1) { std::printf("  [ERRO] abate recebido\n"); ++g_fail; }
+        {
+            const json& as = h["abateSkin"];
+            const json& fd = h["abatidos"].back();
+            std::printf("  abate com skin: faixa n=%d skin=%s, quadro skin=%s\n", as.value("n", 0), as.value("skin", "").c_str(), fd.value("skin", "").c_str());
+            if (as.value("n", 0) != 1 || as.value("skin", "") != "m4a1:neon" || fd.value("skin", "") != "m4a1:neon") {
+                std::printf("  [ERRO] abate com skin\n"); ++g_fail;
+            }
+        }
+        jogo_skin_arma(e, "m4a1", "");
         st["amigo"]["v"] = true; st["amigo"]["p"] = {p[0] + 3.f, p[1], p[2] - 12.f};
         jogo_rede_aplicar(e, st.dump().c_str());
         frames(e, 30);
@@ -482,6 +492,7 @@ int main(int argc, char** argv) {
                 for (int k = 0; k < 4; ++k) {
                     engine_set_camera(e, k == 3 ? -0.15f : 0.f, 1.02f, 0.f, cams[k][0], cams[k][1], cams[k][2]);
                     frames(e, 20);  // (efeitos de partícula da skin, como os raios, já aparecem)
+                    if (std::getenv("TIRO")) { engine_test_shot(e, id); frames(e, std::atoi(std::getenv("TIRO"))); }  // TIRO=quadros depois do tiro
                     save(out, ("angulo" + std::to_string(k) + "_" + g + (sk.empty() ? "" : "_" + sk) + ".png").c_str());
                 }
             }

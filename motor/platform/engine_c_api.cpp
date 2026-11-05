@@ -453,6 +453,21 @@ int engine_import_project(Engine* e, const char* json) {
     return ok ? 1 : 0;
 }
 int engine_add_spec(Engine* e, const char* json) { return e && json ? createSpec(e, json) : -1; }
+// Teste: um tiro da arma (objeto id) na direção do cano, com o efeito da skin se ela tiver
+void engine_test_shot(Engine* e, int id) {
+    if (!e) return;
+    eng::GameObject* w = eng::objectById(e, id);
+    if (!w) return;
+    eng::AABB b;
+    if (!eng::subtreeBounds(e, *w, b)) return;
+    const glm::mat4& m = w->transform.world();
+    const glm::vec3 dir = glm::normalize(glm::vec3(m[2]));
+    const glm::vec3 c = (b.min + b.max) * 0.5f;
+    const float meio = glm::dot(b.max - b.min, glm::abs(dir)) * 0.5f;
+    const glm::vec3 boca = c + dir * meio + glm::vec3(0.f, (b.max.y - b.min.y) * 0.25f, 0.f);
+    eng::muzzleFx(e, eng::Scene::handleOf(*w), boca, dir);
+    eng::bulletFx(e, eng::Scene::handleOf(*w), boca, boca + dir * 30.f);
+}
 void engine_set_time_of_day(Engine* e, float hour) { if (e) eng::setTimeOfDay(e, hour); }
 float engine_get_time_of_day(Engine* e) { return e ? e->timeOfDay : 13.f; }
 

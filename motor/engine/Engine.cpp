@@ -1211,14 +1211,14 @@ static void fireGun(Engine* e, CharacterInfo& c, GameObject& root, btRigidBody* 
     glm::vec3 muzzle = from + aim;
     if (GameObject* w = e->scene.get(c.weapon)) muzzle = glm::vec3(w->transform.world() * glm::vec4(c.muzzle, 1.f));
     playSound(e, c.shotSound.empty() ? "tiro_m4" : c.shotSound.c_str(), muzzle, 1.f);
-    addFlash(e, fxMuzzleFlash(e->particles, e->fxRng, muzzle, aim), 0.06f);
+    muzzleFx(e, c.weapon, muzzle, aim);
     for (int k = 0; k < c.gunPellets; ++k) {
         glm::vec3 j(e->fxRng.range(-1.f, 1.f), e->fxRng.range(-1.f, 1.f), e->fxRng.range(-1.f, 1.f));
         glm::vec3 dir = glm::normalize(aim + j * spread);
         glm::vec3 hit; GameObject* obj = nullptr; float frac = 1.f;
         bool any = e->physics.raycastIgnoring(from, from + dir * 300.f, self, hit, obj, frac);
         glm::vec3 end = any ? hit : from + dir * 300.f;
-        fxBullet(e->particles, muzzle, end);
+        bulletFx(e, c.weapon, muzzle, end);
         if (!any) continue;
         fxImpact(e->particles, e->fxRng, hit, dir);
         if (k == 0) playSound(e, "impacto", end, 0.5f);
@@ -1276,13 +1276,13 @@ static void fire(Engine* e, CharacterInfo& c, GameObject& root, btRigidBody* sel
         glm::vec3 muzzle = end;
         if (GameObject* w = e->scene.get(c.weapon)) muzzle = glm::vec3(w->transform.world() * glm::vec4(c.muzzle, 1.f));
         glm::vec3 shotDir = glm::normalize(end - muzzle);
-        addFlash(e, fxMuzzleFlash(e->particles, e->fxRng, muzzle, shotDir), 0.06f);
+        muzzleFx(e, c.weapon, muzzle, shotDir);
         playSound(e, c.shotSound.empty() ? "tiro_m4" : c.shotSound.c_str(), muzzle, 1.f);
         if (any) playSound(e, "impacto", end, 0.5f);
         int pellets = kind == WK_Shotgun ? 6 : 1;
         for (int k = 0; k < pellets; ++k) {
             glm::vec3 jitter = k ? glm::vec3(e->fxRng.range(-1.f, 1.f), e->fxRng.range(-1.f, 1.f), e->fxRng.range(-1.f, 1.f)) * 0.04f * glm::length(end - muzzle) : glm::vec3(0.f);
-            fxBullet(e->particles, muzzle, end + jitter);
+            bulletFx(e, c.weapon, muzzle, end + jitter);
         }
         if (any) fxImpact(e->particles, e->fxRng, hit, dir);
     } else if (any) {
@@ -1814,12 +1814,39 @@ void castSpell(Engine* e, int element) {
     }
 }
 
+static Emitter* skinShot(Engine* e, Scene::Handle weapon) {
+    GameObject* w = e->scene.get(weapon);
+    return w && w->emitter && w->emitter->disparo ? w->emitter : nullptr;
+}
+void muzzleFx(Engine* e, Scene::Handle weapon, glm::vec3 muzzle, glm::vec3 dir) {
+    if (Emitter* em = skinShot(e, weapon)) {
+        addFlash(e, fxDisparoSkin(e->particles, e->fxRng, muzzle, dir, em->corDisparo, em->corDisparo2), 0.08f);
+        em->pulso = 1.f;  // a pintura acende forte e apaga (updateEffects)
+        return;
+    }
+    addFlash(e, fxMuzzleFlash(e->particles, e->fxRng, muzzle, dir), 0.06f);
+}
+void bulletFx(Engine* e, Scene::Handle weapon, glm::vec3 from, glm::vec3 to) {
+    Emitter* em = skinShot(e, weapon);
+    fxBullet(e->particles, from, to, em ? &em->corDisparo : nullptr);
+}
+
 void updateEffects(Engine* e, float dt) {
     e->castCooldown -= dt;
     // emissores (rodam também no editor, para ver o efeito enquanto monta a cena)
     e->emitters.forEach([&](Emitter& em, EmitterPool::Handle) {
         GameObject* o = em.owner;
         if (!o || !o->active) return;
+        if (em.disparo && em.pulso > 0.f) {  // pulso do tiro: a pintura e a borda acendem e apagam
+            em.pulso = std::max(0.f, em.pulso - dt * 7.f);
+            const float k = em.pulso * em.pulso;
+            Scene::forEachInSubtree(*o, [&](GameObject& p) {
+                if (!p.meshRenderer) return;
+                e->renderer.setEmissive(p.meshRenderer->material, glm::vec3(em.emiBase * (1.f + 2.5f * k)));
+                e->renderer.setRim(p.meshRenderer->material, glm::vec4(glm::vec3(em.rimBase), em.rimBase.w * (1.f + 2.f * k)));
+            });
+        }
+        if (em.kind == FX_Raios && em.estilo < 0) return;  // só o tiro (sem efeito contínuo)
         if (em.kind == FX_Raios) {
             em.timer += dt;
             const glm::vec3 agora = o->transform.worldPosition();
@@ -1879,6 +1906,7 @@ int gatherLights(Engine* e, PointLight* out, int max) {
     e->emitters.forEach([&](Emitter& em, EmitterPool::Handle) {
         GameObject* o = em.owner;
         if (!o || !o->active || em.kind == FX_Smoke || em.kind == FX_Explosion) return;
+        if (em.kind == FX_Raios && em.estilo < 0) return;
         if (em.kind == FX_Raios) {  // luz azul fraca no meio da arma, piscando como eletricidade
             const float pisca = em.estilo == 2 ? (std::sin(em.timer * 47.f) * std::sin(em.timer * 13.1f) > -0.2f ? 1.f : 0.35f)
                                                : 0.65f + 0.35f * std::sin(em.timer * 31.f) * std::sin(em.timer * 11.7f);

@@ -285,6 +285,8 @@ void applyMaterialTo(Engine* e, GameObject& g, bool subtree, const json& spec) {
         glm::vec4 aura(0.f);
         glm::vec3 raios(-1.f);
         int estiloRaios = 0;
+        bool disparo = false;
+        glm::vec3 corDisparo(0.2f, 0.55f, 1.f), corDisparo2(1.f, 0.75f, 0.3f);
         if (existe(base + "_efeito.json")) {
             std::ifstream in(base + "_efeito.json");
             json ef = json::parse(in, nullptr, false);
@@ -297,6 +299,16 @@ void applyMaterialTo(Engine* e, GameObject& g, bool subtree, const json& spec) {
                 if (ef.contains("aura_particulas") && ef["aura_particulas"].is_array() && ef["aura_particulas"].size() == 3) {
                     for (int k = 0; k < 3; ++k) raios[k] = ef["aura_particulas"][k].is_number() ? ef["aura_particulas"][k].get<float>() : 0.f;
                     estiloRaios = 1;
+                }
+                if (ef.contains("disparo") && ef["disparo"].is_object()) {
+                    disparo = true;
+                    const json& d = ef["disparo"];
+                    auto cor3 = [&](const char* k, glm::vec3& c) {
+                        if (d.contains(k) && d[k].is_array() && d[k].size() == 3)
+                            for (int q = 0; q < 3; ++q) c[q] = d[k][q].is_number() ? d[k][q].get<float>() : c[q];
+                    };
+                    cor3("cor", corDisparo);
+                    cor3("cor2", corDisparo2);
                 }
                 if (ef.contains("aura_raios") && ef["aura_raios"].is_array() && ef["aura_raios"].size() == 3) {
                     for (int k = 0; k < 3; ++k) raios[k] = ef["aura_raios"][k].is_number() ? ef["aura_raios"][k].get<float>() : 0.f;
@@ -333,7 +345,15 @@ void applyMaterialTo(Engine* e, GameObject& g, bool subtree, const json& spec) {
                 remap.push_back({mr.material, id});
                 mr.material = id;
             });
-            if (raios.x >= 0.f) anexarRaios(e, g, raios, estiloRaios);
+            if (raios.x >= 0.f || disparo) anexarRaios(e, g, raios.x >= 0.f ? raios : glm::vec3(1.f), raios.x >= 0.f ? estiloRaios : -1);
+            if (disparo && g.emitter) {
+                Emitter& em = *g.emitter;
+                em.disparo = true;
+                em.corDisparo = corDisparo;
+                em.corDisparo2 = corDisparo2;
+                em.emiBase = forcaEmi;
+                em.rimBase = aura;
+            }
         } else {
             e->lastError = "não consegui ler a imagem " + it->get<std::string>();
         }

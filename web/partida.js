@@ -167,6 +167,7 @@ function montarHud(online) {
       <span class="meta" id="meta">até 50 abates</span></div>
     <div id="rede" style="display:${online ? '' : 'none'}"></div>
     <div id="abates"></div>
+    <div id="abate-skin" aria-live="polite"></div>
     <button id="pausar" aria-label="Pausar">${ICONE.pausa}</button>
     <div id="centro"></div>
     <button id="botao-loja">${ICONE.sacola}<span>Loja de armas</span></button>
@@ -268,6 +269,11 @@ function desenharMinimapa(cv, pontos, meuTime) {
 }
 
 const corTime = (t) => (t === 0 ? '#93C5FD' : '#FCD34D');
+
+// Skins com abate próprio: frase no quadro de abates e faixa grande na tela de quem abateu (chave "arma:skin")
+const ABATES_SKIN = {
+  'ak47:dragao_azul': { classe: 'dragao', titulo: 'Fúria do Dragão', frase: 'devorou', arma: 'AK-47 Dragão Azul' },
+};
 function atualizarHud(j) {
   const t = partida && partida.hud;
   if (!t || !t.isConnected) return;
@@ -333,9 +339,25 @@ function atualizarHud(j) {
   bl.querySelector('span').textContent = rot;
   // abates (últimos 4)
   const feed = (j.abatidos || []).slice(-4);
-  $('#abates', t).innerHTML = feed.map((f) => (f.a
-    ? `<span><b style="color:${corTime(f.at)}">${f.voce ? 'Você' : esc(f.a)}</b> abateu <b style="color:${corTime(f.vt)}">${esc(f.v)}</b>${f.arma ? ' · ' + esc(f.arma) : ''}</span>`
-    : `<span><b style="color:${corTime(f.vt)}">${esc(f.v)}</b> caiu</span>`)).join('');
+  $('#abates', t).innerHTML = feed.map((f) => {
+    if (!f.a) return `<span><b style="color:${corTime(f.vt)}">${esc(f.v)}</b> caiu</span>`;
+    const s = ABATES_SKIN[f.skin];
+    if (s) return `<span class="abate-${s.classe}"><b style="color:${corTime(f.at)}">${f.voce ? 'Você' : esc(f.a)}</b> <i>${s.frase}</i> <b style="color:${corTime(f.vt)}">${esc(f.v)}</b> · <em>${s.arma}</em></span>`;
+    return `<span><b style="color:${corTime(f.at)}">${f.voce ? 'Você' : esc(f.a)}</b> abateu <b style="color:${corTime(f.vt)}">${esc(f.v)}</b>${f.arma ? ' · ' + esc(f.arma) : ''}</span>`;
+  }).join('');
+  // faixa do abate com skin (só para quem abateu): aparece quando o número muda
+  const as = j.abateSkin || {};
+  if (partida.abateSkinN === undefined) partida.abateSkinN = as.n | 0;
+  if ((as.n | 0) > partida.abateSkinN && ABATES_SKIN[as.skin]) {
+    const s = ABATES_SKIN[as.skin];
+    const el = $('#abate-skin', t);
+    el.className = 'abate-' + s.classe;
+    el.innerHTML = `<small>${esc(s.arma)}</small><strong>${esc(s.titulo)}</strong><span>${s.frase} <b>${esc(as.vitima)}</b></span>`;
+    void el.offsetWidth;  // reinicia a animação
+    el.classList.add('mostrar');
+    if (config.vibrar) motor.vibrar(60);
+  }
+  partida.abateSkinN = as.n | 0;
   desenharMinimapa($('#minimapa', t), j.mapa, j.time | 0);
 }
 
