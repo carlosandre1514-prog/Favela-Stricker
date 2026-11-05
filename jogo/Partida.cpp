@@ -23,30 +23,36 @@ bool sameHandle(Scene::Handle a, Scene::Handle b) { return a.index == b.index &&
 // Roupas da partida: o personagem é sempre o mesmo boneco em blocos (estilo Roblox); cada roupa é um conjunto
 // de cores, estampa da camisa, colete, chapéu e luvas. As 10 são gratuitas (pagas novas entram no mercado).
 struct SkinDef { const char* name; int price; const char* look; };
-const SkinDef kSkins[2][5] = {
+const SkinDef kSkins[2][6] = {
     {{"PM", 0, R"({"camisa":"#6E86A8","calca":"#25324A","tenis":"#16161A","chapeu":"bone","cor_chapeu":"#25324A","colete":true,"cor_colete":"#1E1E22","manga_comprida":true})"},
      {"Polícia Civil", 0, R"({"camisa":"#1C1C20","calca":"#2E4A78","tenis":"#3A2A20","chapeu":"bone","cor_chapeu":"#1C1C20","colete":true,"cor_colete":"#2A2A2E","estampa":"gola","cor2":"#D9B24A"})"},
      {"Exército", 0, R"({"camisa":"#5C6B3A","calca":"#4A5530","tenis":"#3B2E22","chapeu":"capacete","cor_chapeu":"#4E5A32","colete":true,"cor_colete":"#6B7A45","manga_comprida":true,"luvas":"#2E2A22"})"},
      {"Choque", 0, R"({"camisa":"#16181C","calca":"#16181C","tenis":"#0E0E10","chapeu":"viseira","cor_chapeu":"#202228","colete":true,"cor_colete":"#2B2E34","manga_comprida":true,"luvas":"#0E0E10"})"},
-     // BOPE: a skin pintada já tem o colete (com a placa "BOPE"); o colete 3D por cima a esconderia
-     {"BOPE", 0, R"({"camisa":"#1E1F22","calca":"#1E1F22","tenis":"#121214","manga_comprida":true,"luvas":"#141416","colete":false})"}},
+     {"BOPE", 0, R"({"camisa":"#1E1F22","calca":"#1E1F22","tenis":"#121214","manga_comprida":true,"luvas":"#141416","colete":true,"cor_colete":"#1A1B1E"})"},
+     // BOPE Caveira: a skin pintada (boina, caveira, camuflagem) já tem o colete com a placa "BOPE"; o colete 3D a esconderia
+     {"BOPE Caveira", 0, R"({"camisa":"#1E1F22","calca":"#1E1F22","tenis":"#121214","manga_comprida":true,"luvas":"#141416","colete":false})"}},
     {{"Rubro", 0, R"({"camisa":"#C8202A","calca":"#18181C","tenis":"#F2F2F2","estampa":"listras","cor2":"#18181C","bermuda":true,"chapeu":"bone","cor_chapeu":"#F2F2F2","colete":true,"cor_colete":"#33382C"})"},
      {"Alvinegro", 0, R"({"camisa":"#F2F2F2","calca":"#18181C","tenis":"#18181C","estampa":"listras_em_pe","cor2":"#18181C","bermuda":true,"chapeu":"bone","cor_chapeu":"#18181C","colete":true,"cor_colete":"#33382C"})"},
      {"Tricolor", 0, R"({"camisa":"#1E7A3C","calca":"#F2F2F2","tenis":"#F2F2F2","estampa":"tres_cores","cor2":"#F2F2F2","cor3":"#8E1B2E","bermuda":true,"chapeu":"bone","cor_chapeu":"#F2F2F2","colete":true,"cor_colete":"#33382C"})"},
      {"Canarinho", 0, R"({"camisa":"#F5D21E","calca":"#1F4FA8","tenis":"#F2F2F2","estampa":"gola","cor2":"#1E8A3C","bermuda":true,"chapeu":"touca","cor_chapeu":"#1F4FA8","colete":true,"cor_colete":"#33382C"})"},
+     {"Faixa", 0, R"({"camisa":"#18181C","calca":"#18181C","tenis":"#F2F2F2","estampa":"faixa","cor2":"#F2F2F2","bermuda":true,"chapeu":"bone","cor_chapeu":"#18181C","colete":true,"cor_colete":"#33382C"})"},
      {"Faixa", 0, R"({"camisa":"#18181C","calca":"#18181C","tenis":"#F2F2F2","estampa":"faixa","cor2":"#F2F2F2","bermuda":true,"chapeu":"bone","cor_chapeu":"#18181C","colete":true,"cor_colete":"#33382C"})"}}};
 
 // Nome do arquivo da skin pintada de cada roupa: shaders/kit/personagens/texturas/<nome>.png (molde em docs/skins).
 // Com o arquivo, o boneco usa a imagem; sem ele, as cores acima.
-const char* kSkinFile[2][5] = {{"pm", "civil", "exercito", "choque", "especial"},
-                               {"rubro", "alvinegro", "tricolor", "canarinho", "faixa"}};
+// (a BOPE clássica, "", é só nas cores; a BOPE Caveira usa a folha pintada especial.png)
+const char* kSkinFile[2][6] = {{"pm", "civil", "exercito", "choque", "", "especial"},
+                               {"rubro", "alvinegro", "tricolor", "canarinho", "faixa", "faixa"}};
+// quantas roupas cada lado tem (a polícia tem 6; o 6º espaço dos bandidos não é usado)
+const int kSkinCount[2] = {6, 5};
+int clampSkin(int team, int skin) { return std::clamp(skin, 0, kSkinCount[std::clamp(team, 0, 1)] - 1); }
 
 // Aparência do boneco de um lutador: a roupa do lado + tom de pele e cabelo que variam de pessoa para pessoa
 json fighterLook(int team, int skin, const std::string& name) {
     team = std::clamp(team, 0, 1);
-    skin = std::clamp(skin, 0, 4);
+    skin = clampSkin(team, skin);
     json a = json::parse(kSkins[team][skin].look);
-    a["textura"] = std::string("kit:personagens/texturas/") + kSkinFile[team][skin] + ".png";
+    if (kSkinFile[team][skin][0]) a["textura"] = std::string("kit:personagens/texturas/") + kSkinFile[team][skin] + ".png";
     static const char* peles[] = {"#F2CCA8", "#E0AC84", "#C68C69", "#9A6444", "#6E4630", "#4E3222"};
     static const char* cabelos[] = {"#1A1410", "#3C2818", "#5A3A20", "#141414"};
     uint32_t h = 2166136261u;
@@ -80,9 +86,10 @@ bool knownGun(const std::string& key) {
     for (const GunDef& g : kGuns) if (key == g.key) return true;
     return false;
 }
-// arma de um lado: a pedida se for do lado; senão a padrão (polícia M4A1, bandidos AK-47)
+// arma pedida para o jogador: qualquer arma conhecida (a arma com skin comprada vale para os dois lados);
+// desconhecida, a padrão do lado (polícia M4A1, bandidos AK-47). A loja da base continua vendendo só as do lado.
 std::string gunForTeam(const std::string& key, int team) {
-    for (const GunDef& g : kGuns) if (key == g.key && (g.team < 0 || g.team == team)) return key;
+    for (const GunDef& g : kGuns) if (key == g.key) return key;
     return team ? "ak47" : "m4a1";
 }
 int charIndexOfRoot(Engine* e, Scene::Handle root) {
@@ -622,7 +629,7 @@ void teamStart(Engine* e) {
         f.bot = !s.player;
         json r = recipeOf(e, *g);
         f.name = f.bot ? std::string(g->name) : "Você";
-        f.skin = std::clamp(r.value("roupa", 0), 0, 4);
+        f.skin = clampSkin(f.team, r.value("roupa", 0));
         // robôs: a arma do projeto se for do lado (pistola, escopeta e sniper saíram: viram o fuzil do lado)
         static const char* botGuns[2][5] = {{"m4a1", "m4colt", "m4a1", "m4colt", "m4a1"}, {"ak47", "ak74", "ak74_tatica", "ak47", "ak74"}};
         std::string arma = r.value("arma", "");
@@ -630,7 +637,7 @@ void teamStart(Engine* e) {
         f.primary = f.weapon;
         f.secondary = "tt33";  // robôs também levam a pistola na coxa
         if (!f.bot) {  // escolhas do jogo: roupa, arma principal e a segunda (troca rápida; "" = só uma)
-            if (M.playerSkin >= 0) f.skin = std::clamp(M.playerSkin, 0, 4);
+            if (M.playerSkin >= 0) f.skin = clampSkin(f.team, M.playerSkin);
             if (!M.playerPrimary.empty()) f.weapon = gunForTeam(M.playerPrimary, f.team);
             f.primary = f.weapon;
             f.secondary = knownGun(M.playerSecondary) ? gunForTeam(M.playerSecondary, f.team) : "";
@@ -645,7 +652,7 @@ void teamStart(Engine* e) {
                 f.remote = true;
                 f.netId = h.value("id", "");
                 f.name = h.value("nome", "Jogador");
-                f.skin = std::clamp(h.value("skin", 0), 0, 4);
+                f.skin = clampSkin(f.team, h.value("skin", 0));
                 f.weapon = gunForTeam(h.value("arma", ""), f.team);
                 f.primary = f.weapon;
                 f.secondary = knownGun(h.value("arma2", "")) ? gunForTeam(h.value("arma2", ""), f.team) : "";
@@ -978,7 +985,7 @@ std::string shopJson(Engine* e) {
         items.push_back({{"id", 200}, {"arma", "granada"}, {"nome", "Granada"}, {"preco", 300}, {"tem", false}, {"usando", false},
                          {"qtd", f.grenades}, {"max", 2}});
     } else {
-        for (int k = 0; k < 5; ++k)
+        for (int k = 0; k < kSkinCount[sh.team]; ++k)
             items.push_back({{"id", 100 + k}, {"nome", kSkins[sh.team][k].name}, {"preco", kSkins[sh.team][k].price},
                              {"tem", kSkins[sh.team][k].price == 0 || owned(100 + k)}, {"usando", f.skin == k}});
     }
@@ -1005,7 +1012,7 @@ std::string shopBuy(Engine* e, int item) {
     std::string name;
     if (isSkin) {
         int k = item - 100;
-        if (sh.kind != 1 || k < 0 || k > 4) return "Item inválido";
+        if (sh.kind != 1 || k < 0 || k >= kSkinCount[sh.team]) return "Item inválido";
         price = kSkins[sh.team][k].price; name = kSkins[sh.team][k].name;
     } else {
         if (sh.kind != 0 || item < 0 || item >= kGunCount || (kGuns[item].team >= 0 && kGuns[item].team != sh.team)) return "Item inválido";

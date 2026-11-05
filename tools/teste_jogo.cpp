@@ -109,6 +109,21 @@ int main(int argc, char** argv) {
         if (!engine_import_project(e, lerProjeto(projPath).dump().c_str())) { std::printf("  [ERRO] o projeto da partida não abriu: %s\n", engine_last_error(e)); ++g_fail; }
     };
 
+    // Arma do jogador com skin na partida (SO_SKIN="ak47:dragao_azul", TIME=0/1): foto em primeira pessoa
+    if (const char* sk = std::getenv("SO_SKIN")) {
+        std::string a = sk, arma = a.substr(0, a.find(':')), skin = a.find(':') == std::string::npos ? "" : a.substr(a.find(':') + 1);
+        const int time = std::getenv("TIME") ? std::atoi(std::getenv("TIME")) : 1;
+        abrirPartida();
+        jogo_skin_arma(e, arma.c_str(), skin.c_str());
+        jogo_escolhas(e, time, 0, arma.c_str(), "tt33");
+        engine_set_first_person(e, 1);
+        engine_set_play(e, 1);
+        frames(e, 60);
+        save(out, ("skin_fp_" + arma + ".png").c_str());
+        std::printf(g_fail ? "FALHOU\n" : "OK\n");
+        return g_fail ? 1 : 0;
+    }
+
     auto steer = [&](int ch, int maxFrames, const std::function<glm::vec2(glm::vec3)>& dirOf, int run = 0) {
         float p[3], r[3], sc[3];
         for (int k = 0; k < maxFrames; ++k) {
@@ -414,7 +429,7 @@ int main(int argc, char** argv) {
     }
     if (std::getenv("SO_RETRATOS_BLOCO")) {
         using nlohmann::json;
-        static const char* keys[2][5] = {{"pm", "civil", "exercito", "choque", "especial"}, {"rubro", "alvinegro", "tricolor", "canarinho", "faixa"}};
+        static const char* keys[2][6] = {{"pm", "civil", "exercito", "choque", "especial", "bope_caveira"}, {"rubro", "alvinegro", "tricolor", "canarinho", "faixa", ""}};
         engine_new_scene(e);
         engine_set_time_of_day(e, 13.f);
         engine_set_quality(e, 0);  // sem sombra no chão (o recorte pega só o boneco)
@@ -422,7 +437,8 @@ int main(int argc, char** argv) {
         frames(e, 3);
         save(out, "previa_fundo.png");
         for (int t = 0; t < 2; ++t)
-            for (int k = 0; k < 5; ++k) {
+            for (int k = 0; k < 6; ++k) {
+                if (!keys[t][k][0]) continue;
                 json look = json::parse(jogo_aparencia_roupa(t, k));
                 if (std::getenv("COLETE")) { look["colete"] = true; look["cor_colete"] = "#2A2D33"; }  // colete em todas (conferir)
                 int id = engine_add_spec(e, json{{"tipo", "personagem"}, {"aparencia", look}, {"semente", 7}, {"pos", {0, 0, 0}}}.dump().c_str());

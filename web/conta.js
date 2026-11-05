@@ -11,7 +11,8 @@ const guardado = {
 // ---------------- catálogo (preços provisórios) ----------------
 const RARIDADES = { comum: 'Comum', rara: 'Rara', epica: 'Épica', lendaria: 'Lendária' };
 
-// Roupas (skins de personagem): o personagem é sempre o mesmo e sempre usa uma delas. As 10 são gratuitas.
+// Roupas (skins de personagem): o personagem é sempre o mesmo e sempre usa uma delas. Todas gratuitas
+// (polícia 6, bandidos 5).
 // A ordem de cada lado é a do motor (Game.cpp kSkins). Polícia só usa farda; bandido só roupa de bandido.
 const ROUPAS = [
   { key: 'pm', nome: 'PM', time: 0, i: 0, preco: 0, raridade: 'comum' },
@@ -19,6 +20,7 @@ const ROUPAS = [
   { key: 'exercito', nome: 'Exército', time: 0, i: 2, preco: 0, raridade: 'comum' },
   { key: 'choque', nome: 'Choque', time: 0, i: 3, preco: 0, raridade: 'comum' },
   { key: 'especial', nome: 'BOPE', time: 0, i: 4, preco: 0, raridade: 'comum' },
+  { key: 'bope_caveira', nome: 'BOPE Caveira', time: 0, i: 5, preco: 0, raridade: 'comum' },
   { key: 'rubro', nome: 'Rubro', time: 1, i: 0, preco: 0, raridade: 'comum' },
   { key: 'alvinegro', nome: 'Alvinegro', time: 1, i: 1, preco: 0, raridade: 'comum' },
   { key: 'tricolor', nome: 'Tricolor', time: 1, i: 2, preco: 0, raridade: 'comum' },
@@ -36,7 +38,14 @@ const ARMAS = [
   { key: 'ak74_tatica', nome: 'AK-74 tática', time: 1, dano: 28, cadencia: 9.5, pente: 30, cai: 45 },
 ];
 const armaPorKey = (k) => ARMAS.find((a) => a.key === k) || ARMAS[0];
-const armaInicial = (time) => (time === 0 ? 'm4a1' : 'ak47');
+// Arma com que o jogador começa: a do lado com skin equipada (a skin comprada aparece na mão); se a skin for de
+// uma arma do outro lado (ex.: AK-47 na Polícia), começa com ela assim mesmo; sem skin, a padrão do lado
+const armaPadrao = (time) => (time === 0 ? 'm4a1' : 'ak47');
+const armaInicial = (time) => {
+  const comSkin = ARMAS.filter((a) => a.key !== 'tt33' && conta.skinArma(a.key));
+  const doLado = comSkin.find((a) => a.time === time) || comSkin.find((a) => a.time !== time);
+  return doLado ? doLado.key : armaPadrao(time);
+};
 
 // Skins de arma (mercado, com moedas): só mudam a pintura, não o dano
 const SKINS_ARMA = [

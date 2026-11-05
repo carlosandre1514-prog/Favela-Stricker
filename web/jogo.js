@@ -192,7 +192,7 @@ function telaRoupa(time, pronto) {
   let sel = conta.roupa(time);
   const t = mostrar(html(`<div class="tela">
     <div class="linha cresce" style="align-items:stretch;gap:14px">
-      <div class="grade-itens cresce" id="r-grade" style="grid-template-columns:repeat(5,minmax(0,1fr));grid-auto-rows:1fr;align-content:stretch;overflow:hidden"></div>
+      <div class="grade-itens cresce" id="r-grade" style="grid-template-columns:repeat(${minhas.length},minmax(0,1fr));grid-auto-rows:1fr;align-content:stretch;overflow:hidden"></div>
     </div>
     <div class="linha"><span class="dica cresce">Você começa com a ${esc(armaPorKey(armaInicial(time)).nome)} e a TT-33. As outras armas compra na base, com o $ dos abates.</span>
       <button class="btn btn-ouro btn-grande" id="r-ir" style="height:48px;font-size:24px;width:200px">${pronto ? 'PRONTO' : `${ICONE.play} COMEÇAR`}</button></div>
