@@ -1,4 +1,3 @@
-#include <functional>
 #include "render/Effects.h"
 #include <algorithm>
 #include <cmath>
@@ -301,7 +300,7 @@ FxLight fxRaios(ParticleSystem& ps, Rng& r, const glm::mat4& world, glm::vec3 a,
 }
 
 FxLight fxAuraArma(ParticleSystem& ps, Rng& r, const glm::mat4& world, glm::vec3 a, glm::vec3 b, float raio, glm::vec3 cor, float dt,
-                   float& accFumaca, float& accBrasa, float& accEstalo, float& accHalo, float& accNevoa, glm::vec3 velArma, bool eletrico) {
+                   float& accFumaca, float& accBrasa, float& accEstalo, float& accHalo, float& accNevoa, glm::vec3 velArma, bool eletrico, float tempo) {
     auto mundo = [&](glm::vec3 p) { return glm::vec3(world * glm::vec4(p, 1.f)); };
     // direções da arma no mundo: comprimento (para trás: a aura escorre para a coronha) e "para fora"
     const glm::vec3 atras = glm::normalize(glm::vec3(world * glm::vec4(a - b, 0.f)) + glm::vec3(1e-5f));
@@ -321,36 +320,63 @@ FxLight fxAuraArma(ParticleSystem& ps, Rng& r, const glm::mat4& world, glm::vec3
         p.shape = PS_Glow; p.occlusion = 0.25f;
         ps.emit(p);
     }
-    // raio em zigue-zague: cada pedaço é um traço fino bem claro com um brilho largo em volta; às vezes abre um galho
-    std::function<void(glm::vec3, glm::vec3, int, float, float, bool)> zigue =
-        [&](glm::vec3 p0, glm::vec3 dir, int segs, float torto, float vida, bool galhos) {
-            for (int k = 0; k < segs; ++k) {
-                glm::vec3 d = glm::normalize(dir + randDir(r) * torto);
-                const float len = r.range(0.014f, 0.028f);
-                const glm::vec3 p1 = p0 + d * len;
-                const float v = 0.02f;
-                for (int camada = 0; camada < 2; ++camada) {
-                    ParticleSpawn s;
-                    const float tam = camada ? 0.012f : 0.0035f;
-                    s.pos = (p0 + p1) * 0.5f; s.vel = d * v;
-                    s.stretch = (len * 0.65f) / v;  // pedaços se sobrepõem: o raio sai como uma linha contínua
-                    s.life = vida; s.size0 = s.size1 = tam;
-                    if (camada) { s.color0 = glm::vec4(cor * 1.4f, 0.4f); s.color1 = glm::vec4(cor, 0.f); s.shape = PS_Glow; }
-                    else { s.color0 = glm::vec4(nucleo * 4.f, 1.f); s.color1 = glm::vec4(cor * 2.5f, 0.f); s.shape = PS_Spark; }
-                    ps.emit(s);
-                }
-                if (galhos && k > 1 && r.chance(0.22f)) zigue(p1, glm::normalize(d + randDir(r)), 2 + int(r.f() * 3.f), torto, vida * 0.8f, false);
-                p0 = p1;
-            }
-        };
+    // um pedaço de raio entre dois pontos (traço fino bem claro + brilho largo em volta)
+    auto traco = [&](glm::vec3 p0, glm::vec3 p1, float vida, float forca) {
+        const glm::vec3 dd = p1 - p0;
+        const float len = glm::length(dd);
+        if (len < 1e-5f) return;
+        const glm::vec3 d = dd / len;
+        const float v = 0.02f;
+        for (int camada = 0; camada < 2; ++camada) {
+            ParticleSpawn s;
+            const float tam = camada ? 0.011f : 0.0032f;
+            s.pos = (p0 + p1) * 0.5f; s.vel = d * v;
+            s.stretch = (len * 0.62f) / v;
+            s.life = vida; s.size0 = s.size1 = tam;
+            if (camada) { s.color0 = glm::vec4(cor * 1.4f * forca, 0.4f); s.color1 = glm::vec4(cor, 0.f); s.shape = PS_Glow; }
+            else { s.color0 = glm::vec4(nucleo * 4.f * forca, 1.f); s.color1 = glm::vec4(cor * 2.5f, 0.f); s.shape = PS_Spark; }
+            ps.emit(s);
+        }
+    };
     if (eletrico) {
-        // raios saindo da arma para fora (mais para trás, como a aura)
-        for (int n = count(accFumaca, 40.f, dt); n > 0; --n)
-            zigue(mundo(pontoNaArma(0.5f)), glm::normalize(randDir(r) + atras * 0.6f), 5 + int(r.f() * 5.f), 0.7f,
-                 r.range(0.07f, 0.14f), true);
-        // raios correndo pela arma, rentes a ela (de um lado para o outro)
-        for (int n = count(accEstalo, 18.f, dt); n > 0; --n)
-            zigue(mundo(pontoNaArma(0.6f)), r.chance(0.5f) ? atras : -atras, 6 + int(r.f() * 5.f), 0.45f, r.range(0.08f, 0.15f), true);
+        // raios em espiral girando em volta da arma: cada raio dá voltas ao redor do eixo (cano -> coronha) num pedaço
+        // da arma; o ângulo de partida gira com o tempo (a espiral roda), o raio ondula e treme como eletricidade e
+        // cada um vive um instante (pisca). Duas "fitas" opostas formam a espiral.
+        const glm::vec3 eixo = b - a;
+        const float ry = raio * 1.3f, rx = raio * 0.85f;  // elipse em volta da arma (ela é mais alta que larga)
+        for (int n = count(accFumaca, 60.f, dt); n > 0; --n) {
+            const int fita = r.chance(0.5f) ? 0 : 1;
+            const float t0 = r.range(-0.25f, 0.95f), comp = r.range(0.18f, 0.35f);
+            const float voltas = r.range(0.9f, 1.6f);
+            const float ang0 = tempo * 4.5f + fita * 3.14159f + t0 * 9.f + r.range(-0.35f, 0.35f);
+            const float vida = r.range(0.06f, 0.13f);
+            const float fase = r.range(0.f, 6.28f);
+            const int segs = 16 + int(r.f() * 8.f);
+            glm::vec3 ant(0.f);
+            for (int k = 0; k <= segs; ++k) {
+                const float u = float(k) / float(segs);
+                const float ang = ang0 + u * voltas * 6.2831853f;
+                // ondulação (onda que corre) + tremida aleatória: o raio não é uma curva lisa
+                const float onda = 1.f + 0.18f * std::sin(u * 17.f + fase + tempo * 25.f);
+                glm::vec3 p = a + eixo * glm::clamp(t0 + u * comp, 0.f, 1.f);
+                p += glm::vec3(std::cos(ang) * rx * onda, std::sin(ang) * ry * onda, 0.f);
+                p += glm::vec3(r.range(-1.f, 1.f), r.range(-1.f, 1.f), r.range(-1.f, 1.f)) * 0.007f;
+                const glm::vec3 w = mundo(p);
+                if (k > 0) {
+                    traco(ant, w, vida, 1.f);
+                    // galhinho de vez em quando, saindo para fora da espiral
+                    if (r.chance(0.07f)) {
+                        glm::vec3 g0 = w, dir = glm::normalize(w - mundo(a + eixo * glm::clamp(t0 + u * comp, 0.f, 1.f)) + randDir(r) * 0.6f);
+                        for (int j = 0; j < 3; ++j) {
+                            glm::vec3 g1 = g0 + glm::normalize(dir + randDir(r) * 0.7f) * r.range(0.012f, 0.022f);
+                            traco(g0, g1, vida * 0.8f, 0.8f);
+                            g0 = g1;
+                        }
+                    }
+                }
+                ant = w;
+            }
+        }
     }
     // fumaça de energia: nuvens que crescem, sobem e escorrem para trás (saturada mesmo de dia: escurece o fundo)
     for (int n = eletrico ? 0 : count(accFumaca, 110.f, dt); n > 0; --n) {

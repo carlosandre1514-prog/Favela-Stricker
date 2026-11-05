@@ -60,7 +60,7 @@ FxLight fxRaios(ParticleSystem& ps, Rng& r, const glm::mat4& world, glm::vec3 a,
 // Aura de energia envolvendo um objeto (skin de arma): fumaça brilhante subindo, brasas e estalos ao longo de a -> b
 FxLight fxAuraArma(ParticleSystem& ps, Rng& r, const glm::mat4& world, glm::vec3 a, glm::vec3 b, float raio, glm::vec3 cor, float dt,
                    float& accFumaca, float& accBrasa, float& accEstalo, float& accHalo, float& accNevoa, glm::vec3 velArma = glm::vec3(0.f),
-                   bool eletrico = false);  // eletrico: raios em zigue-zague no lugar das labaredas
+                   bool eletrico = false, float tempo = 0.f);  // eletrico: raios em zigue-zague no lugar das labaredas
 FxLight fxMuzzleFlash(ParticleSystem& ps, Rng& r, glm::vec3 pos, glm::vec3 dir);
 void fxBullet(ParticleSystem& ps, glm::vec3 from, glm::vec3 to);
 void fxImpact(ParticleSystem& ps, Rng& r, glm::vec3 pos, glm::vec3 dir);

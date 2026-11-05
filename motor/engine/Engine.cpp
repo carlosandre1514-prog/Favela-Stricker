@@ -1828,7 +1828,7 @@ void updateEffects(Engine* e, float dt) {
             em.ultimo = agora;
             em.temUltimo = true;
             if (em.estilo >= 1)
-                fxAuraArma(e->particles, e->fxRng, o->transform.world(), em.a, em.b, em.raio, em.color, dt, em.accum, em.accum2, em.accum3, em.accum4, em.accum5, vel, em.estilo == 2);
+                fxAuraArma(e->particles, e->fxRng, o->transform.world(), em.a, em.b, em.raio, em.color, dt, em.accum, em.accum2, em.accum3, em.accum4, em.accum5, vel, em.estilo == 2, em.timer);
             else
                 fxRaios(e->particles, e->fxRng, o->transform.world(), em.a, em.b, em.raio, em.color, dt, em.accum, em.accum2, em.accum3, vel);
             return;
@@ -1880,7 +1880,8 @@ int gatherLights(Engine* e, PointLight* out, int max) {
         GameObject* o = em.owner;
         if (!o || !o->active || em.kind == FX_Smoke || em.kind == FX_Explosion) return;
         if (em.kind == FX_Raios) {  // luz azul fraca no meio da arma, piscando como eletricidade
-            const float pisca = 0.65f + 0.35f * std::sin(em.timer * 31.f) * std::sin(em.timer * 11.7f);
+            const float pisca = em.estilo == 2 ? (std::sin(em.timer * 47.f) * std::sin(em.timer * 13.1f) > -0.2f ? 1.f : 0.35f)
+                                               : 0.65f + 0.35f * std::sin(em.timer * 31.f) * std::sin(em.timer * 11.7f);
             push({glm::vec3(o->transform.world() * glm::vec4((em.a + em.b) * 0.5f, 1.f)), em.color, (em.estilo >= 1 ? 2.2f : 1.4f) * pisca, 2.8f});
             return;
         }
