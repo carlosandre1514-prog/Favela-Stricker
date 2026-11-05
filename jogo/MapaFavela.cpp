@@ -316,7 +316,7 @@ void genFavela(Engine* e, Rng& r, glm::vec3& spawn, float& spawnYaw) {
         // A borda de cada pedaço desce 60 cm (saia): onde um pedaço detalhado encosta num simples não abre fresta.
         const int N = 5, sub = res / N;              // 44 células por pedaço
         const float csz = 2 * half / N;
-        static const float kLodDist[3] = {115.f, 250.f, 1e30f};  // (o motor multiplica pelo nível: Leve 46 m / 100 m)
+        static const float kLodDist[3] = {85.f, 200.f, 1e30f};  // (o motor multiplica pelo nível: Leve 34 m / 80 m)
         for (int cj = 0; cj < N; ++cj)
             for (int ci = 0; ci < N; ++ci)
                 for (int l = 0; l < 3; ++l) {
@@ -908,7 +908,8 @@ void genFavela(Engine* e, Rng& r, glm::vec3& spawn, float& spawnYaw) {
         c.used = true;
         std::vector<Vertex> v; std::vector<uint32_t> idx;
         std::function<glm::vec3(float, float)> hint = [](float, float) { return glm::vec3(0.f, 1.f, 0.f); };
-        terrainMesh(v, idx, -700.f, -700.f, 1400.f, 64, far, nullptr, &hint);
+        // 36x36 células de 39 m: os morros estão a centenas de metros e são suaves (antes 64x64, 8 mil triângulos)
+        terrainMesh(v, idx, -700.f, -700.f, 1400.f, 36, far, nullptr, &hint);
         c.mesh = e->renderer.createMesh(v.data(), uint32_t(v.size()), idx.data(), uint32_t(idx.size()), false);
         c.ground = addMeshObject(e, "Morros ao fundo", c.mesh, e->mats[int(Mat::Terrain)], glm::vec3(0.f), glm::vec3(1.f), glm::vec3(0.f), false);
         if (GameObject* go = e->scene.get(c.ground)) if (go->meshRenderer) go->meshRenderer->castShadows = false;

@@ -1085,8 +1085,25 @@ int createFromSpecJson(Engine* e, const std::string& specJson, std::string* err)
             const int vid = attachGearMesh(e, ci, CJ_Chest, vest, "Colete");
             if (vid < 0) e->lastError.clear();
             else if (doModelo)
-                if (GameObject* vg = e->scene.get(e->objects[vid]))
+                if (GameObject* vg = e->scene.get(e->objects[vid])) {
                     applyMaterialTo(e, *vg, true, json{{"textura", "kit:personagens/colete/colete.jpg"}, {"metal", 0.f}, {"rugosidade", 0.8f}});
+                    // De longe, o colete 3D (~1 mil triângulos cada) vira o de blocos (bem poucos), na mesma cor: com 10
+                    // lutadores eram ~10 mil triângulos só de colete, a maioria longe demais para ver o detalhe.
+                    // (o motor multiplica a distância pelo nível gráfico)
+                    const float kColeteLonge = 18.f;
+                    Scene::forEachInSubtree(*vg, [&](GameObject& o) { if (o.meshRenderer) o.meshRenderer->lodFar = kColeteLonge; });
+                    Geo simples;
+                    simples.place(glm::vec3(0.f), 0.f);
+                    buildBlockVest(p, simples[Mat::Painted]);
+                    const int sid = attachGearMesh(e, ci, CJ_Chest, simples, "Colete longe");
+                    if (sid < 0) e->lastError.clear();
+                    else if (GameObject* sg = e->scene.get(e->objects[sid]))
+                        Scene::forEachInSubtree(*sg, [&](GameObject& o) {
+                            if (!o.meshRenderer) return;
+                            o.meshRenderer->lodNear = kColeteLonge;
+                            o.meshRenderer->castShadows = false;  // de longe a sombra do colete some no corpo
+                        });
+                }
         }
         if (p.bloco && p.texturizado && p.chapeu == 1) {  // boné por cima da skin pintada (some na primeira pessoa)
             Geo cap;
