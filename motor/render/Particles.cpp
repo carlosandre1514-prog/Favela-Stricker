@@ -42,7 +42,16 @@ void ParticleSystem::emit(const ParticleSpawn& s) {
     seed_ = seed_ * 1664525u + 1013904223u;
     p.seed = (seed_ >> 8) / float(1 << 24);
     p.shape = s.shape; p.additive = s.additive; p.occlusion = s.occlusion;
-    p.carry = s.carry;
+    p.ancora = s.presa && ancoraAtual >= 0 && ancoraAtual < kAncoras ? int8_t(ancoraAtual) : int8_t(-1);
+}
+
+void ParticleSystem::moverAncora(int a, glm::vec3 delta) {
+    for (int i = 0; i < count_; ++i)
+        if (parts_[i].ancora == a) parts_[i].pos += delta;
+}
+void ParticleSystem::soltarAncora(int a) {
+    for (int i = 0; i < count_; ++i)
+        if (parts_[i].ancora == a) parts_[i].ancora = -1;
 }
 
 void ParticleSystem::update(float dt) {
@@ -52,7 +61,7 @@ void ParticleSystem::update(float dt) {
         if (p.age >= p.life) { parts_[i] = parts_[--count_]; continue; }  // remove trocando com o último
         p.vel *= 1.f / (1.f + p.drag * dt);
         p.vel.y -= p.gravity * dt;
-        p.pos += (p.vel + p.carry) * dt;
+        p.pos += p.vel * dt;
         p.rot += p.rotVel * dt;
         ++i;
     }

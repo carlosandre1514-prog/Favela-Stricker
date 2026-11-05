@@ -98,6 +98,45 @@ GLuint Renderer::loadProgram(const char* vsFile, const char* fsFile) {
     return link(vs, fs, "EXTRA", vsFile);
 }
 
+// Pega os uniforms do programa e fixa as unidades de textura dos samplers:
+// 0 albedo, 1 normal, 2 metal/rugosidade, 3 emissivo, 4 sombra, 5 ambiente, 6 AO, 7-8 camadas do terreno
+void Renderer::setupPbr(Program& p) {
+    p.uModel = glGetUniformLocation(p.id, "uModel");
+    p.uLightVP = glGetUniformLocation(p.id, "uLightVP");
+    p.uAlbedoF = glGetUniformLocation(p.id, "uAlbedoFactor");
+    p.uRough = glGetUniformLocation(p.id, "uRoughnessFactor");
+    p.uMetal = glGetUniformLocation(p.id, "uMetallicFactor");
+    p.uEmis = glGetUniformLocation(p.id, "uEmissiveFactor");
+    p.uRim = glGetUniformLocation(p.id, "uRim");
+    p.uAlphaCut = glGetUniformLocation(p.id, "uAlphaCutoff");
+    p.uOccStrength = glGetUniformLocation(p.id, "uOcclusionStrength");
+    p.uMode = glGetUniformLocation(p.id, "uMode");
+    p.uTime = glGetUniformLocation(p.id, "uTime");
+    static const char* kSamplers[] = {"uAlbedoMap", "uNormalMap", "uOrmMap", "uEmissiveMap", "uShadowMap",
+                                      "uEnvMap", "uOcclusionMap", "uTerrainAlb", "uTerrainNh"};
+    glUseProgram(p.id);
+    for (int i = 0; i < 9; ++i) {
+        GLint loc = glGetUniformLocation(p.id, kSamplers[i]);
+        if (loc >= 0) glUniform1i(loc, i);
+    }
+}
+
+// Variante do gráfico Leve (sem sombra e sem mapa de normais): compilada só quando o Leve é usado.
+// Se não compilar, fica o shader normal.
+bool Renderer::ensureLeve() {
+    if (leve_[0].id && leve_[1].id) return true;
+    if (leveTried_) return false;
+    leveTried_ = true;
+    leve_[0].id = link(pbrVs_, pbrFs_, "INSTANCED\n#define LEVE", "pbr leve");
+    leve_[1].id = link(pbrVs_, pbrFs_, "SKINNED\n#define LEVE", "pbr leve");
+    if (!leve_[0].id || !leve_[1].id) {
+        for (Program& p : leve_) { if (p.id) glDeleteProgram(p.id); p.id = 0; }
+        return false;
+    }
+    for (Program& p : leve_) setupPbr(p);
+    return true;
+}
+
 bool Renderer::init(const char* shaderDir) {
     std::string d = shaderDir;
     shaderDir_ = d;
@@ -121,19 +160,8 @@ bool Renderer::init(const char* shaderDir) {
         if (!p->id) return false;
     if (!skyProg_ || !lineProg_) return false;
 
-    for (Program* p : {&pbr_, &pbrInst_, &pbrSkin_, &shadow_, &shadowInst_, &shadowSkin_}) {
-        p->uModel = glGetUniformLocation(p->id, "uModel");
-        p->uLightVP = glGetUniformLocation(p->id, "uLightVP");
-        p->uAlbedoF = glGetUniformLocation(p->id, "uAlbedoFactor");
-        p->uRough = glGetUniformLocation(p->id, "uRoughnessFactor");
-        p->uMetal = glGetUniformLocation(p->id, "uMetallicFactor");
-        p->uEmis = glGetUniformLocation(p->id, "uEmissiveFactor");
-        p->uRim = glGetUniformLocation(p->id, "uRim");
-        p->uAlphaCut = glGetUniformLocation(p->id, "uAlphaCutoff");
-        p->uOccStrength = glGetUniformLocation(p->id, "uOcclusionStrength");
-        p->uMode = glGetUniformLocation(p->id, "uMode");
-        p->uTime = glGetUniformLocation(p->id, "uTime");
-    }
+    pbrVs_ = pv; pbrFs_ = pf;
+    for (Program* p : {&pbr_, &pbrInst_, &pbrSkin_, &shadow_, &shadowInst_, &shadowSkin_}) setupPbr(*p);
     skyInvVP_ = glGetUniformLocation(skyProg_, "uInvViewProj");
     skyZenith_ = glGetUniformLocation(skyProg_, "uZenith");
     skyHorizon_ = glGetUniformLocation(skyProg_, "uHorizon");
@@ -141,19 +169,6 @@ bool Renderer::init(const char* shaderDir) {
     skyIntensity_ = glGetUniformLocation(skyProg_, "uSkyIntensity");
     skyCapture_ = glGetUniformLocation(skyProg_, "uCapture");
 
-    // Unidades de textura dos samplers (fixas): 0 albedo, 1 normal, 2 metal/rugosidade, 3 emissivo, 4 sombra, 5 ambiente, 6 AO
-    for (Program* p : {&pbr_, &pbrInst_, &pbrSkin_}) {
-        glUseProgram(p->id);
-        glUniform1i(glGetUniformLocation(p->id, "uAlbedoMap"), 0);
-        glUniform1i(glGetUniformLocation(p->id, "uNormalMap"), 1);
-        glUniform1i(glGetUniformLocation(p->id, "uOrmMap"), 2);
-        glUniform1i(glGetUniformLocation(p->id, "uEmissiveMap"), 3);
-        glUniform1i(glGetUniformLocation(p->id, "uShadowMap"), 4);
-        glUniform1i(glGetUniformLocation(p->id, "uEnvMap"), 5);
-        glUniform1i(glGetUniformLocation(p->id, "uOcclusionMap"), 6);
-        glUniform1i(glGetUniformLocation(p->id, "uTerrainAlb"), 7);
-        glUniform1i(glGetUniformLocation(p->id, "uTerrainNh"), 8);
-    }
 
     glGenBuffers(1, &sceneUbo_);
     glBindBuffer(GL_UNIFORM_BUFFER, sceneUbo_);
@@ -172,6 +187,7 @@ bool Renderer::init(const char* shaderDir) {
     glBindBuffer(GL_ARRAY_BUFFER, instanceVbo_);
     glBufferData(GL_ARRAY_BUFFER, sizeof(glm::mat4) * kMaxDraws, nullptr, GL_STREAM_DRAW);
     instanceScratch_ = static_cast<glm::mat4*>(std::malloc(sizeof(glm::mat4) * kMaxDraws));
+    lotes_ = static_cast<Lote*>(std::malloc(sizeof(Lote) * kMaxDraws));
     for (auto& lv2 : lineVerts_) lv2 = static_cast<LineVertex*>(std::malloc(sizeof(LineVertex) * kMaxLineVerts));
 
     // VAO das linhas do editor
@@ -224,10 +240,14 @@ void Renderer::shutdown() {
     instanceScratch_ = nullptr;
     for (auto& lv : lineVerts_) { std::free(lv); lv = nullptr; }
     for (Program* p : {&pbr_, &pbrInst_, &pbrSkin_, &shadow_, &shadowInst_, &shadowSkin_}) glDeleteProgram(p->id);
+    for (Program& p : leve_) { if (p.id) glDeleteProgram(p.id); p = Program{}; }
+    leveTried_ = false;
+    std::free(lotes_);
+    lotes_ = nullptr;
     glDeleteProgram(skyProg_);
     glDeleteProgram(lineProg_);
     GLuint bufs[] = {sceneUbo_, jointUbo_, instanceVbo_, lineVbo_, cutUbo_};
-    glDeleteBuffers(4, bufs);
+    glDeleteBuffers(5, bufs);
     GLuint vaos[] = {lineVao_, emptyVao_};
     glDeleteVertexArrays(2, vaos);
     GLuint tex[] = {shadowTex_, envCube_, terrainAlb_, terrainNh_};
@@ -551,7 +571,32 @@ void Renderer::shadowPass(const CascadeSet& cs) {
 
 void Renderer::drawBatches(uint32_t passBit, const glm::mat4* lightVP) {
     const bool shadowOnly = lightVP != nullptr;
-    uint32_t i = 0;
+    const bool usaLeve = !shadowOnly && leve && ensureLeve();
+    const Program& progInst = shadowOnly ? shadowInst_ : usaLeve ? leve_[0] : pbrInst_;
+    const Program& progSkin = shadowOnly ? shadowSkin_ : usaLeve ? leve_[1] : pbrSkin_;
+
+    // 1) junta as matrizes de todos os lotes (itens seguidos com o mesmo mesh + material visíveis neste passe)
+    //    e manda tudo para a placa de vídeo de uma vez. Antes cada lote recriava um buffer de 1 MB (~190 vezes
+    //    por quadro): no celular isso custa caro no driver e faz o quadro variar (engasgos).
+    uint32_t nLotes = 0, total = 0, i = 0;
+    while (i < drawCount_) {
+        if (draws_[i].jointPalette) { ++i; continue; }
+        const uint64_t key = draws_[i].key;
+        const uint32_t first = total;
+        while (i < drawCount_ && draws_[i].key == key && !draws_[i].jointPalette) {
+            if (draws_[i].passMask & passBit) instanceScratch_[total++] = draws_[i].model;
+            ++i;
+        }
+        lotes_[nLotes++] = {first, total - first};
+    }
+    if (total > 0) {
+        glBindBuffer(GL_ARRAY_BUFFER, instanceVbo_);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(glm::mat4) * total, instanceScratch_, GL_STREAM_DRAW);
+    }
+
+    // 2) desenha na mesma ordem; cada lote lê as suas matrizes a partir do seu começo no buffer
+    uint32_t lote = 0;
+    i = 0;
     while (i < drawCount_) {
         const DrawItem& first = draws_[i];
         const Mesh& mesh = meshes_[first.mesh];
@@ -559,7 +604,7 @@ void Renderer::drawBatches(uint32_t passBit, const glm::mat4* lightVP) {
         if (first.jointPalette) {  // skinned: um draw por objeto
             ++i;
             if (!(first.passMask & passBit)) continue;
-            const Program& p = shadowOnly ? shadowSkin_ : pbrSkin_;
+            const Program& p = progSkin;
             glUseProgram(p.id);
             if (shadowOnly) glUniformMatrix4fv(p.uLightVP, 1, GL_FALSE, &(*lightVP)[0][0]);
             else bindMaterial(p, materials_[first.material]);
@@ -574,26 +619,22 @@ void Renderer::drawBatches(uint32_t passBit, const glm::mat4* lightVP) {
             continue;
         }
 
-        // lote: itens consecutivos com a mesma chave (mesmo mesh + material) visíveis neste passe
-        uint32_t j = i, n = 0;
-        while (j < drawCount_ && draws_[j].key == first.key && !draws_[j].jointPalette) {
-            if (draws_[j].passMask & passBit) instanceScratch_[n++] = draws_[j].model;
-            ++j;
-        }
-        i = j;
-        if (n == 0) continue;
-        const Program& p = shadowOnly ? shadowInst_ : pbrInst_;
+        while (i < drawCount_ && draws_[i].key == first.key && !draws_[i].jointPalette) ++i;
+        const Lote& l = lotes_[lote++];
+        if (l.n == 0) continue;
+        const Program& p = progInst;
         glUseProgram(p.id);
         if (shadowOnly) glUniformMatrix4fv(p.uLightVP, 1, GL_FALSE, &(*lightVP)[0][0]);
         else bindMaterial(p, materials_[first.material]);
 
-        glBindBuffer(GL_ARRAY_BUFFER, instanceVbo_);
-        glBufferData(GL_ARRAY_BUFFER, sizeof(glm::mat4) * kMaxDraws, nullptr, GL_STREAM_DRAW);  // orphaning
-        glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(glm::mat4) * n, instanceScratch_);
         glBindVertexArray(mesh.vao);
-        glDrawElementsInstanced(GL_TRIANGLES, GLsizei(mesh.indexCount), GL_UNSIGNED_INT, nullptr, GLsizei(n));
+        glBindBuffer(GL_ARRAY_BUFFER, instanceVbo_);
+        const size_t base = sizeof(glm::mat4) * l.first;
+        for (int k = 0; k < 4; ++k)
+            glVertexAttribPointer(6 + k, 4, GL_FLOAT, GL_FALSE, sizeof(glm::mat4), (void*)(base + sizeof(glm::vec4) * k));
+        glDrawElementsInstanced(GL_TRIANGLES, GLsizei(mesh.indexCount), GL_UNSIGNED_INT, nullptr, GLsizei(l.n));
         ++stats_.drawCalls;
-        stats_.triangles += mesh.indexCount / 3 * n;
+        stats_.triangles += mesh.indexCount / 3 * l.n;
     }
     glBindVertexArray(0);
 }

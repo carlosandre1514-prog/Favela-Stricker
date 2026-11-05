@@ -210,6 +210,9 @@ struct Engine {
     ParticleSystem particles;
     Rng fxRng{7};
     FxFlash flashes[16];
+    // Boca do cano de cada arma que atirou agora há pouco: o fogo do disparo anda preso a ela (ver muzzleFx)
+    struct BocaAncora { Scene::Handle arma{}; glm::vec3 local{0.f}, ultimo{0.f}; float vida = 0.f; };
+    BocaAncora ancoras[ParticleSystem::kAncoras];
     Projectile projectiles[32];
     Bolt bolts[8];
     float castCooldown = 0.f;
@@ -436,6 +439,7 @@ bool attachGear(Engine* e, int character, const std::string& name);
 std::string gameStatusText(Engine* e);
 // Efeitos do tiro de uma arma: o da skin dela (se tiver "disparo") ou o padrão. Chame no lugar de fxMuzzleFlash/fxBullet.
 void muzzleFx(Engine* e, Scene::Handle weapon, glm::vec3 muzzle, glm::vec3 dir);
+void atualizarAncoras(Engine* e, float dt);  // depois de posicionar as armas, antes de desenhar
 void bulletFx(Engine* e, Scene::Handle weapon, glm::vec3 from, glm::vec3 to);
 void applyKitTexture(Engine* e, GameObject& g, const std::string& kitName, float metal = -1.f, float rough = -1.f);  // textura de cor do kit no objeto
 

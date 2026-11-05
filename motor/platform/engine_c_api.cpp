@@ -74,7 +74,8 @@ void applyQualityLevel(Engine* e, int nivel) {
     TextureManager::instance().modelMax = kTexMax[nivel];
     e->renderer.simplify = kTris[nivel];
     TextureManager::instance().anisotropia = kAniso[nivel];
-    e->renderer.shadowCascadesMax = nivel >= 3 ? 3 : 2;  // Intermediária: 2 faixas de sombra (cada faixa desenha o mapa de novo)
+    e->renderer.shadowCascadesMax = nivel >= 3 ? 3 : 2;
+    e->renderer.leve = nivel == 0;  // Leve: shader sem sombra e sem mapa de normais (mais leve por pixel)  // Intermediária: 2 faixas de sombra (cada faixa desenha o mapa de novo)
 }
 }  // namespace eng
 
@@ -165,6 +166,7 @@ void engine_frame(Engine* e, float dt) {
     eng::updateFirstPersonEye(e, dt);
     eng::updateSupportHands(e, dt);
     eng::applyFirstPerson(e);
+    eng::atualizarAncoras(e, dt);  // fogo do disparo preso à boca da arma já posicionada
     eng::updateCuts(e);
     eng::updateLamps(e);
 

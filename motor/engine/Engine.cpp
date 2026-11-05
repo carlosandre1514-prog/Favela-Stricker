@@ -1818,24 +1818,54 @@ static Emitter* skinShot(Engine* e, Scene::Handle weapon) {
     GameObject* w = e->scene.get(weapon);
     return w && w->emitter && w->emitter->disparo ? w->emitter : nullptr;
 }
-// velocidade de quem segura a arma (o corpo do lutador): o clarão do tiro anda junto e fica na boca do cano
-static glm::vec3 armaVelocidade(Engine* e, Scene::Handle weapon) {
-    for (const CharacterInfo& c : e->characters)
-        if (c.weapon.index == weapon.index && c.weapon.gen == weapon.gen)
-            if (GameObject* r = e->scene.get(c.root); r && r->rigidBody && r->rigidBody->body) {
-                const btVector3 v = r->rigidBody->body->getLinearVelocity();
-                return glm::vec3(v.x(), v.y(), v.z());
-            }
-    return glm::vec3(0.f);
+// Âncora na boca do cano: guarda o ponto no espaço da arma; a cada quadro, depois que a arma foi posicionada
+// (mão, primeira pessoa, corrida, pulo), as partículas presas andam o mesmo que a boca andou. Assim o fogo
+// sai sempre da boca da arma, parado ou em movimento (antes ia pela velocidade do corpo e passava da frente).
+static int ancoraDaArma(Engine* e, Scene::Handle weapon, glm::vec3 muzzle) {
+    GameObject* w = e->scene.get(weapon);
+    if (!w) return -1;
+    const glm::mat4 mundo = w->transform.world();
+    int slot = -1, livre = -1, velha = 0;
+    for (int i = 0; i < ParticleSystem::kAncoras; ++i) {
+        const Engine::BocaAncora& a = e->ancoras[i];
+        if (a.vida > 0.f && a.arma.index == weapon.index && a.arma.gen == weapon.gen) { slot = i; break; }
+        if (a.vida <= 0.f && livre < 0) livre = i;
+        if (a.vida < e->ancoras[velha].vida) velha = i;
+    }
+    if (slot >= 0) {  // a mesma arma atirando de novo: o fogo do tiro anterior acompanha até aqui antes de trocar o ponto
+        Engine::BocaAncora& a = e->ancoras[slot];
+        e->particles.moverAncora(slot, glm::vec3(mundo * glm::vec4(a.local, 1.f)) - a.ultimo);
+    } else {
+        slot = livre >= 0 ? livre : velha;
+        e->particles.soltarAncora(slot);
+    }
+    Engine::BocaAncora& a = e->ancoras[slot];
+    a.arma = weapon;
+    a.local = glm::vec3(glm::inverse(mundo) * glm::vec4(muzzle, 1.f));
+    a.ultimo = muzzle;
+    a.vida = 0.5f;  // mais que a vida do fogo
+    return slot;
+}
+void atualizarAncoras(Engine* e, float dt) {
+    for (int i = 0; i < ParticleSystem::kAncoras; ++i) {
+        Engine::BocaAncora& a = e->ancoras[i];
+        if (a.vida <= 0.f) continue;
+        GameObject* w = e->scene.get(a.arma);
+        if (!w || (a.vida -= dt) <= 0.f) { a.vida = 0.f; e->particles.soltarAncora(i); continue; }
+        const glm::vec3 agora = glm::vec3(w->transform.world() * glm::vec4(a.local, 1.f));
+        e->particles.moverAncora(i, agora - a.ultimo);
+        a.ultimo = agora;
+    }
 }
 void muzzleFx(Engine* e, Scene::Handle weapon, glm::vec3 muzzle, glm::vec3 dir) {
-    const glm::vec3 carry = armaVelocidade(e, weapon);
+    e->particles.ancoraAtual = ancoraDaArma(e, weapon, muzzle);
     if (Emitter* em = skinShot(e, weapon)) {
-        addFlash(e, fxDisparoSkin(e->particles, e->fxRng, muzzle, dir, em->corDisparo, em->corDisparo2, carry), 0.08f);
+        addFlash(e, fxDisparoSkin(e->particles, e->fxRng, muzzle, dir, em->corDisparo, em->corDisparo2), 0.08f);
         em->pulso = 1.f;  // a pintura acende forte e apaga (updateEffects)
-        return;
+    } else {
+        addFlash(e, fxMuzzleFlash(e->particles, e->fxRng, muzzle, dir), 0.06f);
     }
-    addFlash(e, fxMuzzleFlash(e->particles, e->fxRng, muzzle, dir, carry), 0.06f);
+    e->particles.ancoraAtual = -1;
 }
 void bulletFx(Engine* e, Scene::Handle weapon, glm::vec3 from, glm::vec3 to) {
     Emitter* em = skinShot(e, weapon);

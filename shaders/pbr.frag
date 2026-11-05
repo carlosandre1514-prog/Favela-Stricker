@@ -5,7 +5,9 @@ precision highp samplerCube;
 in vec3 vWorldPos;
 in vec3 vNormal;
 in vec2 vUV;
+#if !defined(LEVE)
 in vec4 vTangent;
+#endif
 in float vViewDepth;
 in vec4 vColor;
 flat in uint vCut;
@@ -67,6 +69,9 @@ vec3 shIrradiance(vec3 n) {
 }
 
 float shadowFactor(vec3 worldPos, vec3 N, vec3 L) {
+#if defined(LEVE)
+    return 1.0;  // gráfico Leve não tem sombra: nem compila as 9 amostras (shader menor, menos registradores)
+#else
     if (uDirDir.w < 0.5 || vViewDepth > uCascadeSplits.w) return 1.0;
     int c = vViewDepth < uCascadeSplits.x ? 0 : (vViewDepth < uCascadeSplits.y ? 1 : 2);
     float texel = uCascadeTexel[c];
@@ -87,6 +92,7 @@ float shadowFactor(vec3 worldPos, vec3 N, vec3 L) {
     // some suavemente no fim da distância de sombra
     float fade = clamp((uCascadeSplits.w - vViewDepth) / (uCascadeSplits.w * 0.15), 0.0, 1.0);
     return mix(1.0, s, fade);
+#endif
 }
 
 vec3 brdf(vec3 N, vec3 V, vec3 L, vec3 radiance, vec3 albedo, float rough, float metal, vec3 F0) {
@@ -225,15 +231,21 @@ void main() {
     float cavity = 1.0;
     if (uMode == 3) { terrainLayers(albedoS.rgb, tnt, cavity); albedoS.a = 1.0; }  // (o alfa da cor é a dica do concreto)
     vec3 orm = texture(uOrmMap, vUV).rgb;
-    float ao = mix(1.0, texture(uOcclusionMap, vUV).r, uOcclusionStrength) * cavity;
+    // sem textura de AO (a maioria): nem lê a textura (o "if" depende só do material, sai de graça)
+    float ao = cavity;
+    if (uOcclusionStrength > 0.0) ao *= mix(1.0, texture(uOcclusionMap, vUV).r, uOcclusionStrength);
     float rough = clamp(orm.g * uRoughnessFactor, 0.045, 1.0), metal = clamp(orm.b * uMetallicFactor, 0.0, 1.0);
 
     vec3 Nv = normalize(vNormal);
     if (!gl_FrontFacing) Nv = -Nv;                                // materiais double-sided
+#if defined(LEVE)
+    vec3 N = Nv;  // Leve: sem mapa de normais (textura a menos por pixel; na resolução do Leve o relevo nem aparece)
+#else
     vec3 T = normalize(vTangent.xyz - Nv * dot(Nv, vTangent.xyz));
     vec3 B = cross(Nv, T) * vTangent.w;
     vec3 nt = uMode == 3 ? tnt : texture(uNormalMap, vUV).xyz * 2.0 - 1.0;
     vec3 N = normalize(mat3(T, B, Nv) * nt);
+#endif
     vec3 V = normalize(uCamPos.xyz - vWorldPos);
     vec3 F0 = mix(vec3(0.04), albedoS.rgb, metal);
     float NoV = max(dot(N, V), 1e-4);
@@ -258,7 +270,8 @@ void main() {
     vec3 specIBL = prefiltered * envBRDFApprox(F0, rough, NoV);
     vec3 ambient = (diffuseIBL + specIBL) * ao * uEnvParams.z;
 
-    vec3 color = Lo + ambient + texture(uEmissiveMap, vUV).rgb * uEmissiveFactor;
+    vec3 color = Lo + ambient;
+    if (any(greaterThan(uEmissiveFactor, vec3(0.0)))) color += texture(uEmissiveMap, vUV).rgb * uEmissiveFactor;  // só o que brilha lê a textura
     if (uRim.a > 0.0) {  // aura: as bordas vistas de lado acendem, com um pulso suave que corre pela arma
         float borda = pow(1.0 - clamp(abs(dot(Nv, V)), 0.0, 1.0), 3.0);
         float pulso = 0.75 + 0.25 * sin(uTime * 2.6 + dot(vWorldPos, vec3(9.0, 13.0, 11.0)));

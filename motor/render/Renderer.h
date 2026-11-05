@@ -107,6 +107,7 @@ public:
     // fração dos triângulos que fica nos modelos carregados (qualidades leves < 1)
     float simplify = 1.f;
     float simplifyOverride = 0.f;
+    bool leve = false;  // gráfico Leve: shader sem sombra e sem mapa de normais (compilado na 1ª vez que for usado)
     int shadowCascadesMax = kNumCascades;  // faixas de sombra desenhadas (as outras ficam sem sombra; Intermediária: 2)  // > 0: fração de triângulos dos próximos modelos (versão de longe das armas)
     // resolução da sombra e do reflexo do ambiente (definidas antes do init; Ultra: 2048 e 256)
     int shadowSize = kShadowMapSize;
@@ -148,9 +149,16 @@ private:
     void shadowPass(const CascadeSet& cs);
     void drawBatches(uint32_t passBit, const glm::mat4* lightVP);
     void bindMaterial(const Program& p, const Material& m);
+    void setupPbr(Program& p);
+    bool ensureLeve();
     void flushLines();
 
     Program pbr_, pbrInst_, pbrSkin_, shadow_, shadowInst_, shadowSkin_;
+    Program leve_[2];       // variante Leve: 0 instanciado, 1 com ossos
+    bool leveTried_ = false;
+    std::string pbrVs_, pbrFs_;  // fontes guardadas para compilar a variante Leve depois
+    struct Lote { uint32_t first, n; };
+    Lote* lotes_ = nullptr;      // lotes do passe atual (kMaxDraws): matrizes de todos enviadas de uma vez
     GLuint skyProg_ = 0, lineProg_ = 0;
     GLint skyInvVP_ = -1, skyZenith_ = -1, skyHorizon_ = -1, skyGround_ = -1, skyIntensity_ = -1, skyCapture_ = -1;
     GLuint emptyVao_ = 0, lineVao_ = 0, lineVbo_ = 0;

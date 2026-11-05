@@ -435,12 +435,12 @@ FxLight fxAuraArma(ParticleSystem& ps, Rng& r, const glm::mat4& world, glm::vec3
     return {mundo((a + b) * 0.5f), cor, 2.2f, 2.8f};
 }
 
-FxLight fxMuzzleFlash(ParticleSystem& ps, Rng& r, glm::vec3 pos, glm::vec3 dir, glm::vec3 carry) {
+FxLight fxMuzzleFlash(ParticleSystem& ps, Rng& r, glm::vec3 pos, glm::vec3 dir) {
     ParticleSpawn f;
     f.pos = pos + dir * 0.05f; f.life = 0.05f; f.size0 = 0.22f; f.size1 = 0.12f;
     f.color0 = glm::vec4(1.f, 0.85f, 0.5f, 1.f) * 2.f; f.color1 = glm::vec4(1.f, 0.5f, 0.1f, 0.f);
     f.shape = PS_Star; f.rot = r.range(0.f, 6.28f);
-    f.carry = carry;
+    f.presa = true;
     ps.emit(f);
     for (int i = 0; i < 6; ++i) {
         ParticleSpawn p;
@@ -448,7 +448,7 @@ FxLight fxMuzzleFlash(ParticleSystem& ps, Rng& r, glm::vec3 pos, glm::vec3 dir, 
         p.life = r.range(0.06f, 0.14f); p.size0 = p.size1 = 0.02f;
         p.color0 = glm::vec4(1.f, 0.85f, 0.4f, 1.f) * 2.f; p.color1 = glm::vec4(1.f, 0.4f, 0.1f, 0.f);
         p.shape = PS_Spark; p.stretch = 0.02f;
-        p.carry = carry;
+        p.presa = true;
         ps.emit(p);
     }
     ParticleSpawn s;
@@ -476,14 +476,14 @@ void fxBullet(ParticleSystem& ps, glm::vec3 from, glm::vec3 to, const glm::vec3*
     ps.emit(b);
 }
 
-FxLight fxDisparoSkin(ParticleSystem& ps, Rng& r, glm::vec3 pos, glm::vec3 dir, glm::vec3 cor, glm::vec3 cor2, glm::vec3 carry) {
+FxLight fxDisparoSkin(ParticleSystem& ps, Rng& r, glm::vec3 pos, glm::vec3 dir, glm::vec3 cor, glm::vec3 cor2) {
     // jato de chamas na boca do cano: miolo quente (cor2, quase branco) que vira a cor da skin e apaga; as labaredas
     // saem esticadas na direção do tiro, freiam rápido, abrem e sobem um pouco, como fogo de verdade
     const glm::vec3 quente = glm::mix(cor2, glm::vec3(1.f), 0.25f);
     ParticleSpawn g;  // clarão do miolo
     g.pos = pos + dir * 0.03f; g.life = 0.05f; g.size0 = 0.1f; g.size1 = 0.05f;
     g.color0 = glm::vec4(glm::mix(quente, cor, 0.3f) * 2.f, 1.f); g.color1 = glm::vec4(cor * 1.5f, 0.f); g.shape = PS_Glow;
-    g.carry = carry;
+    g.presa = true;
     ps.emit(g);
     for (int i = 0; i < 22; ++i) {  // jato principal
         ParticleSpawn p;
@@ -492,7 +492,7 @@ FxLight fxDisparoSkin(ParticleSystem& ps, Rng& r, glm::vec3 pos, glm::vec3 dir, 
         p.life = r.range(0.1f, 0.2f); p.size0 = r.range(0.035f, 0.05f); p.size1 = r.range(0.1f, 0.15f);
         p.color0 = glm::vec4(glm::mix(quente, cor, r.range(0.6f, 0.95f)) * 1.5f, 0.9f); p.color1 = glm::vec4(cor * 0.6f, 0.f);
         p.shape = PS_Flame; p.stretch = 0.045f; p.drag = 12.f; p.gravity = -1.f; p.occlusion = 0.25f;
-        p.carry = carry;
+        p.presa = true;
         ps.emit(p);
     }
     for (int i = 0; i < 12; ++i) {  // labaredas de fora: mais abertas, lentas e escuras
@@ -502,7 +502,7 @@ FxLight fxDisparoSkin(ParticleSystem& ps, Rng& r, glm::vec3 pos, glm::vec3 dir, 
         p.life = r.range(0.12f, 0.24f); p.size0 = 0.04f; p.size1 = r.range(0.11f, 0.15f);
         p.color0 = glm::vec4(cor * 1.4f, 0.8f); p.color1 = glm::vec4(cor * 0.5f, 0.f);
         p.shape = PS_Flame; p.stretch = 0.02f; p.drag = 6.f; p.gravity = -1.5f; p.rot = r.range(0.f, 6.28f); p.occlusion = 0.2f;
-        p.carry = carry;
+        p.presa = true;
         ps.emit(p);
     }
     for (int i = 0; i < 8; ++i) {  // fagulhas azuis
@@ -512,7 +512,7 @@ FxLight fxDisparoSkin(ParticleSystem& ps, Rng& r, glm::vec3 pos, glm::vec3 dir, 
         p.life = r.range(0.15f, 0.3f); p.size0 = p.size1 = 0.008f;
         p.color0 = glm::vec4(quente * 3.f, 1.f); p.color1 = glm::vec4(cor * 1.5f, 0.f);
         p.shape = PS_Spark; p.stretch = 0.02f; p.drag = 2.f; p.gravity = -0.5f;
-        p.carry = carry;
+        p.presa = true;
         ps.emit(p);
     }
     return {pos + dir * 0.1f, cor, 18.f, 7.f};

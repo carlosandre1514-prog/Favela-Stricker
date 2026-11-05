@@ -28,8 +28,7 @@ struct ParticleSpawn {
     uint8_t shape = PS_Glow;
     bool additive = true;      // aditivo (brilha) ou alfa (fumaça escura)
     float occlusion = 0.f;     // aditivo que também escurece um pouco o fundo (cor saturada mesmo de dia)
-    glm::vec3 carry{0.f};      // velocidade de quem soltou (ex.: a arma correndo): somada sempre, sem freio, para o
-                               // clarão do tiro continuar na boca do cano enquanto a pessoa anda
+    bool presa = false;        // presa na boca do cano (âncora atual do sistema): anda junto com a arma desenhada
 };
 
 // Partículas com capacidade fixa, simuladas na CPU sem alocação e desenhadas num único draw call instanciado.
@@ -44,6 +43,12 @@ public:
     void update(float dt);
     int draw(const Camera& cam);  // retorna nº de draw calls
     int count() const { return count_; }
+    // Âncoras (a boca do cano de uma arma): as partículas "presas" seguem a âncora que estava ativa ao nascer,
+    // andando e girando junto com a arma desenhada (correndo, virando, pulando: o fogo sai sempre da boca)
+    static constexpr int kAncoras = 16;
+    int ancoraAtual = -1;  // âncora das próximas partículas presas (-1 = nenhuma)
+    void moverAncora(int a, glm::vec3 delta);
+    void soltarAncora(int a);  // as que ainda vivem ficam soltas no mundo
 
 private:
     struct P {
@@ -51,7 +56,7 @@ private:
         glm::vec3 vel; float life;
         glm::vec4 c0, c1;
         float s0, s1, rot, rotVel, drag, gravity, stretch, seed, occlusion;
-        glm::vec3 carry;
+        int8_t ancora;
         uint8_t shape; bool additive;
     };
     struct GpuInstance { glm::vec4 posSize, color, velStretch, misc; };

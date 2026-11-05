@@ -67,11 +67,10 @@ FxLight fxRaios(ParticleSystem& ps, Rng& r, const glm::mat4& world, glm::vec3 a,
 FxLight fxAuraArma(ParticleSystem& ps, Rng& r, const glm::mat4& world, glm::vec3 a, glm::vec3 b, float raio, glm::vec3 cor, float dt,
                    float& accFumaca, float& accBrasa, float& accEstalo, float& accHalo, float& accNevoa, glm::vec3 velArma = glm::vec3(0.f),
                    bool eletrico = false, float tempo = 0.f);  // eletrico: raios em zigue-zague no lugar das labaredas
-FxLight fxMuzzleFlash(ParticleSystem& ps, Rng& r, glm::vec3 pos, glm::vec3 dir, glm::vec3 carry = glm::vec3(0.f));
+FxLight fxMuzzleFlash(ParticleSystem& ps, Rng& r, glm::vec3 pos, glm::vec3 dir);  // clarão e fagulhas presos à âncora atual
 void fxBullet(ParticleSystem& ps, glm::vec3 from, glm::vec3 to, const glm::vec3* cor = nullptr);  // cor: bala colorida (skin)
 // Tiro de skin com efeito próprio: jato de chamas na boca do cano, do miolo quente (cor2) até a cor da skin (cor)
-FxLight fxDisparoSkin(ParticleSystem& ps, Rng& r, glm::vec3 pos, glm::vec3 dir, glm::vec3 cor, glm::vec3 cor2,
-                      glm::vec3 carry = glm::vec3(0.f));  // carry: velocidade da arma (o fogo acompanha)
+FxLight fxDisparoSkin(ParticleSystem& ps, Rng& r, glm::vec3 pos, glm::vec3 dir, glm::vec3 cor, glm::vec3 cor2);  // fogo preso à âncora atual
 void fxImpact(ParticleSystem& ps, Rng& r, glm::vec3 pos, glm::vec3 dir);
 void fxSpellTrail(ParticleSystem& ps, Rng& r, const FxPalette& pal, glm::vec3 pos, glm::vec3 vel, float dt);
 
