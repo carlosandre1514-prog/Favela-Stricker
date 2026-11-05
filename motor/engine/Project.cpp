@@ -3,6 +3,7 @@
 //  - criar objetos pelo editor (cada botão gera uma "receita"),
 //  - os comandos do assistente de IA (ferramentas).
 // Cada objeto raiz guarda a receita que o recria; ao salvar, a receita recebe o transform atual.
+#include <fstream>
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -224,16 +225,29 @@ void applyMaterialTo(Engine* e, GameObject& g, bool subtree, const json& spec) {
         GLuint tex = carregar(it->get<std::string>(), true);
         // metal/brilho por pixel (G = rugosidade, B = metal, como no glTF): partes metálicas e outras foscas na skin
         // (sozinha: a imagem <nome>_orm.jpg ao lado da textura, se existir)
-        GLuint orm = 0;
-        if (auto o = spec.find("textura_orm"); o != spec.end() && o->is_string()) {
-            orm = carregar(o->get<std::string>(), false);
-        } else {
-            std::string f = it->get<std::string>();
-            if (f.rfind("kit:", 0) == 0) f = kitPath(e, f.substr(4));
-            const size_t ponto = f.rfind('.');
-            if (ponto != std::string::npos) {
-                f = f.substr(0, ponto) + "_orm.jpg";
-                if (FILE* fp = std::fopen(f.c_str(), "rb")) { std::fclose(fp); orm = carregar(f, false); }
+        // Também sozinhos, se existirem: <nome>_emi.jpg (o que acende, ex.: chamas azuis) e <nome>_efeito.json
+        // ({"emissivo": força, "aura": [r, g, b, força]}: brilho nas bordas da arma)
+        std::string base = it->get<std::string>();
+        if (base.rfind("kit:", 0) == 0) base = kitPath(e, base.substr(4));
+        base = base.substr(0, base.rfind('.'));
+        auto existe = [](const std::string& f) {
+            FILE* fp = std::fopen(f.c_str(), "rb");
+            if (fp) std::fclose(fp);
+            return fp != nullptr;
+        };
+        GLuint orm = 0, emi = 0;
+        if (auto o = spec.find("textura_orm"); o != spec.end() && o->is_string()) orm = carregar(o->get<std::string>(), false);
+        else if (existe(base + "_orm.jpg")) orm = carregar(base + "_orm.jpg", false);
+        if (existe(base + "_emi.jpg")) emi = carregar(base + "_emi.jpg", true);
+        float forcaEmi = 1.f;
+        glm::vec4 aura(0.f);
+        if (existe(base + "_efeito.json")) {
+            std::ifstream in(base + "_efeito.json");
+            json ef = json::parse(in, nullptr, false);
+            if (ef.is_object()) {
+                if (ef.contains("emissivo") && ef["emissivo"].is_number()) forcaEmi = ef["emissivo"].get<float>();
+                if (ef.contains("aura") && ef["aura"].is_array() && ef["aura"].size() == 4)
+                    for (int k = 0; k < 4; ++k) aura[k] = ef["aura"][k].is_number() ? ef["aura"][k].get<float>() : 0.f;
             }
         }
         if (tex) {
@@ -248,6 +262,11 @@ void applyMaterialTo(Engine* e, GameObject& g, bool subtree, const json& spec) {
                 copy.albedo = tex;
                 copy.albedoFactor = glm::vec4(1.f);
                 copy.mode = 0;
+                if (emi) {
+                    copy.emissive = emi;
+                    copy.emissive_factor = glm::vec3(forcaEmi);
+                }
+                copy.rim = aura;
                 if (orm) {
                     copy.orm = orm;
                     copy.metallic = copy.roughness = 1.f;

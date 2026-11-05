@@ -128,6 +128,7 @@ bool Renderer::init(const char* shaderDir) {
         p->uRough = glGetUniformLocation(p->id, "uRoughnessFactor");
         p->uMetal = glGetUniformLocation(p->id, "uMetallicFactor");
         p->uEmis = glGetUniformLocation(p->id, "uEmissiveFactor");
+        p->uRim = glGetUniformLocation(p->id, "uRim");
         p->uAlphaCut = glGetUniformLocation(p->id, "uAlphaCutoff");
         p->uOccStrength = glGetUniformLocation(p->id, "uOcclusionStrength");
         p->uMode = glGetUniformLocation(p->id, "uMode");
@@ -400,6 +401,7 @@ void Renderer::bindMaterial(const Program& p, const Material& m) {
     glUniform1f(p.uRough, m.roughness);
     glUniform1f(p.uMetal, m.metallic);
     glUniform3fv(p.uEmis, 1, &m.emissive_factor[0]);
+    if (p.uRim >= 0) glUniform4fv(p.uRim, 1, &m.rim[0]);
     glUniform1f(p.uAlphaCut, m.alphaCutoff);
     glUniform1i(p.uMode, m.mode);
     if (p.uTime >= 0) glUniform1f(p.uTime, time);

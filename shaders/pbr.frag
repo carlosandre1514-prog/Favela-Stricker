@@ -22,6 +22,7 @@ uniform vec4 uAlbedoFactor;
 uniform float uRoughnessFactor;
 uniform float uMetallicFactor;
 uniform vec3 uEmissiveFactor;
+uniform vec4 uRim;                // aura nas bordas: rgb e força (0 = sem)
 uniform float uAlphaCutoff;       // 0 = opaco
 uniform float uOcclusionStrength; // 0 = sem textura de AO
 uniform int uMode;                // 0 padrão, 1 terreno simples, 2 água (oceano), 3 terreno com camadas
@@ -258,6 +259,11 @@ void main() {
     vec3 ambient = (diffuseIBL + specIBL) * ao * uEnvParams.z;
 
     vec3 color = Lo + ambient + texture(uEmissiveMap, vUV).rgb * uEmissiveFactor;
+    if (uRim.a > 0.0) {  // aura: as bordas vistas de lado acendem, com um pulso suave que corre pela arma
+        float borda = pow(1.0 - clamp(abs(dot(Nv, V)), 0.0, 1.0), 3.0);
+        float pulso = 0.75 + 0.25 * sin(uTime * 2.6 + dot(vWorldPos, vec3(9.0, 13.0, 11.0)));
+        color += uRim.rgb * (uRim.a * borda * pulso);
+    }
     if (uFog.w > 0.0) {
         float fog = 1.0 - exp(-uFog.w * length(uCamPos.xyz - vWorldPos));
         color = mix(color, uFog.rgb, fog);

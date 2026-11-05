@@ -46,6 +46,7 @@ struct Material {
     glm::vec4 albedoFactor{1.f};
     float roughness = 1.f, metallic = 1.f;
     glm::vec3 emissive_factor{0.f};
+    glm::vec4 rim{0.f};        // brilho nas bordas (aura, ex.: skin de arma): rgb e força; pulsa devagar
     float alphaCutoff = 0.f;   // > 0: alpha test (glTF alphaMode MASK)
     float occlusionStrength = 1.f;
     bool doubleSided = false;
@@ -137,7 +138,7 @@ private:
     struct Program {
         GLuint id = 0;
         GLint uModel = -1, uLightVP = -1;
-        GLint uAlbedoF = -1, uRough = -1, uMetal = -1, uEmis = -1, uAlphaCut = -1, uOccStrength = -1, uMode = -1, uTime = -1;
+        GLint uAlbedoF = -1, uRough = -1, uMetal = -1, uEmis = -1, uRim = -1, uAlphaCut = -1, uOccStrength = -1, uMode = -1, uTime = -1;
     };
 
     void updateEnvironment(const Environment& env);

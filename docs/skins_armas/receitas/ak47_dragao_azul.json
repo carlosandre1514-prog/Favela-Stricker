@@ -142,5 +142,15 @@
    "metal": 1.0,
    "rugosidade": 0.22
   }
+ },
+ "brilho": {
+  "emissivo": 1.5,
+  "aura": [
+   0.15,
+   0.42,
+   1.0,
+   1.1
+  ],
+  "azul_min": 35
  }
 }
