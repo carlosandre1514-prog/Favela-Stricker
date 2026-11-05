@@ -428,6 +428,9 @@ int main(int argc, char** argv) {
                     engine_set_camera(e, 0.f, 1.2f, 0.f, 3.6f, 0.2f, 1.5f);
                     frames(e, 2);
                     save(out, (std::string("costas_") + keys[t][k] + ".png").c_str());
+                    engine_set_camera(e, 0.f, 1.2f, 0.f, 1.5708f, 0.1f, 1.3f);
+                    frames(e, 2);
+                    save(out, (std::string("lado_") + keys[t][k] + ".png").c_str());
                 }
                 if (std::getenv("PERTO")) {  // a cabeça de perto (cabelo 3D), de três quartos e de trás
                     engine_set_camera(e, 0.f, 1.62f, 0.f, 0.6f, 0.12f, 0.75f);

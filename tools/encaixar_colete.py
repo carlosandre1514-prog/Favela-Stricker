@@ -19,7 +19,7 @@ import numpy as np
 from PIL import Image
 
 # onde o colete fica no boneco (fração da altura): tronco do boneco de blocos tem 0,24 × 0,12 de largura × fundo
-LARG, FUNDO = 0.146, 0.093       # meia largura e meia profundidade da superelipse (cobre os cantos do tronco)
+LARG, FUNDO = 0.136, 0.093       # meia largura e meia profundidade da superelipse (cobre os cantos do tronco)
 Y0, Y1 = 0.555, 0.862            # da cintura até um pouco acima do ombro (alças)
 
 
@@ -58,6 +58,18 @@ def main():
     out[:, 0] = w[:, 0] * LARG
     out[:, 2] = w[:, 1] * FUNDO
     out[:, 1] = Y0 + (V[:, 1] - ymin) / (ymax - ymin) * (Y1 - Y0)
+    # nada do colete dentro do tronco (caixa de 0,24 × 0,12, da cintura ao ombro em 0,825): cada ponto que cair
+    # dentro dela, com uma folga, sai pela face mais perto (a parte de dentro das placas fica rente ao tronco)
+    folga = 0.009
+    cx, cz, base, topo = 0.12 + folga, 0.06 + folga, 0.50, 0.825 + folga
+    for i in range(len(out)):
+        x, y, z = out[i]
+        if abs(x) < cx and abs(z) < cz and base < y < topo:
+            pen = [(cx - abs(x), 0), (cz - abs(z), 2), (topo - y, 1)]
+            d, eixo = min(pen)
+            if eixo == 0: out[i, 0] = np.sign(x) * cx
+            elif eixo == 2: out[i, 2] = np.sign(z) * cz
+            else: out[i, 1] = topo
     # normais: escala inversa (a deformação suave da superelipse mexe pouco nelas)
     n = N / np.array([LARG / a, (Y1 - Y0) / (ymax - ymin), FUNDO / b])
     n /= np.maximum(np.linalg.norm(n, axis=1, keepdims=True), 1e-9)

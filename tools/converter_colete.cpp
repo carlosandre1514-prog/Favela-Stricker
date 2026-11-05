@@ -1,6 +1,6 @@
 // Converte o colete do Sketchfab ("Armor vest" de 3DWorkbench, CC BY 4.0) de FBX para uma malha leve (OBJ) que o
 // tools/encaixar_colete.py ajusta ao tronco do boneco de blocos.
-//   - pula o manequim e a base que vêm no arquivo (grupos DUM*)
+//   - pula o manequim e a base que vêm no arquivo (grupos DUM*) e as bolsas/rádio das laterais (entrariam nos braços)
 //   - as duas texturas (colete e bolsos) viram uma só: colete à esquerda (u 0..0,5), bolsos à direita (0,5..1)
 //   - junta os vértices iguais e simplifica com o mesmo simplificador do motor (motor/procgen/Simplify.cpp)
 // Compilar (com o ufbx e o glm que o CMake baixa em build/_deps):
@@ -36,6 +36,9 @@ int main(int argc, char** argv) {
     for (size_t ni = 0; ni < sc->nodes.count; ++ni) {
         ufbx_node* n = sc->nodes.data[ni];
         if (!n->mesh || std::strncmp(n->name.data, "DUM", 3) == 0) continue;  // manequim e base: fora
+        // bolsas e rádio das laterais: ficam bem para fora e entrariam nos braços do boneco (que encostam no tronco)
+        if (std::strncmp(n->name.data, "mat_", 4) == 0 || std::strncmp(n->name.data, "extra_", 6) == 0 ||
+            std::strncmp(n->name.data, "Plastik", 7) == 0) continue;
         ufbx_mesh* m = n->mesh;
         std::vector<uint32_t> tri(m->max_face_triangles * 3);
         const ufbx_matrix nm = ufbx_matrix_for_normals(&n->geometry_to_world);
