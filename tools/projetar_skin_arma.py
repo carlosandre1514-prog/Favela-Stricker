@@ -20,7 +20,7 @@ Com acabamento ou zonas, grava também <saida>_orm.jpg (G = rugosidade, B = meta
      (<saida>_emi.jpg) e as bordas da arma ganham um brilho que pulsa (<saida>_efeito.json); "raios": [r, g, b]
      solta raios e faíscas dessa cor do cabo até a boca do cano; "aura_particulas": [r, g, b] envolve a arma toda numa
      aura de fumaça brilhante, brasas e faíscas dessa cor; "aura_raios": [r, g, b] a mesma aura com raios no lugar da fumaça;
-     "disparo": {"cor": [r, g, b], "cor2": [r, g, b]} tiro próprio (sopro de fogo, faíscas, bala colorida, pintura acende); "cor": "azul" ou "vermelho" (o que acende)
+     "disparo": {"cor": [r, g, b], "cor2": [r, g, b]} tiro próprio (chamas da cor2 à cor na boca do cano, bala colorida, pintura acende); "cor": "azul" ou "vermelho" (o que acende)
 
 Uso: python3 tools/projetar_skin_arma.py ak47 referencia.png receita.json saida.jpg
 """
