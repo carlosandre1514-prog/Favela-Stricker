@@ -558,6 +558,9 @@ void teamStart(Engine* e) {
     M.online = online; M.host = host; M.localId = localId; M.roster = roster;
     if (e->rules.objetivo != "times") return;
     M.active = true;
+    // a partida começa de manhã: o dia passa (manhã, tarde, noite) e volta a amanhecer até acabar o tempo
+    // (um dia inteiro em ciclo_min do projeto: 10 min, numa partida de 20 min são dois dias)
+    setTimeOfDay(e, 6.5f);
     // bases e lojas do projeto
     glm::vec3 bsum[2]{}; int bn[2] = {0, 0}, tn[2] = {0, 0};
     glm::vec3 tsum[2]{};

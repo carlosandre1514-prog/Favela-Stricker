@@ -119,7 +119,14 @@ int main(int argc, char** argv) {
         engine_set_first_person(e, 1);
         engine_set_play(e, 1);
         frames(e, 60);
+        std::printf("  hora no começo da partida: %.2f h\n", engine_get_time_of_day(e));
         save(out, ("skin_fp_" + arma + ".png").c_str());
+        if (std::getenv("HORAS")) {  // o dia passando: um quadro de 0,5 s por vez
+            for (int min = 1; min <= (std::getenv("HORAS") ? std::atoi(std::getenv("HORAS")) : 1); ++min) {
+                for (int k = 0; k < 120; ++k) engine_frame(e, 0.5f);
+                std::printf("  %2d min de partida: %.1f h\n", min, engine_get_time_of_day(e));
+            }
+        }
         if (std::getenv("CORRER")) {  // correndo e atirando: o clarão tem que ficar na boca do cano
             for (int k = 0; k < 40; ++k) { engine_player_input(e, 0.f, 1.f, 1); frames(e, 1); }
             for (int k = 0; k < 3; ++k) { engine_player_input(e, 0.f, 1.f, 1); engine_player_fire(e); frames(e, 1); }
