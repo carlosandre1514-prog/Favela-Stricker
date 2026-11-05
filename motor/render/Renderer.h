@@ -46,7 +46,8 @@ struct Material {
     glm::vec4 albedoFactor{1.f};
     float roughness = 1.f, metallic = 1.f;
     glm::vec3 emissive_factor{0.f};
-    glm::vec4 rim{0.f};        // brilho nas bordas (aura, ex.: skin de arma): rgb e força; pulsa devagar
+    glm::vec4 rim{0.f};
+    char nome[24] = {};        // nome do material no modelo, minúsculo (skin de arma com uma imagem por peça)        // brilho nas bordas (aura, ex.: skin de arma): rgb e força; pulsa devagar
     float alphaCutoff = 0.f;   // > 0: alpha test (glTF alphaMode MASK)
     float occlusionStrength = 1.f;
     bool doubleSided = false;

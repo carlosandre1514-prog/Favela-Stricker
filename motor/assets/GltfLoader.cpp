@@ -1,6 +1,7 @@
 #define TINYGLTF_IMPLEMENTATION
 #define TINYGLTF_NO_STB_IMAGE_WRITE
 #define STB_IMAGE_IMPLEMENTATION
+#include <cctype>
 #include <cstdlib>
 #include <tiny_gltf.h>
 #include <algorithm>
@@ -197,6 +198,7 @@ bool loadGltf(const char* path, LoadContext& ctx, LoadedModel& out) {
     };
     for (const auto& gm : model.materials) {
         Material m;
+        for (size_t k = 0; k < gm.name.size() && k + 1 < sizeof(m.nome); ++k) m.nome[k] = char(std::tolower((unsigned char)gm.name[k]));
         const auto& pbr = gm.pbrMetallicRoughness;
         m.albedoFactor = glm::vec4(pbr.baseColorFactor[0], pbr.baseColorFactor[1], pbr.baseColorFactor[2], pbr.baseColorFactor[3]);
         m.roughness = float(pbr.roughnessFactor);

@@ -326,15 +326,24 @@ void applyMaterialTo(Engine* e, GameObject& g, bool subtree, const json& spec) {
                 if (!m) return;
                 Material copy = *m;
                 copy.albedo = tex;
+                // arma de várias peças (ex.: M4 Colt: corpo, carregador, luneta): <skin>_<peça>.jpg pinta só a peça,
+                // com o _emi/_orm dela se tiver
+                GLuint ormP = orm, emiP = emi;
+                if (m->nome[0] && existe(base + "_" + m->nome + ".jpg")) {
+                    const std::string bp = base + "_" + m->nome;
+                    copy.albedo = carregar(bp + ".jpg", true);
+                    if (existe(bp + "_emi.jpg")) emiP = carregar(bp + "_emi.jpg", true);
+                    if (existe(bp + "_orm.jpg")) ormP = carregar(bp + "_orm.jpg", false);
+                }
                 copy.albedoFactor = glm::vec4(1.f);
                 copy.mode = 0;
-                if (emi) {
-                    copy.emissive = emi;
+                if (emiP) {
+                    copy.emissive = emiP;
                     copy.emissive_factor = glm::vec3(forcaEmi);
                 }
                 copy.rim = aura;
-                if (orm) {
-                    copy.orm = orm;
+                if (ormP) {
+                    copy.orm = ormP;
                     copy.metallic = copy.roughness = 1.f;
                 } else {
                     if (metal || rough) copy.orm = TextureManager::instance().white();  // metal/brilho iguais na arma toda

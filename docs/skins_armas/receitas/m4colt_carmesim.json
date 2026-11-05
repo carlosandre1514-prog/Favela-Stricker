@@ -1,0 +1,168 @@
+{
+ "nota": "M4 Colt Vermelho Carmesim: referência 1672x941 (arma grande de lado no alto, cano à esquerda). foto = [x do lado da coronha, y de baixo, x do lado do cano, y de cima]. A M4 Colt tem 3 peças (base, magazin, visier).",
+ "pecas": {
+  "base": {
+   "partes": {
+    "cabo": {
+     "t": [
+      0.2,
+      0.335
+     ],
+     "y": [
+      0.3,
+      1.15
+     ],
+     "foto": [
+      1185,
+      467,
+      1000,
+      223
+     ]
+    },
+    "coronha": {
+     "t": [
+      -0.01,
+      0.2
+     ],
+     "y": [
+      0.5,
+      1.5
+     ],
+     "foto": [
+      1625,
+      433,
+      1165,
+      113
+     ]
+    },
+    "corpo": {
+     "t": [
+      0.2,
+      0.53
+     ],
+     "y": [
+      0.75,
+      1.75
+     ],
+     "foto": [
+      1180,
+      353,
+      745,
+      33
+     ]
+    },
+    "guarda-mão": {
+     "t": [
+      0.53,
+      0.765
+     ],
+     "y": [
+      1.0,
+      1.7
+     ],
+     "foto": [
+      750,
+      273,
+      455,
+      49
+     ]
+    },
+    "cano": {
+     "t": [
+      0.765,
+      1.01
+     ],
+     "y": [
+      1.0,
+      1.75
+     ],
+     "foto": [
+      455,
+      273,
+      35,
+      33
+     ]
+    }
+   }
+  },
+  "magazin": {
+   "partes": {
+    "carregador": {
+     "t": [
+      0.37,
+      0.52
+     ],
+     "y": [
+      -0.05,
+      1.2
+     ],
+     "foto": [
+      905,
+      510,
+      735,
+      285
+     ]
+    }
+   }
+  },
+  "visier": {
+   "partes": {
+    "luneta": {
+     "t": [
+      0.34,
+      0.51
+     ],
+     "y": [
+      1.45,
+      2.01
+     ],
+     "foto": [
+      980,
+      110,
+      782,
+      10
+     ]
+    }
+   }
+  }
+ },
+ "acabamento": {
+  "metal": 0.75,
+  "rugosidade": 0.32
+ },
+ "preto_minimo": [
+  32,
+  28,
+  30
+ ],
+ "brilho": {
+  "cor": "vermelho",
+  "emissivo": 1.5,
+  "azul_min": 45,
+  "aura": [
+   1.0,
+   0.12,
+   0.06,
+   0.9
+  ]
+ },
+ "zonas": {
+  "cano preto": {
+   "t": [
+    0.83,
+    1.01
+   ],
+   "y": [
+    1.2,
+    1.45
+   ],
+   "cor": [
+    30,
+    28,
+    32
+   ],
+   "metal": 0.9,
+   "rugosidade": 0.3
+  }
+ }
+}

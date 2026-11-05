@@ -32,7 +32,7 @@ import numpy as np
 from PIL import Image
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from molde_arma import ler_glb  # noqa: E402
+from molde_arma import ler_glb, materiais_glb  # noqa: E402
 
 TAM = 1024
 
@@ -40,15 +40,31 @@ TAM = 1024
 def main():
     arma, ref_p, receita_p, saida = sys.argv[1:5]
     raiz = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
-    pos, uv, idx, tex = ler_glb(os.path.join(raiz, 'shaders', 'kit', 'armas', arma + '.glb'))
+    glb = os.path.join(raiz, 'shaders', 'kit', 'armas', arma + '.glb')
     ref = np.asarray(Image.open(ref_p).convert('RGB'), float)
-    H, W = ref.shape[:2]
     receita = json.load(open(receita_p))
-    partes = receita['partes']
+    mats = materiais_glb(glb)
+    if len(mats) <= 1:
+        pos, uv, idx, tex = ler_glb(glb)
+        projetar(pos, uv, idx, tex, ref, receita, receita['partes'], pos.min(0), pos.max(0), saida, True)
+        return
+    # arma de várias peças (cada uma com a sua textura): a medida é a da arma inteira; a 1ª peça grava <saida>, as
+    # outras <saida>_<peça>.jpg (o jogo pinta cada peça com a sua). Partes por peça em "pecas": {"<peça>": {...}}
+    pecas = [(mi, nome.lower(), ler_glb(glb, mi)) for mi, nome in mats]
+    todos = np.concatenate([d[0] for _, _, d in pecas])
+    mn, mx = todos.min(0), todos.max(0)
+    raiz_saida = os.path.splitext(saida)[0]
+    for k, (mi, nome, (pos, uv, idx, tex)) in enumerate(pecas):
+        partes = receita.get('pecas', {}).get(nome, {}).get('partes', receita.get('partes'))
+        out = saida if k == 0 else f'{raiz_saida}_{nome}.jpg'
+        projetar(pos, uv, idx, tex, ref, receita, partes, mn, mx, out, k == 0)
+
+
+def projetar(pos, uv, idx, tex, ref, receita, partes, mn, mx, saida, efeito):
+    H, W = ref.shape[:2]
     zonas = receita.get('zonas', {})
     acab = receita.get('acabamento')
     preto = np.array(receita.get('preto_minimo', [0, 0, 0]), float)
-    mn, mx = pos.min(0), pos.max(0)
     t = (pos[:, 2] - mn[2]) / (mx[2] - mn[2])
     # parte de cada triângulo: a primeira da receita que contém o centro (ordem da receita = prioridade)
     nomes = list(partes)
@@ -149,7 +165,8 @@ def main():
         base = os.path.splitext(saida)[0]
         Image.fromarray(np.clip(emi, 0, 255).astype(np.uint8)).save(base + '_emi.jpg', quality=88)
         ef = {k: brilho[k] for k in ('emissivo', 'aura', 'raios', 'aura_particulas', 'aura_raios', 'disparo') if k in brilho}
-        json.dump(ef, open(base + '_efeito.json', 'w'))
+        if efeito:
+            json.dump(ef, open(base + '_efeito.json', 'w'))
     if acab or zonas:
         Image.fromarray(np.clip(orm, 0, 255).astype(np.uint8)).save(os.path.splitext(saida)[0] + '_orm.jpg', quality=92)
     contagem = {nm: int((parte_tri == k).sum()) for k, nm in enumerate(nomes)}
