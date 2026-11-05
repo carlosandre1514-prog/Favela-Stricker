@@ -8,3 +8,4 @@ local.properties
 shaders/cache/
 servidor/node_modules/
 /build*/
+__pycache__/
