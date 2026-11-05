@@ -938,10 +938,29 @@ int createFromSpecJson(Engine* e, const std::string& specJson, std::string* err)
         if (id < 0) return fail(e->lastError.empty() ? "não consegui criar o personagem" : e->lastError);
         int ci = int(e->characters.size()) - 1;
         if (p.bloco && p.colete) {  // colete: peça separada, por cima da roupa (preso no peito)
+            // modelo 3D do colete ("Armor vest" de 3DWorkbench, CC BY 4.0: créditos em CREDITOS.txt), tingido na cor da
+            // roupa; sem o arquivo, o colete de blocos
+            static std::vector<uint8_t> modelo;
+            static bool lido = false;
+            if (!lido) {
+                lido = true;
+                if (FILE* f = std::fopen(kitPath(e, "personagens/colete/colete.bin").c_str(), "rb")) {
+                    std::fseek(f, 0, SEEK_END);
+                    const long n = std::ftell(f);
+                    std::fseek(f, 0, SEEK_SET);
+                    if (n > 0) { modelo.resize(size_t(n)); if (std::fread(modelo.data(), 1, modelo.size(), f) != modelo.size()) modelo.clear(); }
+                    std::fclose(f);
+                }
+            }
             Geo vest;
             vest.place(glm::vec3(0.f), 0.f);
-            buildBlockVest(p, vest[Mat::Painted]);
-            if (attachGearMesh(e, ci, CJ_Chest, vest, "Colete") < 0) e->lastError.clear();
+            const bool doModelo = buildModelVest(p, vest, modelo);
+            if (!doModelo) buildBlockVest(p, vest[Mat::Painted]);
+            const int vid = attachGearMesh(e, ci, CJ_Chest, vest, "Colete");
+            if (vid < 0) e->lastError.clear();
+            else if (doModelo)
+                if (GameObject* vg = e->scene.get(e->objects[vid]))
+                    applyMaterialTo(e, *vg, true, json{{"textura", "kit:personagens/colete/colete.jpg"}, {"metal", 0.f}, {"rugosidade", 0.8f}});
         }
         if (p.bloco && p.texturizado && p.chapeu == 1) {  // boné por cima da skin pintada (some na primeira pessoa)
             Geo cap;

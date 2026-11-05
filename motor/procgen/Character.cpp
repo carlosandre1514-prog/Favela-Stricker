@@ -616,6 +616,37 @@ struct HairMesh {
 }  // namespace
 
 
+// Colete de modelo 3D: o arquivo já vem encaixado no tronco (fração da altura); a textura vai no material (Project.cpp)
+bool buildModelVest(const CharacterParams& p, Geo& g, const std::vector<uint8_t>& data) {
+    if (data.size() < 12 || std::memcmp(data.data(), "COL1", 4) != 0) return false;
+    uint32_t nv = 0, ni = 0;
+    std::memcpy(&nv, data.data() + 4, 4);
+    std::memcpy(&ni, data.data() + 8, 4);
+    if (data.size() != 12 + size_t(nv) * 32 + size_t(ni) * 4) return false;
+    const float H = p.height;
+    MeshBuilder& b = g[Mat::Painted];
+    b.joint = -1; b.xf = glm::mat4(1.f); b.uvTile = glm::vec2(0.f);
+    glm::vec4 cor = p.coleteCor.a > 0.f ? p.coleteCor : srgb(32, 34, 38);
+    b.color = glm::vec4(glm::min(glm::vec3(cor) * 1.9f, glm::vec3(1.f)), 1.f);  // a textura é clara: a cor da roupa tinge
+    const uint32_t v0 = uint32_t(b.v.size());
+    const uint8_t* q = data.data() + 12;
+    for (uint32_t i = 0; i < nv; ++i, q += 32) {
+        float f[8];
+        std::memcpy(f, q, sizeof f);
+        const glm::vec3 n(f[3], f[4], f[5]);
+        const glm::vec3 t = std::abs(n.y) < 0.9f ? glm::normalize(glm::cross(glm::vec3(0, 1, 0), n)) : glm::vec3(1, 0, 0);
+        b.pushVertex(glm::vec3(f[0], f[1], f[2]) * H, n, glm::vec2(f[6], f[7]), t);
+    }
+    for (uint32_t i = 0; i < ni; ++i, q += 4) {
+        uint32_t k;
+        std::memcpy(&k, q, 4);
+        if (k >= nv) return false;
+        b.idx.push_back(v0 + k);
+    }
+    b.color = glm::vec4(1.f);
+    return true;
+}
+
 // Boné por cima da cabeça (skin pintada): copa arredondada que cobre o alto do cubo, aba na frente e botão em cima
 void buildBlockCap(const CharacterParams& p, MeshBuilder& b) {
     const float H = p.height;

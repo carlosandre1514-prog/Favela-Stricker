@@ -333,7 +333,7 @@ function telaArmas() {
 // ---------------- configurações ----------------
 function telaConfig(aba = 'sens') {
   motor.girarMenu(true);
-  const abas = [['sens', 'Sensibilidade'], ['graficos', 'Gráficos'], ['audio', 'Som e voz'], ['hud', 'Controles (HUD)'], ['conta', 'Conta']];
+  const abas = [['sens', 'Sensibilidade'], ['graficos', 'Gráficos'], ['audio', 'Som e voz'], ['hud', 'Controles (HUD)'], ['conta', 'Conta'], ['creditos', 'Créditos']];
   const t = mostrar(html(`<div class="tela"><div class="config">
     <div class="menu">${abas.map(([k, n]) => `<button class="aba ${k === aba ? 'sel' : ''}" data-aba="${k}">${n}</button>`).join('')}</div>
     <div class="corpo" id="c-corpo"></div></div></div>`), 'config');
@@ -372,6 +372,20 @@ function telaConfig(aba = 'sens') {
       <div class="linha"><button class="btn btn-ouro" id="c-editar">Editar o HUD</button><button class="btn btn-fraco" id="c-hud-padrao">Voltar ao padrão</button></div></div>`;
     $('#c-editar', c).onclick = () => abrirEditorHud(() => telaConfig('hud'));
     $('#c-hud-padrao', c).onclick = () => { guardado.del('hud_layout'); layout = carregarLayout(); aviso('HUD de volta ao padrão'); };
+  } else if (aba === 'creditos') {
+    // modelos e texturas de outros autores (as licenças CC BY pedem o crédito; a lista completa está em CREDITOS.txt)
+    const itens = [
+      ['Colete dos personagens', '"Armor vest" por 3DWorkbench (Sketchfab)', 'CC BY 4.0 · simplificado e encaixado no boneco'],
+      ['Fuzil M4A1', '"M4A1" por Firewarden3D (Sketchfab)', 'CC BY 4.0 · texturas reduzidas'],
+      ['Animações', 'Mixamo (Adobe)', 'uso livre em jogos'],
+      ['Prédios e peças da cidade', 'Downtown City MegaKit por Quaternius', 'CC0'],
+      ['Texturas do chão', 'Poly Haven', 'CC0'],
+      ['Água', 'ocean por Jérémy Bouny (jbouny)', 'MIT'],
+      ['Fontes', 'Bebas Neue (Dharma Type), Inter (Rasmus Andersson), Permanent Marker, Bangers, Rubik Wet Paint', 'SIL OFL 1.1 / Apache 2.0'],
+      ['Bibliotecas', 'GLM, tinygltf, nlohmann/json, stb, ufbx, Bullet Physics', 'MIT / zlib / domínio público'],
+    ];
+    c.innerHTML = itens.map(([o, quem, lic]) => `<div class="ajuste"><span class="nome">${esc(o)}<small>${esc(lic)}</small></span><span class="cresce" style="font-size:13px">${esc(quem)}</span></div>`).join('') +
+      '<span class="dica">CC BY 4.0: creativecommons.org/licenses/by/4.0 · lista completa no arquivo CREDITOS.txt do jogo.</span>';
   } else if (aba === 'conta') {
     const quem = !fb ? 'Sem conta (só neste aparelho)' : fb.anonimo ? 'Convidado (crie uma conta para não perder nada)' : fb.email;
     c.innerHTML = `<div class="ajuste"><span class="nome">Nome no jogo</span><input type="text" id="c-nome" maxlength="16" value="${esc(conta.nome())}"><button class="btn btn-fraco" id="c-salvar-nome">Salvar</button></div>

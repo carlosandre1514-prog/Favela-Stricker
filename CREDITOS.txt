@@ -1,4 +1,4 @@
-CRÉDITOS — modelos, texturas e código de terceiros usados no Motor 3D
+CRÉDITOS — modelos, texturas e código de terceiros usados no Favela Strike (e no Motor 3D)
 
 M4A1 (arma realista)
   Autor: Firewarden3D — https://sketchfab.com/Firewarden3D
@@ -17,6 +17,14 @@ Pistola TT-33 (kit/armas/tt33.glb) e as skins Crimson Forge, Nebula Shadow e Gol
 
 Acessórios de arma (mira red dot, trilho, coronha tática, empunhadura frontal) — arquivo "Low.fbx"
   Autor: a confirmar (pacote gratuito enviado pelo dono do projeto).
+
+Colete à prova de balas dos personagens (shaders/kit/personagens/colete)
+  Modelo "Armor vest" no Sketchfab (página do autor: https://sketchfab.com/3DWorkbench)
+  Autor: 3DWorkbench (Sketchfab). Licença: Creative Commons Atribuição 4.0 (CC BY 4.0) —
+  https://creativecommons.org/licenses/by/4.0/ — uso comercial permitido, com crédito ao autor.
+  Alterações: sem o manequim e a base do arquivo, malha simplificada (21.776 -> 2.204 triângulos), encaixada no
+  tronco do boneco de blocos e tingida com a cor de cada roupa; colete e bolsos numa textura só, clareada, com o
+  relevo do mapa normal (tools/converter_colete.cpp e tools/encaixar_colete.py).
 
 Soldado (traje tático): personagem "Vanguard" do Mixamo (Adobe), uso livre em jogos.
 

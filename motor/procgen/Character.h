@@ -69,6 +69,8 @@ void buildBlockVest(const CharacterParams& p, MeshBuilder& mesh);
 void buildBlockHair(const CharacterParams& p, Geo& g, uint32_t seed);
 // Boné separado (p.chapeu == 1 com skin pintada), na cor p.chapeuCor, no espaço do personagem (preso na cabeça)
 void buildBlockCap(const CharacterParams& p, MeshBuilder& b);
+// Colete de modelo 3D (colete.bin do tools/encaixar_colete.py, em fração da altura), na cor p.coleteCor. false = arquivo inválido
+bool buildModelVest(const CharacterParams& p, Geo& g, const std::vector<uint8_t>& data);
 // Cabelo de modelo 3D (arquivo .bin feito por tools/converter_cabelo.py): a touca arredondada na cor do modelo (sempre)
 // e as peças do modelo (cachos, twists, mechas) na camada de detalhe. false = arquivo inválido.
 bool buildModelHair(const CharacterParams& p, Geo& g, const std::vector<uint8_t>& data);  // a base fica sempre; cachos/mechas só de perto
