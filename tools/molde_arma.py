@@ -7,7 +7,7 @@ Gera em docs/skins_armas/:
                                (cano, guarda-mão, corpo, carregador, cabo, coronha) e a legenda
   <arma>_molde_limpo.png       só os contornos e as cores das partes, fundo cinza (bom para mandar para a IA)
 
-Uso: python3 tools/molde_arma.py ak47
+Uso: python3 tools/molde_arma.py ak47   (arma com várias texturas: um molde por peça, ex.: m4colt_visier_molde.png)
 """
 import io
 import json
@@ -25,7 +25,8 @@ PARTES = [('cano', (230, 60, 60)), ('guarda-mão', (245, 160, 40)), ('corpo', (6
           ('carregador', (170, 90, 230)), ('cabo', (60, 200, 110)), ('coronha', (240, 220, 60))]
 
 
-def ler_glb(p):
+def ler_glb(p, material=None):
+    """material: índice do material (armas com várias texturas, ex.: corpo, carregador e luneta); None = o primeiro."""
     d = open(p, 'rb').read()
     l = struct.unpack('<I', d[12:16])[0]
     js = json.loads(d[20:20 + l])
@@ -66,7 +67,7 @@ def ler_glb(p):
             m = t @ m
         return m
 
-    P, U, I, mat_principal = [], [], [], None
+    P, U, I, mat_principal = [], [], [], material
     base = 0
 
     def visita(ni, pai):
@@ -100,6 +101,15 @@ def ler_glb(p):
     return pos, uv, idx, textura
 
 
+def materiais_glb(p):
+    """Nomes dos materiais com textura de cor (cada um é uma peça com o seu molde)."""
+    d = open(p, 'rb').read()
+    l = struct.unpack('<I', d[12:16])[0]
+    js = json.loads(d[20:20 + l])
+    return [(i, m.get('name', str(i))) for i, m in enumerate(js.get('materials', []))
+            if 'baseColorTexture' in m.get('pbrMetallicRoughness', {})]
+
+
 def parte_de(c, mn, mx, frente):
     """Parte da arma pelo centro do triângulo: ao longo do comprimento (z) e da altura (y)."""
     t = (c[2] - mn[2]) / (mx[2] - mn[2])
@@ -115,7 +125,16 @@ def parte_de(c, mn, mx, frente):
 
 def main():
     arma = sys.argv[1] if len(sys.argv) > 1 else 'ak47'
-    pos, uv, idx, textura = ler_glb(os.path.join(RAIZ, 'shaders', 'kit', 'armas', arma + '.glb'))
+    glb = os.path.join(RAIZ, 'shaders', 'kit', 'armas', arma + '.glb')
+    mats = materiais_glb(glb)
+    # arma de uma textura: <arma>_molde.png; de várias (ex.: M4 Colt: corpo, carregador, luneta): <arma>_<peça>_molde.png
+    for mi, nome in (mats if len(mats) > 1 else [(None, '')]):
+        molde_de(arma, glb, mi, nome.lower())
+
+
+def molde_de(arma, glb, mi, peca):
+    pos, uv, idx, textura = ler_glb(glb, mi)
+    base = arma + ('_' + peca if peca else '')
     mn, mx = pos.min(0), pos.max(0)
     # de que lado está a boca do cano: a ponta mais fina (menos altura) do comprimento
     zz = pos[:, 2]
@@ -126,16 +145,19 @@ def main():
     saida = os.path.join(RAIZ, 'docs', 'skins_armas')
     os.makedirs(saida, exist_ok=True)
     tex = textura.resize((TAM, TAM), Image.LANCZOS)
-    tex.save(os.path.join(saida, f'{arma}_textura_original.png'))
+    tex.save(os.path.join(saida, f'{base}_textura_original.png'))
     # preenche cada triângulo com a cor da parte (molde limpo) e contorna (molde sobre a textura)
     limpo = Image.new('RGB', (TAM, TAM), (128, 128, 128))
     dl = ImageDraw.Draw(limpo)
     camada = Image.new('RGBA', (TAM, TAM), (0, 0, 0, 0))
     dc = ImageDraw.Draw(camada)
+    # peça separada (carregador, luneta): uma cor só, com o nome da peça na legenda
+    NOMES_PECA = {'magazin': 'carregador', 'visier': 'luneta', 'scope': 'luneta', 'mag': 'carregador'}
+    so_uma = NOMES_PECA.get(peca) if peca else None
+    legenda = [(so_uma, (170, 90, 230) if so_uma == 'carregador' else (60, 200, 220))] if so_uma else PARTES
     for tri in idx:
         c = pos[tri].mean(0)
-        k = parte_de(c, mn, mx, frente)
-        cor = PARTES[k][1]
+        cor = legenda[0][1] if so_uma else PARTES[parte_de(c, mn, mx, frente)][1]
         pts = [(float(u % 1.0) * TAM, float(v % 1.0) * TAM) for u, v in uv[tri]]
         dl.polygon(pts, fill=cor)
         dc.polygon(pts, fill=cor + (70,), outline=cor + (230,))
@@ -148,15 +170,15 @@ def main():
         except OSError:
             fonte = ImageFont.load_default()
         x = 10
-        for nome, cor in PARTES:
+        for nome, cor in legenda:
             w = int(d.textlength(nome, font=fonte)) + 34
             d.rectangle((x, TAM - 36, x + w, TAM - 6), fill=(20, 20, 24))
             d.rectangle((x + 6, TAM - 28, x + 22, TAM - 14), fill=cor)
             d.text((x + 28, TAM - 34), nome, fill=(240, 240, 240), font=fonte)
             x += w + 6
-    molde.save(os.path.join(saida, f'{arma}_molde.png'))
-    limpo.save(os.path.join(saida, f'{arma}_molde_limpo.png'))
-    print('feito:', saida, '· boca do cano em', '+z' if frente > 0 else '-z', '·', len(idx), 'triângulos')
+    molde.save(os.path.join(saida, f'{base}_molde.png'))
+    limpo.save(os.path.join(saida, f'{base}_molde_limpo.png'))
+    print('feito:', base, '· boca do cano em', '+z' if frente > 0 else '-z', '·', len(idx), 'triângulos')
 
 
 if __name__ == '__main__':
