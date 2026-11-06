@@ -13,7 +13,7 @@ async function lojaApi(metodo, rota, corpo) {
   try {
     const t = await fb.tokenValido();
     const r = await fetch(SERVIDOR + '/api/loja/' + rota, {
-      method: metodo, headers: { Authorization: 'Bearer ' + t, 'Content-Type': 'application/json' },
+      method: metodo, headers: { Authorization: 'Bearer ' + t, 'Content-Type': 'application/json', ...(social.id ? { 'X-Jogador-Id': social.id } : {}) },
       body: corpo ? JSON.stringify(corpo) : undefined,
     });
     return r.ok ? r.json() : null;
@@ -22,19 +22,20 @@ async function lojaApi(metodo, rota, corpo) {
 
 // ao entrar na conta: avisa o painel do site (jogador e sessão) e já busca compras feitas enquanto o jogo estava fechado
 async function lojaAoEntrar() {
-  const r = await lojaApi('POST', 'entrar');
+  const r = await lojaApi('POST', 'entrar', { nick: conta.nome() });
   lojaPronta = !!(r && r.ok);
   if (lojaPronta) receberComprasDoSite();
 }
 
-// abre o pagamento do pacote no navegador, com o ID do jogador já preenchido
+// abre o pagamento do pacote no navegador, com o ID do jogador (9 dígitos) já preenchido
 async function comprarNoSite(i) {
   if (!fb || fb.anonimo) return janela('Entre na sua conta', 'Para comprar moedas, entre com e-mail e senha (convidado não pode comprar).');
   if (!lojaPronta) await lojaAoEntrar();
   if (!lojaPronta) return janela('Loja em configuração', 'A compra de moedas pelo site ainda está sendo ligada. Tente de novo daqui a pouco.');
-  const url = `${LOJA.site}/jogo/${LOJA.jogo}?id=${encodeURIComponent(fb.uid)}&sku=${SKU_PACOTES[i]}`;
+  if (!social.id) await garantirIdentidade();
+  const url = `${LOJA.site}/jogo/${LOJA.jogo}?id=${encodeURIComponent(social.id || fb.uid)}&sku=${SKU_PACOTES[i]}`;
   if (window.Nativo && Nativo.abrirLink) Nativo.abrirLink(url); else window.open(url, '_blank');
-  janela('Pagamento aberto no navegador', 'Pague o Pix no site e volte ao jogo: as moedas entram sozinhas em alguns segundos.');
+  janela('Pagamento aberto no navegador', `No site, o seu ID é ${social.id ? idBonito(social.id) : '(criando…)'}. Pague o Pix e volte ao jogo: as moedas entram sozinhas em alguns segundos.`);
 }
 
 // entrega: credita e grava a conta ANTES de confirmar; o código do pedido fica na conta (nunca credita 2 vezes)

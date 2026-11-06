@@ -294,7 +294,14 @@ async function carregarConta() {
 // ---------------- sala do multiplayer (Firebase: salas/<código>) ----------------
 const LETRAS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 class Sala {
-  constructor(codigo, host) { this.codigo = codigo; this.host = host; this.jogadores = {}; this.estado = 'espera'; this.fechada = false; this.ouvintes = []; }
+  // modo: 'times' (Polícia x Bandidos, até 10) ou 'br' (Ressurgência, até 40, só gente)
+  constructor(codigo, host, modo = 'times', publica = false, formato = 'squad') {
+    this.codigo = codigo; this.host = host; this.modo = modo; this.publica = publica; this.formato = formato;
+    this.jogadores = {}; this.estado = 'espera'; this.fechada = false; this.ouvintes = []; this.comecaEm = 0;
+  }
+  get max() { return this.modo === 'br' ? Sala.maxBR(this.formato) : 10; }
+  static tamanho(formato) { return { solo: 1, duo: 2, trio: 3, squad: 4 }[formato] || 4; }
+  static maxBR(formato) { const t = Sala.tamanho(formato); return Math.floor(40 / t) * t; }  // trio: 39
   // 401/403: o banco (Realtime Database) recusou pelas regras; o resto é rede ou endereço do banco
   static erroBanco(code) {
     if (code === 401 || code === 403) return 'O banco do Firebase recusou (' + code + '): no Firebase, abra Realtime Database → Regras e cole as regras do README (salas e usuarios para quem está logado).';
@@ -302,29 +309,47 @@ class Sala {
     return 'o Firebase recusou (' + code + ')';
   }
   static novoCodigo() { let s = ''; for (let i = 0; i < 6; i++) s += LETRAS[Math.floor(Math.random() * LETRAS.length)]; return s; }
-  static async criar(eu) {
+  static async criar(eu, modo = 'times', publica = false, formato = 'squad') {
     for (let k = 0; k < 6; k++) {
       const c = Sala.novoCodigo();
       const g = await fb.get('salas/' + c);
       if (!g.ok) return [null, Sala.erroBanco(g.code)];
       if (g.dado !== null) continue;
-      const r = await fb.put('salas/' + c, { host: fb.uid, estado: 'espera', criada: { '.sv': 'timestamp' }, jogadores: { [fb.uid]: eu } });
+      const r = await fb.put('salas/' + c, { host: fb.uid, estado: 'espera', modo, publica, formato, criada: { '.sv': 'timestamp' },
+        jogadores: { [fb.uid]: { ...eu, entrou: { '.sv': 'timestamp' } } } });
       if (!r.ok) return [null, `não consegui criar a sala (${r.code})`];
-      return [new Sala(c, true), ''];
+      return [new Sala(c, true, modo, publica, formato), ''];
     }
     return [null, 'não achei um código livre, tente de novo'];
   }
-  static async entrar(codigo, eu) {
+  static async entrar(codigo, eu, vagasPrecisas = 1) {
     const c = codigo.trim().toUpperCase();
     const g = await fb.get('salas/' + c);
     if (!g.ok) return [null, Sala.erroBanco(g.code)];
-    if (!g.dado) return [null, 'não existe sala com o código ' + c];
+    if (!g.dado || !g.dado.estado) return [null, 'não existe sala com o código ' + c];
     if (g.dado.estado !== 'espera') return [null, 'essa sala já está jogando'];
+    const modo = g.dado.modo === 'br' ? 'br' : 'times', formato = g.dado.formato || 'squad';
+    const max = modo === 'br' ? Sala.maxBR(formato) : 10;
     const js = g.dado.jogadores || {};
-    if (Object.keys(js).length >= 10 && !js[fb.uid]) return [null, 'a sala está cheia (10 pessoas)'];
-    const r = await fb.put(`salas/${c}/jogadores/${fb.uid}`, eu);
+    if (Object.keys(js).length + vagasPrecisas > max && !js[fb.uid]) return [null, `a sala está cheia (${max} pessoas)`];
+    const r = await fb.put(`salas/${c}/jogadores/${fb.uid}`, { ...eu, entrou: { '.sv': 'timestamp' } });
     if (!r.ok) return [null, `não consegui entrar (${r.code})`];
-    return [new Sala(c, g.dado.host === fb.uid), ''];
+    return [new Sala(c, g.dado.host === fb.uid, modo, !!g.dado.publica, formato), ''];
+  }
+  // Ressurgência, partida rápida: entra na sala pública que está esperando gente; se não tem (ou encheu, ou já
+  // começou), cria uma e avisa as próximas pessoas (salas/BR_PUBLICA aponta para ela)
+  // uma sala pública por formato (solo, duo, trio, squad); o grupo inteiro precisa caber
+  static async partidaRapida(eu, formato = 'squad', grupo = 1) {
+    const ponteiro = 'salas/BR_PUBLICA_' + formato.toUpperCase();
+    const p = await fb.get(ponteiro);
+    if (p.ok && p.dado && p.dado.codigo) {
+      const [s] = await Sala.entrar(p.dado.codigo, eu, grupo);
+      if (s && s.modo === 'br' && s.formato === formato) return [s, ''];
+    }
+    const [s, erro] = await Sala.criar(eu, 'br', true, formato);
+    if (!s) return [null, erro];
+    await fb.put(ponteiro, { codigo: s.codigo, criada: { '.sv': 'timestamp' } });
+    return [s, ''];
   }
   ouvir(aoMudar, aoEstado, aoFechar, aoSair) {
     this.ouvintes.push(fb.ouvir(`salas/${this.codigo}/jogadores`, (ev, sub, dado) => {
@@ -346,6 +371,8 @@ class Sala {
       if (dado === null) { this.fechada = true; aoFechar(); return; }
       if (dado !== this.estado) { this.estado = dado; aoEstado(dado); }
     }));
+    if (this.modo === 'br')  // sala pública: quando começa (contagem de quem criou)
+      this.ouvintes.push(fb.ouvir(`salas/${this.codigo}/comeca_em`, (_ev, _sub, dado) => { this.comecaEm = Number(dado) || 0; aoMudar(); }));
   }
   lista() { return Object.entries(this.jogadores).map(([id, p]) => ({ id, ...p })); }
   // o que o motor precisa de cada pessoa: lado, roupa, as duas armas e as skins das armas dela (os outros veem)
@@ -354,6 +381,51 @@ class Sala {
       arma: p.arma || '', arma2: p.arma2 || 'tt33', skins: p.skins || {} })));
   }
   atualizar(eu) { return fb.patch(`salas/${this.codigo}/jogadores/${fb.uid}`, eu); }
+  // Ressurgência: quem criou a sala monta os times do formato (solo 1, duo 2, trio 3, squad 4): cada grupo de amigos
+  // fica junto no mesmo time; quem veio sozinho completa os times pela ordem de chegada. Sorteia a semente (zona e
+  // pontos de queda iguais em todos os celulares). Precisa de pelo menos 2 times.
+  static montarTimes(lista, tam) {
+    const l = lista.slice().sort((a, b) => (Number(a.entrou) || 0) - (Number(b.entrou) || 0) || (a.id < b.id ? -1 : 1));
+    const grupos = new Map();
+    for (const p of l) { const k = p.grupo || 'sozinho:' + p.id; if (!grupos.has(k)) grupos.set(k, []); grupos.get(k).push(p); }
+    const pedacos = [];
+    for (const g of grupos.values()) for (let i = 0; i < g.length; i += tam) pedacos.push(g.slice(i, i + tam));
+    pedacos.sort((a, b) => b.length - a.length);
+    const times = [];
+    for (const g of pedacos) {
+      const t = times.find((x) => x.length + g.length <= tam);
+      if (t) t.push(...g); else times.push([...g]);
+    }
+    // um time só (ex.: 3 amigos sozinhos num squad): divide para ter adversário
+    if (times.length === 1 && times[0].length > 1) times.push(times[0].splice(Math.ceil(times[0].length / 2)));
+    const mapa = {};
+    times.forEach((t, i) => t.forEach((p) => { mapa[p.id] = i; }));
+    return [mapa, times.length];
+  }
+  async comecarBR() {
+    const l = this.lista();
+    const tam = Sala.tamanho(this.formato);
+    const [times, nt] = Sala.montarTimes(l, tam);
+    if (l.length < 2 || nt < 2) return false;
+    const semente = 1 + Math.floor(Math.random() * 2e9);
+    await fb.del(`salas/${this.codigo}/est`);
+    await fb.del(`salas/${this.codigo}/ev`);
+    if (this.publica) {  // a sala pública começou: as próximas pessoas vão para outra
+      const ponteiro = 'salas/BR_PUBLICA_' + this.formato.toUpperCase();
+      const p = await fb.get(ponteiro);
+      if (p.ok && p.dado && p.dado.codigo === this.codigo) await fb.del(ponteiro);
+    }
+    return (await fb.patch('salas/' + this.codigo, { estado: 'jogo', inicio: { '.sv': 'timestamp' }, times, semente, tamanho: tam })).ok;
+  }
+  // o que o motor precisa na Ressurgência: semente e cada pessoa com o time, o lado da roupa, roupa, armas e skins
+  async rosterBR() {
+    const g = await fb.get('salas/' + this.codigo);
+    const d = (g.ok && g.dado) || {};
+    const times = d.times || {};
+    const jogadores = Object.entries(d.jogadores || this.jogadores).map(([id, p]) => ({ id, nome: p.nome || 'Jogador', time: times[id] | 0,
+      lado: p.time | 0, skin: p.skin | 0, arma: p.arma || '', arma2: p.arma2 || 'tt33', skins: p.skins || {} }));
+    return { semente: d.semente | 0 || 1, tamanho: d.tamanho | 0 || 4, jogadores, meuTime: times[fb.uid] | 0 };
+  }
   async comecar() {
     await fb.del(`salas/${this.codigo}/est`);
     await fb.del(`salas/${this.codigo}/ev`);
@@ -367,8 +439,14 @@ class Sala {
   }
   async sair() {
     this.parar();
-    if (this.host) await fb.del('salas/' + this.codigo);
-    else await fb.del(`salas/${this.codigo}/jogadores/${fb.uid}`);
+    if (this.host) {
+      await fb.del('salas/' + this.codigo);
+      if (this.publica) {
+        const ponteiro = 'salas/BR_PUBLICA_' + this.formato.toUpperCase();
+        const p = await fb.get(ponteiro);
+        if (p.ok && p.dado && p.dado.codigo === this.codigo) await fb.del(ponteiro);
+      }
+    } else await fb.del(`salas/${this.codigo}/jogadores/${fb.uid}`);
     this.fechada = true;
   }
   parar() { for (const o of this.ouvintes) o.fechar(); this.ouvintes = []; }

@@ -8,7 +8,7 @@ function topo(titulo, voltar, extra = '', direita = chipMoedas(false)) {
   return h;
 }
 function ligarAtalhos(t) {
-  for (const b of $$('[data-ir]', t)) b.onclick = () => ({ moedas: telaMoedas, mercado: () => telaMercado('todas'), armas: telaArmas, config: () => telaConfig('sens'), multi: telaMultiplayer })[b.dataset.ir]();
+  for (const b of $$('[data-ir]', t)) b.onclick = () => ({ moedas: telaMoedas, mercado: () => telaMercado('todas'), armas: telaArmas, config: () => telaConfig('sens'), multi: telaMultiplayer, amigos: () => telaAmigos('amigos') })[b.dataset.ir]();
 }
 const nomeNivel = () => NIVEIS[motor.nivel()]?.nome || 'Leve';
 
@@ -67,7 +67,7 @@ function telaLogin() {
     fb = f;
     guardado.set('login_refresh', f.refresh || '');
     await carregarConta();
-    if (typeof lojaAoEntrar === 'function') lojaAoEntrar();  // loja do site: compras pagas entram sozinhas
+    garantirIdentidade().then(() => { if (typeof lojaAoEntrar === 'function') lojaAoEntrar(); });  // loja do site: com o ID de 9 dígitos
     telaInicio();
   };
   $('#l-ir', t).onclick = () => {
@@ -96,7 +96,7 @@ async function comecarLogin() {
   const f = novoFirebase();
   if (!salvo || !f) { telaLogin(); return; }
   mostrar(html('<div class="tela sobre-mapa" style="align-items:center;justify-content:center"><span class="bebas" style="font-size:30px">ENTRANDO…</span></div>'), 'entrando');
-  if (await f.restaurar(salvo)) { fb = f; await carregarConta(); if (typeof lojaAoEntrar === 'function') lojaAoEntrar(); telaInicio(); } else telaLogin();
+  if (await f.restaurar(salvo)) { fb = f; await carregarConta(); garantirIdentidade().then(() => { if (typeof lojaAoEntrar === 'function') lojaAoEntrar(); }); telaInicio(); } else telaLogin();
 }
 
 // ---------------- tela inicial ----------------
@@ -111,7 +111,7 @@ function cartaoConta() {
   return `<button class="cartao-conta" id="i-conta" aria-label="Sua conta: nível ${n.nivel}, ${esc(n.patente.nome)}">
     <span class="insignia">${insignia(n.patente, 30)}</span>
     <span class="dados"><span class="linha1"><b>${esc(conta.nome())}</b><span class="nv">NV ${n.nivel}</span></span>
-      <span class="pat">${esc(n.patente.nome)}${n.divisao ? ' ' + n.divisao : ''}</span>
+      <span class="pat">${esc(n.patente.nome)}${n.divisao ? ' ' + n.divisao : ''}${social.id || guardado.get('meu_id', '') ? ` · ID ${idBonito(social.id || guardado.get('meu_id', ''))}` : ''}</span>
       <span class="barra-xp"><i style="width:${pct}%"></i></span>
       <span class="xp">${n.precisa ? `${fmt(n.noNivel)} / ${fmt(n.precisa)} XP` : 'NÍVEL MÁXIMO'}</span></span>
   </button>`;
@@ -180,6 +180,7 @@ function telaInicio() {
     </div>
     <div class="direita-topo">
       ${chipMoedas()}
+      <button class="chip amigos" data-ir="amigos" aria-label="Amigos">${ICONE.grupo}<span>Amigos</span><b class="badge-amigos" style="display:none">0</b></button>
       <button class="chip engrenagem" data-ir="config" aria-label="Configurações">${ICONE.engrenagem}</button>
       ${cartaoConta()}
     </div>
@@ -194,6 +195,7 @@ function telaInicio() {
   </div>`), 'inicio');
   ligarAtalhos(t);
   ligarGiroBoneco(t);
+  atualizarBadgeAmigos();
   $('#i-jogar', t).onclick = telaModo;
   $('#i-conta', t).onclick = () => telaConfig('conta');
 }
@@ -210,8 +212,8 @@ function telaModo() {
         <span class="texto" style="color:#FEE2E2">10 times de 4 caem do céu na favela. Caiu? Volta em 10 s perto do seu time, enquanto alguém do time estiver de pé. A zona fecha: o último time de pé vence.</span>
         <span class="cresce"></span>
         <div class="linha" style="gap:6px;flex-wrap:wrap"><span class="tag" style="background:rgba(220,38,38,.22);color:#FEE2E2">40 jogadores</span>
-          <span class="tag" style="background:rgba(220,38,38,.22);color:#FEE2E2">zona em 6 fases</span><span class="tag" style="background:rgba(220,38,38,.22);color:#FEE2E2">qualquer roupa</span></div>
-        <div class="linha" style="justify-content:space-between"><span style="font-size:12px;color:#FECACA">~8 min · você + 3 robôs no time</span><span class="entrar" style="background:#DC2626">JOGAR</span></div>
+          <span class="tag" style="background:rgba(220,38,38,.22);color:#FEE2E2">zona em 6 fases</span><span class="tag" style="background:rgba(220,38,38,.22);color:#FEE2E2">voz do time</span></div>
+        <div class="linha" style="justify-content:space-between"><span style="font-size:12px;color:#FECACA">~8 min · online, só gente de verdade</span><span class="entrar" style="background:#DC2626">JOGAR</span></div>
       </button>
       <button class="lado pol" data-modo="0">
         <div class="linha" style="gap:12px"><div class="icone" style="background:#3B82F6">${ICONE.escudo}</div>
@@ -265,7 +267,7 @@ function telaRoupa(time, pronto, modo = 0) {
     </div>
     <div class="linha" style="gap:8px;flex-wrap:wrap"><span class="dica">Arma inicial:</span><span id="r-armas" class="linha" style="gap:6px;flex-wrap:wrap"></span>
       <span class="dica cresce">${br ? '+ TT-33 · você cai com ela (e a skin dela) e pega munição de quem abater' : '+ TT-33 · qualquer arma serve nos dois lados; as outras compra na base com o $ dos abates'}</span>
-      <button class="btn btn-ouro btn-grande" id="r-ir" style="height:48px;font-size:24px;width:200px">${pronto ? 'PRONTO' : `${ICONE.play} COMEÇAR`}</button></div>
+      <button class="btn btn-ouro btn-grande" id="r-ir" style="height:48px;font-size:24px;width:200px">${pronto ? 'PRONTO' : br ? `${ICONE.play} CONTINUAR` : `${ICONE.play} COMEÇAR`}</button></div>
   </div>`), 'roupa');
   t.prepend(topo(br ? 'SUA ROUPA · RESSURGÊNCIA' : time ? 'SUA ROUPA · BANDIDOS' : 'SUA FARDA · POLÍCIA', () => (pronto ? telaSala() : br ? telaModo() : telaLado())));
   const desenhar = () => {
@@ -294,7 +296,7 @@ function telaRoupa(time, pronto, modo = 0) {
     const lado = br ? sel.time : time;
     conta.usarRoupa(lado, sel.key);
     guardado.set('lado', lado);
-    if (pronto) pronto(); else iniciarPartida(lado, sel, null, null, br ? 1 : 0);
+    if (pronto) pronto(); else if (br) telaRessurgencia(); else iniciarPartida(lado, sel, null, null);
   };
 }
 
@@ -477,12 +479,22 @@ function telaConfig(aba = 'sens') {
   } else if (aba === 'conta') {
     const quem = !fb ? 'Sem conta (só neste aparelho)' : fb.anonimo ? 'Convidado (crie uma conta para não perder nada)' : fb.email;
     c.innerHTML = `<div class="ajuste"><span class="nome">Nome no jogo</span><input type="text" id="c-nome" maxlength="16" value="${esc(conta.nome())}"><button class="btn btn-fraco" id="c-salvar-nome">Salvar</button></div>
+      <div class="ajuste"><span class="nome">Seu ID</span><span class="cresce bebas ouro" style="font-size:24px;letter-spacing:2px">${social.id ? idBonito(social.id) : '—'}</span>
+        ${social.id ? '<button class="btn btn-fraco" id="c-copiar-id">Copiar</button>' : `<span class="dica">${esc(social.erro || 'criando…')}</span>`}</div>
       <div class="ajuste"><span class="nome">Conta</span><span class="cresce" style="font-size:13px">${esc(quem)}</span></div>
       <div class="ajuste"><span class="nome">Moedas</span><span class="cresce amarelo" style="font-weight:800">${fmt(conta.moedas)}</span></div>
       <div class="ajuste"><span class="nome">Nível</span>${insignia(nivelDe(conta.xp).patente, 26)}<span class="cresce" style="font-size:13px"><b>${nivelDe(conta.xp).nivel}</b> · ${esc(nivelDe(conta.xp).patente.nome)} ${nivelDe(conta.xp).divisao} · ${fmt(conta.xp)} XP no total</span></div>
       <div class="ajuste" style="flex-wrap:wrap;gap:8px"><span class="nome">Patentes</span>${PATENTES.map((p) => `<span class="linha" style="gap:4px;font-size:11px;color:#C3C8D2">${insignia(p, 20)}${esc(p.nome)} <span class="apagado">(nv ${p.de})</span></span>`).join('')}</div>
       <button class="btn btn-fraco" id="c-sair" style="align-self:flex-start">Sair da conta</button>`;
-    $('#c-salvar-nome', c).onclick = () => { const n = $('#c-nome', c).value.trim().slice(0, 16); if (!n) return; guardado.set('nome', n); salvarConta(); aviso('Nome salvo'); };
+    $('#c-salvar-nome', c).onclick = async () => {
+      const n = $('#c-nome', c).value.trim().slice(0, 16);
+      if (!n) return;
+      if (!fb || !fb.token) { guardado.set('nome', n); aviso('Nome salvo'); return; }
+      const erro = await trocarNick(n);
+      if (erro) janela('Nick', erro);
+    };
+    const cp = $('#c-copiar-id', c);
+    if (cp) cp.onclick = () => copiarTexto(social.id);
     $('#c-sair', c).onclick = async () => {
       if (!(await confirmar('Sair da conta?', 'Você volta para a tela de login.', 'Sair'))) return;
       sairDaSala();
@@ -524,8 +536,8 @@ function telaMultiplayer() {
   const st = $('#mp-status', t);
   const conectar = async (acao) => {
     const nm = $('#mp-nome', t).value.trim().slice(0, 16) || 'Jogador';
-    guardado.set('nome', nm);
-    salvarConta();
+    if (nm !== conta.nome() && fb && fb.token && social.pronto) { const erro = await trocarNick(nm, true); if (erro) { st.textContent = erro; return; } }
+    else if (nm !== conta.nome()) { guardado.set('nome', nm); salvarConta(); }
     if (!fb || !fb.token) { st.textContent = 'Entre na sua conta (ou como convidado) para jogar online'; return; }
     st.textContent = 'Conectando…';
     try {
@@ -544,10 +556,210 @@ function telaMultiplayer() {
   };
 }
 
+// ---------------- amigos ----------------
+function copiarTexto(t) {
+  try { navigator.clipboard.writeText(String(t)).then(() => aviso('Copiado: ' + t)).catch(() => aviso(String(t))); } catch (_) { aviso(String(t)); }
+}
+async function telaAmigos(aba = 'amigos') {
+  motor.girarMenu(true);
+  const npedidos = Object.keys(social.pedidos).length;
+  const t = mostrar(html(`<div class="tela" style="gap:10px">
+    <div class="cartao linha" style="gap:14px;padding:10px 16px">
+      <div class="coluna" style="gap:0"><span class="dica" style="font-size:11px;font-weight:800;letter-spacing:2px">SEU ID</span>
+        <span class="bebas ouro" style="font-size:30px;letter-spacing:3px">${social.id ? idBonito(social.id) : '— — —'}</span></div>
+      ${social.id ? '<button class="btn btn-fraco" id="a-copiar">Copiar</button>' : ''}
+      <span class="dica cresce">${social.pronto ? `Nick: <b>${esc(conta.nome())}</b> · passe o ID para os amigos te acharem (e use ele no site para comprar moedas)` : esc(social.erro || 'Criando o seu ID…')}</span></div>
+    <div class="cartao coluna cresce" id="a-conteudo" style="overflow:auto;gap:6px"><span class="dica">Carregando…</span></div></div>`), 'amigos');
+  const abas = `<div class="abas">${[['amigos', 'Amigos'], ['pedidos', `Pedidos${npedidos ? ' (' + npedidos + ')' : ''}`], ['adicionar', 'Adicionar']]
+    .map(([k, n]) => `<button class="aba ${k === aba ? 'sel' : ''}" data-aba="${k}">${n}</button>`).join('')}</div>`;
+  t.prepend(topo('AMIGOS', telaInicio, abas, ''));
+  for (const b of $$('[data-aba]', t)) b.onclick = () => telaAmigos(b.dataset.aba);
+  const cp = $('#a-copiar', t);
+  if (cp) cp.onclick = () => copiarTexto(social.id);
+  social.aoMudar = () => { if (telaAtual() === 'amigos' && aba === 'pedidos') telaAmigos('pedidos'); };
+  const c = $('#a-conteudo', t);
+  if (!fb || !fb.token) { c.innerHTML = '<span class="dica">Entre na sua conta para ter amigos</span>'; return; }
+  if (!social.pronto) { c.innerHTML = `<span class="dica">${esc(social.erro || 'Criando o seu ID…')}</span>`; return; }
+  const linha = (p, botoes) => `<div class="linha amigo" data-uid="${esc(p.uid)}">
+    <span class="ponto ${estaOnline(p) ? 'on' : ''}"></span>
+    <div class="coluna cresce" style="gap:0"><b>${esc(p.nome || 'Jogador')}</b>
+      <span class="dica" style="font-size:11px">ID ${idBonito(p.id)} · NV ${p.nivel || 1} · ${estaOnline(p) ? (p.jogando ? 'jogando ' + esc(p.jogando) : 'online') : 'offline'}</span></div>${botoes}</div>`;
+  try {
+    if (aba === 'amigos') {
+      const lista = await meusAmigos();
+      c.innerHTML = lista.length ? lista.map((p) => linha(p, `${estaOnline(p) && !p.jogando ? '<button class="btn btn-ouro" data-convidar>Convidar</button>' : ''}
+        <button class="btn btn-fraco" data-remover>Remover</button>`)).join('') : '<span class="dica">Nenhum amigo ainda. Vá em Adicionar e procure pelo ID ou pelo nick.</span>';
+      for (const b of $$('[data-convidar]', c)) b.onclick = async () => {
+        const erro = await convidarAmigo(b.closest('[data-uid]').dataset.uid);
+        aviso(erro || 'Convite enviado! Ele vai entrar no seu grupo da Ressurgência');
+      };
+      for (const b of $$('[data-remover]', c)) b.onclick = async () => {
+        if (!(await confirmar('Desfazer amizade?', '', 'Remover'))) return;
+        await desfazerAmizade(b.closest('[data-uid]').dataset.uid);
+        telaAmigos('amigos');
+      };
+    } else if (aba === 'pedidos') {
+      const ps = Object.entries(social.pedidos).map(([uid, p]) => ({ uid, ...p }));
+      c.innerHTML = ps.length ? ps.map((p) => linha(p, '<button class="btn btn-ouro" data-aceitar>Aceitar</button><button class="btn btn-fraco" data-recusar>Recusar</button>')).join('')
+        : '<span class="dica">Nenhum pedido de amizade agora.</span>';
+      for (const b of $$('[data-aceitar]', c)) b.onclick = async () => { await aceitarPedido(b.closest('[data-uid]').dataset.uid); aviso('Agora vocês são amigos!'); telaAmigos('pedidos'); };
+      for (const b of $$('[data-recusar]', c)) b.onclick = async () => { await recusarPedido(b.closest('[data-uid]').dataset.uid); telaAmigos('pedidos'); };
+    } else {
+      c.innerHTML = `<div class="linha" style="gap:8px"><input type="text" id="a-busca" maxlength="16" placeholder="ID (9 números) ou nick" class="cresce">
+        <button class="btn btn-ouro" id="a-buscar">Procurar</button></div><div class="coluna" id="a-achados" style="gap:6px"></div>`;
+      const buscar = async () => {
+        const res = $('#a-achados', c);
+        res.innerHTML = '<span class="dica">Procurando…</span>';
+        try {
+          const ps = (await buscarJogadores($('#a-busca', c).value)).filter((p) => p.uid !== fb.uid);
+          res.innerHTML = ps.length ? ps.map((p) => linha(p, '<button class="btn btn-ouro" data-pedir>Adicionar</button>')).join('') : '<span class="dica">Ninguém com esse ID ou nick.</span>';
+          for (const b of $$('[data-pedir]', res)) b.onclick = async () => {
+            const erro = await enviarPedido(b.closest('[data-uid]').dataset.uid);
+            if (erro) aviso(erro); else { b.textContent = 'Pedido enviado'; b.disabled = true; }
+          };
+        } catch (e) { res.innerHTML = `<span class="dica">${esc(e.message)}</span>`; }
+      };
+      $('#a-buscar', c).onclick = buscar;
+      $('#a-busca', c).addEventListener('keydown', (e) => { if (e.key === 'Enter') buscar(); });
+    }
+  } catch (e) { c.innerHTML = `<span class="dica">Sem conexão: ${esc(e.message)}</span>`; }
+}
+// escolher um amigo online para chamar para o grupo
+async function escolherAmigoParaConvidar() {
+  if (!social.pronto) { aviso(social.erro || 'Criando o seu ID…'); return; }
+  const online = (await meusAmigos()).filter((p) => estaOnline(p) && !p.jogando);
+  if (!online.length) { janela('Convidar', 'Nenhum amigo online agora. Adicione amigos na tela Amigos (pelo ID ou nick).'); return; }
+  const el = html(`<div class="camada fixo"><div class="janela" style="min-width:320px">
+    <span class="t">Convidar para o grupo</span>
+    ${online.map((p) => `<button class="btn btn-fraco" data-uid="${esc(p.uid)}" style="justify-content:space-between;display:flex">${esc(p.nome)} <span class="dica">NV ${p.nivel || 1}</span></button>`).join('')}
+    <button class="btn btn-escuro" id="cv-fechar">Fechar</button></div></div>`);
+  palco.appendChild(el);
+  $('#cv-fechar', el).onclick = () => el.remove();
+  for (const b of $$('[data-uid]', el)) b.onclick = async () => {
+    const erro = await convidarAmigo(b.dataset.uid);
+    aviso(erro || 'Convite enviado!');
+    el.remove();
+    telaRessurgencia();
+  };
+}
+
+// ---------------- Ressurgência online: partida rápida, sala com amigos ou código ----------------
+function telaRessurgencia() {
+  acordarServidor();
+  motor.girarMenu(true);
+  const lado = guardado.get('lado', 0);
+  const g = social.grupo;
+  const formato = g ? g.formato : guardado.get('formato_br', 'squad');
+  const tam = FORMATOS[formato].tam;
+  const souLider = !g || g.lider === fb.uid;
+  const membros = g ? Object.entries(g.membros || {}) : [[fb ? fb.uid : 'eu', { nome: conta.nome() }]];
+  const vagas = Array.from({ length: tam }, (_, i) => membros[i]);
+  const t = mostrar(html(`<div class="tela">
+    <div class="linha" style="gap:8px;flex-wrap:wrap"><span class="dica" style="font-weight:800;letter-spacing:1px">FORMATO</span>
+      ${Object.entries(FORMATOS).map(([k, f]) => `<button class="aba ${k === formato ? 'sel' : ''}" data-formato="${k}" ${souLider ? '' : 'disabled'}>${f.nome}<span class="dica" style="font-size:10px"> · ${f.tam === 1 ? 'sozinho' : f.tam + ' por time'}</span></button>`).join('')}
+      <span class="cresce"></span><span class="dica">${g && !souLider ? 'o líder escolhe o formato e procura a partida' : ''}</span></div>
+    <div class="linha cresce" style="align-items:stretch;gap:14px">
+      <div class="cartao coluna cresce" style="border-color:rgba(248,113,113,.5);background:linear-gradient(160deg,#3B0D0D,#1A0B0B)">
+        <span class="bebas" style="font-size:34px;color:#FCA5A5">PARTIDA RÁPIDA · ${FORMATOS[formato].nome.toUpperCase()}</span>
+        <div class="grupo-vagas">${vagas.map((m, i) => m
+          ? `<div class="vaga cheia"><b>${esc(m[1].nome || 'Jogador')}</b><span class="dica">${i === 0 || m[1].lider ? 'líder' : 'no grupo'}</span></div>`
+          : `<button class="vaga" data-convidar ${souLider ? '' : 'disabled'}>+ convidar amigo</button>`).join('')}</div>
+        <span class="cresce"></span>
+        ${souLider ? '<button class="btn" id="br-rapida" style="background:#DC2626;color:#fff">PROCURAR PARTIDA</button>' : '<span class="dica" style="color:#FEE2E2">Esperando o líder procurar a partida…</span>'}
+        ${g ? '<button class="btn btn-fraco" id="br-sair-grupo" style="margin-top:6px">Sair do grupo</button>' : ''}</div>
+      <div class="cartao coluna cresce" style="border-color:rgba(251,191,36,.35)"><span class="bebas ouro" style="font-size:34px">SALA COM AMIGOS</span>
+        <span class="dica">Cria um código: até 40 pessoas. Quem entra junto cai no mesmo time. Você começa quando quiser.</span>
+        <span class="cresce"></span><button class="btn btn-ouro" id="br-criar">CRIAR SALA</button></div>
+      <div class="cartao coluna cresce" style="border-color:rgba(96,165,250,.35)"><span class="bebas azul" style="font-size:34px">ENTRAR COM CÓDIGO</span>
+        <input type="text" id="br-codigo" maxlength="6" placeholder="CÓDIGO" style="font-size:22px;text-transform:uppercase;letter-spacing:.2em">
+        <span class="cresce"></span><button class="btn btn-azul" id="br-entrar">ENTRAR</button></div>
+    </div><div class="status" id="br-status"></div></div>`), 'ressurgencia');
+  t.prepend(topo('RESSURGÊNCIA ONLINE', () => telaRoupa(lado, null, 1), '', '<span class="dica">só gente de verdade · voz do time</span>'));
+  const st = $('#br-status', t);
+  social.aoMudar = () => { if (telaAtual() === 'ressurgencia') telaRessurgencia(); };
+  for (const b of $$('[data-formato]', t)) b.onclick = async () => { await mudarFormatoGrupo(b.dataset.formato); telaRessurgencia(); };
+  for (const b of $$('[data-convidar]', t)) b.onclick = () => escolherAmigoParaConvidar();
+  const sg = $('#br-sair-grupo', t);
+  if (sg) sg.onclick = async () => { await sairDoGrupo(); telaRessurgencia(); };
+  const conectar = async (acao) => {
+    if (!fb || !fb.token) { st.textContent = 'Entre na sua conta (ou como convidado) para jogar online'; return; }
+    st.textContent = 'Conectando…';
+    try {
+      const [s, erro] = await acao();
+      if (!s) { st.textContent = erro; return; }
+      if (s.modo !== 'br') { s.sair().catch(() => {}); st.textContent = 'Esse código é de uma sala de Polícia x Bandidos (entre pelo Multiplayer)'; return; }
+      sala = s;
+      ligarSala(s);
+      telaSala();
+    } catch (e) { st.textContent = 'sem conexão: ' + e.message; }
+  };
+  const eu = () => ({ ...minhaEntrada(guardado.get('lado', 0)), grupo: social.grupo ? social.grupo.lider : '' });
+  const rapida = $('#br-rapida', t);
+  // o líder procura para o grupo todo: a sala precisa ter vaga para todos; depois avisa o grupo onde entrar
+  if (rapida) rapida.onclick = () => conectar(async () => {
+    const n = social.grupo ? Object.keys(social.grupo.membros || {}).length : 1;
+    const [s, erro] = await Sala.partidaRapida(eu(), formato, n);
+    if (s && social.grupo && social.grupo.lider === fb.uid) await fb.patch('grupos/' + fb.uid, { sala: s.codigo });
+    return [s, erro];
+  });
+  $('#br-criar', t).onclick = () => conectar(() => Sala.criar(eu(), 'br', false, formato));
+  $('#br-entrar', t).onclick = () => {
+    const c = $('#br-codigo', t).value.trim().toUpperCase();
+    if (c.length !== 6) { st.textContent = 'O código tem 6 letras/números'; return; }
+    conectar(() => Sala.entrar(c, eu()));
+  };
+}
+
+// Sala de espera da Ressurgência: quem já entrou, contagem da sala pública e o botão de começar de quem criou
+let contagemBR = null;
+function telaSalaBR() {
+  acordarServidor();
+  const s = sala;
+  if (!s) { telaInicio(); return; }
+  motor.girarMenu(true);
+  const lista = s.lista().sort((a, b) => (Number(a.entrou) || 0) - (Number(b.entrou) || 0));
+  const n = lista.length;
+  const t = mostrar(html(`<div class="tela">
+    <div class="topo"><button class="voltar" id="s-sair" aria-label="Sair da sala">${ICONE.voltar}</button>
+      <div class="coluna" style="gap:0"><span class="dica" style="font-size:11px;font-weight:800;letter-spacing:2px">${s.publica ? 'PARTIDA RÁPIDA · RESSURGÊNCIA' : 'SALA DA RESSURGÊNCIA · CÓDIGO'}</span>
+        <span class="bebas" style="font-size:40px;letter-spacing:${s.publica ? 1 : 6}px;color:#FCA5A5">${s.publica ? 'PROCURANDO JOGADORES' : s.codigo}</span></div>
+      <span class="cresce"></span><span class="etiqueta" style="background:#7F1D1D;color:#FECACA">${(FORMATOS[s.formato] || FORMATOS.squad).nome.toUpperCase()}</span>
+      <span class="bebas" style="font-size:44px;color:#F9FAFB">${n}<span class="dica" style="font-size:20px">/${s.max}</span></span></div>
+    <div class="cartao cresce" style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px 14px;align-content:start;overflow:auto">
+      ${lista.map((p) => `<span style="font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${p.id === fb.uid ? 'font-weight:800;color:#86EFAC' : ''}">${p.id === fb.uid ? '▶ ' : ''}${esc(p.nome || 'Jogador')}</span>`).join('')}</div>
+    <div class="linha"><span class="dica cresce" id="s-info"></span>
+      ${s.host && !s.publica ? `<button class="btn btn-grande" id="s-iniciar" style="height:48px;font-size:24px;background:#DC2626;color:#fff" ${n < 2 ? 'disabled' : ''}>INICIAR ${ICONE.play}</button>` : ''}</div></div>`), 'salabr');
+  $('#s-sair', t).onclick = async () => {
+    if (await confirmar('Sair da sala?', s.host && !s.publica ? 'Você criou a sala: ela fecha para todos.' : '', 'Sair')) {
+      sairDaSala();
+      if (social.grupo && social.grupo.lider === fb.uid) fb.patch('grupos/' + fb.uid, { sala: '' });
+      telaRessurgencia();
+    }
+  };
+  if (s.host && !s.publica) $('#s-iniciar', t).onclick = async () => { if (!(await s.comecarBR())) aviso('Precisa de pelo menos 2 pessoas (e conexão)'); };
+  // contagem: a sala pública começa 60 s depois de ter 2 pessoas (ou na hora, com 40)
+  clearInterval(contagemBR);
+  const info = $('#s-info', t);
+  const tique = async () => {
+    if (sala !== s || telaAtual() !== 'salabr') { clearInterval(contagemBR); return; }
+    const m = s.lista().length;
+    if (!s.publica) { info.textContent = m < 2 ? 'Mande o código para os amigos · precisa de pelo menos 2 pessoas' : s.host ? 'Quando todo mundo entrar, aperte INICIAR' : 'Esperando quem criou a sala iniciar…'; return; }
+    if (s.host) {
+      if (m >= 2 && !s.comecaEm) { s.comecaEm = Date.now() + 60000; fb.patch('salas/' + s.codigo, { comeca_em: s.comecaEm }); }
+      if (m < 2 && s.comecaEm) { s.comecaEm = 0; fb.patch('salas/' + s.codigo, { comeca_em: 0 }); }
+      if (s.estado === 'espera' && (m >= s.max || (s.comecaEm && Date.now() >= s.comecaEm))) { s.estado = 'comecando'; if (!(await s.comecarBR())) s.estado = 'espera'; }
+    }
+    const falta = s.comecaEm ? Math.max(0, Math.ceil((s.comecaEm - Date.now()) / 1000)) : 0;
+    info.textContent = m < 2 ? 'Esperando mais gente entrar (precisa de pelo menos 2)…' : `A partida começa em ${falta} s · ou na hora com ${s.max} pessoas`;
+  };
+  tique();
+  contagemBR = setInterval(tique, 1000);
+}
+
 function ligarSala(s) {
   setTimeout(() => motor.prepararPartida(), 300);  // já vai carregando o mapa enquanto espera na sala
   s.ouvir(
-    () => { if (telaAtual() === 'sala') telaSala(); },
+    () => { if (telaAtual() === 'sala') telaSala(); else if (telaAtual() === 'salabr') telaSalaBR(); },
     (estado) => { if (sala === s && estado === 'jogo' && !partida) comecarOnline(s); },
     () => { if (sala !== s) return; sala = null; aviso('A sala fechou (quem criou saiu)'); if (partida) pararPartida(); telaInicio(); },
     (id) => motor.redeEvento(JSON.stringify({ t: 'saiu', id })));
@@ -558,6 +770,7 @@ function telaSala() {
   acordarServidor();
   const s = sala;
   if (!s) { telaInicio(); return; }
+  if (s.modo === 'br') { telaSalaBR(); return; }
   motor.girarMenu(true);
   const lista = s.lista();
   const eu = lista.find((p) => p.id === fb.uid);
@@ -583,7 +796,16 @@ function telaSala() {
   if (s.host) $('#s-iniciar', t).onclick = async () => { if (!(await s.comecar())) aviso('Não consegui iniciar (sem conexão?)'); };
 }
 
-function comecarOnline(s) {
+async function comecarOnline(s) {
+  if (s.modo === 'br') {  // Ressurgência: times e semente que quem criou a sala sorteou
+    clearInterval(contagemBR);
+    const eu = s.lista().find((p) => p.id === fb.uid) || minhaEntrada(guardado.get('lado', 0));
+    const lado = eu.time | 0;
+    const roupa = ROUPAS.find((r) => r.time === lado && r.i === (eu.skin | 0)) || conta.roupa(lado);
+    s.rosterBRpronto = await s.rosterBR();
+    iniciarPartida(lado, roupa, s, eu.arma || armaInicial(lado), 1);
+    return;
+  }
   const eu = s.lista().find((p) => p.id === fb.uid) || minhaEntrada(guardado.get('lado', 0));
   const time = eu.time | 0;
   const roupa = ROUPAS.find((r) => r.time === time && r.i === (eu.skin | 0)) || conta.roupa(time);
@@ -595,8 +817,9 @@ function comecarOnline(s) {
 function fimRessurgencia(j) {
   const br = j.br || {};
   const lugar = br.colocacao | 0 || 10;
-  const lado = partida ? partida.time : 0;
+  const online = !!(partida && partida.sala);
   pararPartida();
+  if (online) sairDaSala();
   const xpAbates = (j.abates | 0) * XP_ABATE, xpResultado = lugar === 1 ? XP_VITORIA : lugar <= 3 ? XP_EMPATE : XP_DERROTA;
   const xp = conta.ganharXp(xpAbates + xpResultado);
   const subiu = xp.depois.nivel > xp.antes.nivel;
@@ -607,7 +830,7 @@ function fimRessurgencia(j) {
     <div class="linha" style="align-items:flex-start">
       <div class="coluna cresce" style="gap:6px"><span style="font-size:12px;font-weight:800;letter-spacing:2px;color:${cor}">${lugar === 1 ? 'RESSURGÊNCIA · VITÓRIA' : 'RESSURGÊNCIA · SEU TIME FICOU EM'}</span>
         <span class="bebas" style="font-size:52px;line-height:.92;color:${cor}">${lugar === 1 ? 'ÚLTIMO TIME DE PÉ' : lugar + 'º LUGAR'}</span>
-        <span class="dica">de 10 times · time ${br.meuTime || 1}</span></div>
+        <span class="dica">de ${br.totalTimes || 10} times · time ${br.meuTime || 1}</span></div>
       <div class="cartao coluna" style="padding:8px 18px;gap:0;align-items:center"><span class="bebas ouro" style="font-size:46px;line-height:1">#${lugar}</span><span class="dica" style="font-size:11px">COLOCAÇÃO</span></div>
     </div>
     <div class="cartao linha fim-xp">
@@ -632,7 +855,7 @@ function fimRessurgencia(j) {
       <button class="btn btn-ouro" id="f-novo" style="height:48px;font-size:15px;letter-spacing:1px;padding:0 22px">JOGAR DE NOVO</button></div>
   </div>`), 'fim');
   $('#f-menu', t).onclick = telaInicio;
-  $('#f-novo', t).onclick = () => telaRoupa(lado, null, 1);
+  $('#f-novo', t).onclick = () => telaRessurgencia();
 }
 
 function fimDePartida(j) {

@@ -65,6 +65,9 @@ Enquanto isso, a partida online segue pelo Firebase (sem voz).
 - **Authentication → Sign-in method:** ligar **E-mail/senha** e **Anônimo** (convidado).
 - **Realtime Database → Regras:**
 
+(ID único de 9 dígitos, nick único, amigos, pedidos de amizade, convites e grupo da Ressurgência: sem estas regras
+essas partes ficam desligadas no jogo)
+
 ```json
 {
   "rules": {
@@ -73,10 +76,54 @@ Enquanto isso, a partida online segue pelo Firebase (sem voz).
     },
     "usuarios": {
       "$uid": { ".read": "auth != null && auth.uid === $uid", ".write": "auth != null && auth.uid === $uid" }
+    },
+    "ids": {
+      "$id": {
+        ".read": "auth != null",
+        ".write": "auth != null && ((!data.exists() && newData.val() === auth.uid) || (data.val() === auth.uid && !newData.exists()))"
+      }
+    },
+    "nicks": {
+      ".read": "auth != null",
+      "$nick": {
+        ".write": "auth != null && ((!data.exists() && newData.val() === auth.uid) || (data.val() === auth.uid && !newData.exists()))"
+      }
+    },
+    "perfis": {
+      "$uid": { ".read": "auth != null", ".write": "auth != null && auth.uid === $uid" }
+    },
+    "amigos": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        "$amigo": {
+          ".write": "auth != null && (auth.uid === $uid || (auth.uid === $amigo && (!newData.exists() || root.child('pedidos').child(auth.uid).child($uid).exists())))"
+        }
+      }
+    },
+    "pedidos": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        "$de": { ".write": "auth != null && (auth.uid === $de || auth.uid === $uid)" }
+      }
+    },
+    "convites": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        "$de": { ".write": "auth != null && (auth.uid === $de || auth.uid === $uid)" }
+      }
+    },
+    "grupos": {
+      "$lider": {
+        ".read": "auth != null",
+        ".write": "auth != null && auth.uid === $lider",
+        "membros": { "$m": { ".write": "auth != null && (auth.uid === $m || auth.uid === $lider)" } }
+      }
     }
   }
 }
 ```
+
+Os mesmos textos estão em `docs/regras_firebase.json`.
 
 ## Testes no PC (sem celular)
 

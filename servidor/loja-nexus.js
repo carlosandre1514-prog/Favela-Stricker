@@ -15,6 +15,11 @@
 //   NEXUS_API_KEY=nx_live_…            (painel → Integração · API)
 //   NEXUS_SIGNING_SECRET=nxs_…         (opcional; obrigatório se o painel exigir assinatura)
 //   FIREBASE_PROJECT_ID=navegador-f06a8
+//   FIREBASE_DB_URL=https://navegador-f06a8-default-rtdb.firebaseio.com
+//
+// O jogador é identificado no site pelo ID de 9 dígitos do jogo (o mesmo que aparece no perfil e que ele digita no
+// site para comprar). O celular manda o ID em X-Jogador-Id; o servidor confere no banco do jogo (ids/<ID> = uid)
+// com o próprio login da pessoa, então ninguém usa o ID de outro. Sem ID (regras antigas no banco): o uid.
 'use strict';
 const crypto = require('crypto');
 
@@ -22,6 +27,22 @@ const SITE = (process.env.NEXUS_URL || 'https://nexus-p70i.onrender.com').replac
 const KEY = process.env.NEXUS_API_KEY || '';
 const SECRET = process.env.NEXUS_SIGNING_SECRET || '';
 const PROJECT = process.env.FIREBASE_PROJECT_ID || 'navegador-f06a8';
+const DB = (process.env.FIREBASE_DB_URL || `https://${PROJECT}-default-rtdb.firebaseio.com`).replace(/\/$/, '');
+
+// ID de 9 dígitos do jogador, conferido no banco (ids/<ID> tem que ser o uid de quem está logado)
+const idsConferidos = new Map();  // uid -> {id, ate}
+async function idDoJogador(req, eu) {
+  const id = String(req.headers['x-jogador-id'] || '');
+  if (!/^\d{9}$/.test(id)) return eu.uid;
+  const c = idsConferidos.get(eu.uid);
+  if (c && c.id === id && Date.now() < c.ate) return id;
+  try {
+    const tok = (req.headers.authorization || '').slice(7);
+    const r = await fetch(`${DB}/ids/${id}.json?auth=${encodeURIComponent(tok)}`, { signal: AbortSignal.timeout(8000) });
+    if (r.ok && (await r.json()) === eu.uid) { idsConferidos.set(eu.uid, { id, ate: Date.now() + 600000 }); return id; }
+  } catch (_) {}
+  return eu.uid;
+}
 
 // ---------------- token do Firebase do jogo (RS256, certificados públicos do Google) ----------------
 let certs = { dados: null, ate: 0 };
@@ -92,7 +113,7 @@ async function tratar(req, res, url) {
   if (!url.pathname.startsWith('/api/loja/')) return false;
   // o APK carrega as telas de outra origem: libera CORS (a autenticação é pelo token, sem cookies)
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type, X-Jogador-Id');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return true; }
   if (!KEY) { responder(res, 503, { erro: 'loja não configurada no servidor (NEXUS_API_KEY)' }); return true; }
@@ -101,27 +122,31 @@ async function tratar(req, res, url) {
   if (!limite(eu.uid)) { responder(res, 429, { erro: 'muitas tentativas, aguarde um minuto' }); return true; }
   try {
     const rota = req.method + ' ' + url.pathname;
+    const jogador = await idDoJogador(req, eu);  // ID de 9 dígitos (ou o uid, sem ID)
     if (rota === 'POST /api/loja/entrar') {
-      await nexus('POST', '/players', { external_id: eu.uid, username: eu.nome || undefined, platform: 'android' });
-      await nexus('POST', '/events', { type: 'session_start', external_id: eu.uid, platform: 'android' });
-      return responder(res, 200, { ok: true, id: eu.uid }), true;
+      const { nick } = await lerCorpo(req);
+      await nexus('POST', '/players', { external_id: jogador, username: String(nick || eu.nome || '').slice(0, 16) || undefined, platform: 'android' });
+      await nexus('POST', '/events', { type: 'session_start', external_id: jogador, platform: 'android' });
+      return responder(res, 200, { ok: true, id: jogador }), true;
     }
     if (rota === 'GET /api/loja/entregas') {
-      const lista = await nexus('GET', '/deliveries?external_id=' + encodeURIComponent(eu.uid));
-      return responder(res, 200, lista.map(o => ({ code: o.code, total_cents: o.total_cents, items: o.items }))), true;
+      // pelo ID; e pelo uid, das compras feitas antes de existir o ID
+      const lista = await nexus('GET', '/deliveries?external_id=' + encodeURIComponent(jogador));
+      const antigas = jogador !== eu.uid ? await nexus('GET', '/deliveries?external_id=' + encodeURIComponent(eu.uid)).catch(() => []) : [];
+      return responder(res, 200, [...lista, ...antigas].map(o => ({ code: o.code, total_cents: o.total_cents, items: o.items }))), true;
     }
     if (rota === 'POST /api/loja/confirmar') {
       const { code } = await lerCorpo(req);
       if (!/^NX-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(String(code || ''))) return responder(res, 400, { erro: 'pedido inválido' }), true;
       const o = await nexus('GET', '/purchases/' + code);
-      if (o.external_player_id !== eu.uid) return responder(res, 403, { erro: 'esse pedido é de outro jogador' }), true;
+      if (o.external_player_id !== jogador && o.external_player_id !== eu.uid) return responder(res, 403, { erro: 'esse pedido é de outro jogador' }), true;
       await nexus('POST', `/deliveries/${code}/ack`);
       return responder(res, 200, { ok: true }), true;
     }
     if (rota === 'POST /api/loja/evento') {
       const { tipo } = await lerCorpo(req);
       if (!['session_start', 'install'].includes(tipo)) return responder(res, 400, { erro: 'evento inválido' }), true;
-      await nexus('POST', '/events', { type: tipo, external_id: eu.uid, platform: 'android' });
+      await nexus('POST', '/events', { type: tipo, external_id: jogador, platform: 'android' });
       return responder(res, 200, { ok: true }), true;
     }
     responder(res, 404, { erro: 'rota da loja não encontrada' });

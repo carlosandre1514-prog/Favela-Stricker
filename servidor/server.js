@@ -22,7 +22,7 @@ const loja = require('./loja-nexus');  // loja de moedas/skins do site NEXUS (Pi
 
 const PORT = process.env.PORT || 10000;
 const WEB = path.join(__dirname, '..', 'web');
-const MAX_POR_SALA = 10;
+const MAX_POR_SALA = 10, MAX_POR_SALA_BR = 40;  // Polícia x Bandidos 10; Ressurgência 10 times de 4
 const MAX_CONEXOES = +process.env.MAX_CONEXOES || 3000;  // passou disso: "servidores cheios" (não cai)
 const MAX_SALAS = +process.env.MAX_SALAS || 400;
 const TICK_MS = 33;                 // pacote da sala 30 vezes por segundo
@@ -142,7 +142,7 @@ wss.on('connection', (ws, req) => {
   }
   const antigo = sala.get(id);
   if (antigo) { try { antigo.ws.close(4001, 'entrou de novo'); } catch (_) {} sala.delete(id); }
-  if (sala.size >= MAX_POR_SALA) { ws.close(4002, 'sala cheia'); if (!sala.size) salas.delete(codigo); return; }
+  if (sala.size >= (q.get('modo') === 'br' ? MAX_POR_SALA_BR : MAX_POR_SALA)) { ws.close(4002, 'sala cheia'); if (!sala.size) salas.delete(codigo); return; }
   // vaga: número de 0 a 254 que identifica cada um nos pacotes (estado e voz)
   const usadas = new Set([...sala.values()].map((p) => p.vaga));
   let vaga = 0;

@@ -109,6 +109,82 @@ int main(int argc, char** argv) {
         if (!engine_import_project(e, lerProjeto(projPath).dump().c_str())) { std::printf("  [ERRO] o projeto da partida não abriu: %s\n", engine_last_error(e)); ++g_fail; }
     };
 
+    // Ressurgência online (SO_BR_ONLINE=1): só gente (sem robôs), times e zona iguais em todos os celulares (mesma
+    // semente), quem é de outro celular anda pela rede, cai pelo evento e volta quando volta lá; quem sai está fora.
+    if (std::getenv("SO_BR_ONLINE")) {
+        using nlohmann::json;
+        eng::Engine* E = reinterpret_cast<eng::Engine*>(e);
+        json ro = {{"semente", 4242}, {"jogadores", json::array()}};
+        const char* ids[] = {"eu", "ana", "beto", "caio", "duda", "edu"};
+        for (int i = 0; i < 6; ++i)
+            ro["jogadores"].push_back({{"id", ids[i]}, {"nome", ids[i]}, {"time", i < 3 ? 0 : 1}, {"lado", i % 2}, {"skin", i % 5},
+                                       {"arma", i % 2 ? "ak47" : "m4a1"}, {"arma2", "tt33"}});
+        auto comecar = [&]() {
+            abrirPartida();
+            jogo_modo(e, 1);
+            jogo_rede_sala(e, 1, "eu", ro.dump().c_str());
+            jogo_escolhas(e, 1, 0, "ak47", "tt33");
+            engine_set_first_person(e, 1);
+            engine_set_play(e, 1);
+        };
+        comecar();
+        eng::TeamMatch& M = eng::matchOf(E);
+        const glm::vec2 zona1 = M.zona.para;
+        int robos = 0, remotos = 0;
+        for (const eng::Fighter& f : M.f) { robos += f.bot && !f.remote; remotos += f.remote; }
+        std::printf("  online: %zu lutadores, %d robôs, %d de outros celulares, %d times, 1ª zona em (%.1f, %.1f)\n", M.f.size(), robos, remotos,
+                    M.times, zona1.x, zona1.y);
+        if (M.f.size() != 6 || robos != 0 || remotos != 5 || M.times != 2) { std::printf("  [ERRO] escalação da Ressurgência online\n"); ++g_fail; }
+        engine_set_play(e, 0);
+        comecar();  // a mesma semente: a mesma zona (como em outro celular)
+        const glm::vec2 zona2 = eng::matchOf(E).zona.para;
+        std::printf("  de novo com a mesma semente: 1ª zona em (%.1f, %.1f)\n", zona2.x, zona2.y);
+        if (glm::length(zona1 - zona2) > 0.01f) { std::printf("  [ERRO] a zona muda de um celular para outro\n"); ++g_fail; }
+        frames(e, 30, 1.f / 30.f);
+        // "beto" (do meu time) anda pela rede e cai pelo evento; volta quando volta lá
+        int bi = -1;
+        for (size_t i = 0; i < M.f.size(); ++i) if (M.f[i].netId == "beto") bi = int(i);
+        float pp[3], rr[3], sc[3];
+        engine_get_transform(e, engine_player_id(e), pp, rr, sc);
+        json st = {{"beto", {{"p", {pp[0] + 3.f, pp[1], pp[2]}}, {"y", 0.0}, {"pi", 0.0}, {"v", true}, {"n", 0}, {"w", "m4a1"}}}};
+        jogo_rede_aplicar(e, st.dump().c_str());
+        frames(e, 30, 1.f / 30.f);
+        const glm::vec3 bp = E->scene.get(M.f[bi].root)->transform.position;
+        std::printf("  beto pela rede: a %.2f m de onde mandou\n", glm::length(bp - glm::vec3(pp[0] + 3.f, pp[1], pp[2])));
+        if (glm::length(bp - glm::vec3(pp[0] + 3.f, pp[1], pp[2])) > 1.f) { std::printf("  [ERRO] o de outro celular não segue a rede\n"); ++g_fail; }
+        jogo_rede_evento(e, json{{"t", "abate"}, {"v", "beto"}, {"a", "duda"}, {"arma", "AK-47"}}.dump().c_str());
+        st["beto"]["v"] = false;
+        jogo_rede_aplicar(e, st.dump().c_str());
+        frames(e, 30 * 3, 1.f / 30.f);
+        const bool caiu = M.f[bi].dead && !M.f[bi].fora;
+        st["beto"]["v"] = true;
+        jogo_rede_aplicar(e, st.dump().c_str());
+        frames(e, 10, 1.f / 30.f);
+        std::printf("  beto caiu (esperando, não está fora)=%d · voltou=%d\n", caiu, !M.f[bi].dead);
+        if (!caiu || M.f[bi].dead) { std::printf("  [ERRO] queda/volta de quem é de outro celular\n"); ++g_fail; }
+        // o time 2 inteiro sai da sala: está fora e o meu time vence
+        for (const char* q : {"caio", "duda", "edu"}) jogo_rede_evento(e, json{{"t", "saiu"}, {"id", q}}.dump().c_str());
+        frames(e, 5, 1.f / 30.f);
+        std::printf("  time 2 saiu: colocação %d · estado %d (%s)\n", M.colocacao[1], E->game.state, E->game.message.c_str());
+        if (!M.colocacao[1] || E->game.state != 1) { std::printf("  [ERRO] o time que saiu continua / sem vitória\n"); ++g_fail; }
+        engine_set_play(e, 0);
+        // solo: 4 pessoas, 4 times de 1; quem cai volta sozinho em 10 s (sem companheiro)
+        ro = {{"semente", 77}, {"tamanho", 1}, {"jogadores", json::array()}};
+        for (int i = 0; i < 4; ++i) ro["jogadores"].push_back({{"id", ids[i]}, {"nome", ids[i]}, {"time", i}, {"lado", 0}, {"skin", 0}, {"arma", "m4a1"}});
+        comecar();
+        frames(e, 30, 1.f / 30.f);
+        const int pj = eng::playerFighter(E);
+        E->game.playerHp = 0.f;
+        frames(e, 2, 1.f / 30.f);
+        const bool caiuSolo = M.f[pj].dead && !M.f[pj].fora;
+        frames(e, 30 * 11, 1.f / 30.f);
+        std::printf("  solo: %d times · caiu=%d (não fora) · voltou em 10 s=%d\n", M.times, caiuSolo, !M.f[pj].dead);
+        if (M.times != 4 || !caiuSolo || M.f[pj].dead) { std::printf("  [ERRO] Ressurgência solo\n"); ++g_fail; }
+        engine_set_play(e, 0);
+        engine_destroy(e);
+        std::printf(g_fail ? "FALHOU\n" : "OK\n");
+        return g_fail ? 1 : 0;
+    }
     // Battle Royale Ressurgência (SO_BR=1): 10 times de 4, renascer perto do time, time eliminado, zona fechando e
     // fim da partida (o jogador fica de pé o tempo todo para ver até o último time). PERFIL=n: tempo por quadro.
     if (std::getenv("SO_BR")) {

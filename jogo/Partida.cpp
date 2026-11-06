@@ -358,7 +358,7 @@ void killFighter(Engine* e, int vi, int ai) {
         else {
             bool companheiro = false;
             for (const Fighter& o : M.f) if (&o != &v && o.team == v.team && !o.dead && !o.fora) companheiro = true;
-            msg = companheiro && M.zona.fase < 4 ? "Você caiu! Renasce em 10 s perto do seu time" : "Você caiu!";
+            msg = M.zona.fase >= 4 ? "Você caiu!" : M.tamanhoTime == 1 ? "Você caiu! Volta em 10 s" : companheiro ? "Você caiu! Renasce em 10 s perto do seu time" : "Você caiu!";
         }
     }
     e->game.message = msg;
@@ -485,7 +485,7 @@ const FaseZona kFases[] = {{60.f, 45.f, 75.f, 2.f}, {50.f, 40.f, 50.f, 4.f}, {45
                            {40.f, 30.f, 18.f, 10.f}, {35.f, 25.f, 8.f, 15.f}, {30.f, 30.f, 0.f, 25.f}};
 constexpr int kFasesN = 6;
 constexpr int kFaseSemRenascer = 4;  // da 5ª fase em diante, quem cai está fora
-constexpr int kTimesBR = 10, kPorTimeBR = 4;
+constexpr int kTimesBR = 10, kPorTimeBR = 4, kMaxTimesBR = 40;  // offline (testes): 10 x 4; online: até 40 times (solo)
 constexpr float kRenasceBR = 10.f, kZonaInicial = 110.f, kAlturaQueda = 22.f;
 const char* kNomesBR[] = {"Biel", "Dedé", "Neguin", "Tico", "Juninho", "Kaká", "Lipe", "Nando", "Rafa", "Tuta", "Vini", "Zé",
                           "Bruninho", "Caio", "Davi", "Edu", "Fael", "Guto", "Hugo", "Igor", "Jow", "Kauã", "Léo", "Márcio",
@@ -503,7 +503,7 @@ glm::vec2 proximoCentro(Engine* e, glm::vec2 c, float r, float rProx) {
     const TeamMatch& M = matchOf(e);
     const float folga = std::max(0.f, r - rProx);
     for (int t = 0; t < 60 && !M.nav.empty(); ++t) {
-        const glm::vec3& n = M.nav[e->fxRng.irange(0, int(M.nav.size()) - 1)];
+        const glm::vec3& n = M.nav[matchOf(e).zonaRng.irange(0, int(M.nav.size()) - 1)];
         if (naFavela(n) && glm::length(glm::vec2(n.x, n.z) - c) <= folga) return {n.x, n.z};
     }
     return c;
@@ -527,18 +527,30 @@ glm::vec3 lugarNaZona(Engine* e) {
 
 void botUpdate(Engine* e, int fi, float dt);
 void updateNades(Engine* e, float dt);
+void remoteUpdate(Engine* e, Fighter& f, float dt);
 
 void brStart(Engine* e) {
     TeamMatch& M = matchOf(e);
     GameState& G = e->game;
+    // online: a sala manda a semente (zona e pontos de queda iguais em todos os celulares) e as pessoas, cada uma
+    // com o time (0..9) que quem criou a sala sorteou. Só gente: nenhum robô.
+    const json ro = M.online ? json::parse(M.roster, nullptr, false) : json();
+    const bool online = ro.is_object() && ro.contains("jogadores") && ro["jogadores"].is_array();
+    M.zonaRng = Rng(online ? ro.value("semente", 1u) : uint64_t(e->fxRng.next()) + 1u);
     M.times = kTimesBR;
-    M.colocacao.assign(kTimesBR, 0);
+    M.tamanhoTime = online ? std::clamp(ro.value("tamanho", 4), 1, 4) : kPorTimeBR;
+    if (online) {
+        int maior = 0;
+        for (const json& j : ro["jogadores"]) if (j.is_object()) maior = std::max(maior, std::clamp(j.value("time", 0), 0, kMaxTimesBR - 1));
+        M.times = maior + 1;
+    }
+    M.colocacao.assign(M.times, 0);
     // pontos de queda: espalhados pela favela (cada novo, o mais longe possível dos já escolhidos)
     std::vector<glm::vec3> cand;
     for (const glm::vec3& n : M.nav) if (naFavela(n)) cand.push_back(n);
     if (cand.empty()) cand.push_back(glm::vec3(0.f));
-    std::vector<glm::vec3> pousos{cand[e->fxRng.irange(0, int(cand.size()) - 1)]};
-    while (int(pousos.size()) < kTimesBR) {
+    std::vector<glm::vec3> pousos{cand[M.zonaRng.irange(0, int(cand.size()) - 1)]};
+    while (int(pousos.size()) < std::max(M.times, kTimesBR)) {
         int best = 0; float bd = -1.f;
         for (size_t i = 0; i < cand.size(); ++i) {
             float d = 1e9f;
@@ -549,6 +561,45 @@ void brStart(Engine* e) {
     }
     static const char* armas[] = {"m4a1", "m4colt", "ak47", "ak74", "ak74_tatica"};
     int nome = e->fxRng.irange(0, int(std::size(kNomesBR)) - 1);
+    if (online) {
+        std::vector<int> noTime(kMaxTimesBR, 0);
+        for (const json& j : ro["jogadores"]) {
+            if (!j.is_object()) continue;
+            Fighter f;
+            f.netId = j.value("id", "");
+            if (f.netId.empty()) continue;
+            f.team = std::clamp(j.value("time", 0), 0, kMaxTimesBR - 1);
+            f.lado = std::clamp(j.value("lado", 0), 0, 1);
+            f.skin = clampSkin(f.lado, j.value("skin", 0));
+            const bool eu = f.netId == M.localId;
+            f.bot = !eu;
+            f.remote = !eu;
+            f.name = eu ? "Você" : j.value("nome", "Jogador");
+            f.money = 0;
+            const std::string arma = j.value("arma", "");
+            f.weapon = knownGun(arma) && arma != "tt33" ? arma : "m4a1";
+            f.primary = f.weapon;
+            const std::string arma2 = j.value("arma2", "tt33");
+            f.secondary = knownGun(arma2) ? arma2 : "";
+            if (eu) {
+                if (knownGun(M.playerPrimary) && M.playerPrimary != "tt33") f.weapon = f.primary = M.playerPrimary;
+                f.slot = 0;
+                fillAmmo(f);
+            } else if (auto sk = j.find("skins"); sk != j.end() && sk->is_object())
+                for (auto it = sk->begin(); it != sk->end(); ++it)
+                    if (it->is_string() && knownGun(it.key())) f.gunSkins[it.key()] = it->get<std::string>();
+            f.netWeapon = f.weapon;
+            const int k = noTime[f.team]++;
+            const float a = 6.2831853f * k / std::max(1, M.tamanhoTime) + 0.3f;
+            glm::vec3 p = groundAt(e, pousos[f.team] + glm::vec3(std::cos(a), 0.f, std::sin(a)) * 1.8f);
+            p.y += kAlturaQueda;
+            M.f.push_back(f);
+            spawnFighterBody(e, M.f.back(), p, a);
+            M.f.back().lastPos = p;
+            if (M.f.back().remote)  // comandado pela rede: o corpo só segue as posições que chegam
+                if (GameObject* rg = e->scene.get(M.f.back().root); rg && rg->rigidBody) e->physics.setKinematic(*rg->rigidBody, true);
+        }
+    } else
     for (int t = 0; t < kTimesBR; ++t)
         for (int k = 0; k < kPorTimeBR; ++k) {
             Fighter f;
@@ -584,7 +635,7 @@ void brStart(Engine* e) {
     z.rPara = kFases[0].raio;
     z.para = proximoCentro(e, z.c, z.r, z.rPara);
     G.playerHp = G.playerMax = 100.f;
-    G.message = "Ressurgência: 10 times de 4. Fique dentro da zona!";
+    G.message = "Ressurgência: " + std::to_string(M.times) + " times. Fique dentro da zona!";
 }
 
 // Volta perto de um companheiro vivo (dentro da zona, sem inimigo colado), caindo do céu
@@ -594,8 +645,17 @@ void brRenascer(Engine* e, Fighter& f) {
     for (const Fighter& o : M.f)
         if (&o != &f && o.team == f.team && !o.dead && !o.fora)
             if (GameObject* g = e->scene.get(o.root)) { alvo = g->transform.position; break; }
-    if (alvo.x > 1e8f) return;
     std::vector<glm::vec3> spots;
+    if (alvo.x > 1e8f) {  // solo: qualquer lugar dentro da zona sem ninguém perto
+        for (const glm::vec3& n : M.nav)
+            if (naFavela(n) && distZona(M.zona, n) < M.zona.r - 4.f && enemyDist(e, f.team, n) > 25.f) spots.push_back(n);
+        if (spots.empty()) for (const glm::vec3& n : M.nav) if (distZona(M.zona, n) < M.zona.r) spots.push_back(n);
+        if (spots.empty()) return;
+        glm::vec3 p = groundAt(e, spots[e->fxRng.irange(0, int(spots.size()) - 1)]);
+        p.y += kAlturaQueda;
+        reviveAt(e, f, p, "De volta! Caiu de novo na zona");
+        return;
+    }
     for (const glm::vec3& n : M.nav) {
         const float d = glm::length(glm::vec2(n.x - alvo.x, n.z - alvo.z));
         if (d < 10.f || d > 40.f || distZona(M.zona, n) > M.zona.r - 4.f) continue;
@@ -706,10 +766,13 @@ void brUpdate(Engine* e, float dt) {
         if (f.dead) {
             if (f.fora) continue;
             // sem ninguém do time de pé (ou zona final): fora da partida
-            if (!temVivo(f.team) || z.fase >= kFaseSemRenascer) { f.fora = true; continue; }
-            if ((f.deadTime += dt) >= kRenasceBR) brRenascer(e, f);
+            if ((M.tamanhoTime > 1 && !temVivo(f.team)) || z.fase >= kFaseSemRenascer || f.left) { f.fora = true; continue; }
+            f.deadTime += dt;
+            if (f.remote) remoteUpdate(e, f, dt);  // de outro celular: volta quando ele voltar lá
+            else if (f.deadTime >= kRenasceBR) brRenascer(e, f);
             continue;
         }
+        if (f.remote) { remoteUpdate(e, f, dt); continue; }
         if (!f.bot) {
             if (G.playerHp <= 0.f) killFighter(e, int(i), M.attacker);
             continue;
@@ -846,7 +909,7 @@ void teamStart(Engine* e) {
     M.playerTeam = chosen; M.playerSkin = skin; M.playerPrimary = primary; M.playerSecondary = secondary;
     M.gunSkins = gunSkins;
     M.online = online; M.host = host; M.localId = localId; M.roster = roster;
-    M.modo = online ? 0 : modo;  // (Ressurgência online: depois)
+    M.modo = modo;
     if (e->rules.objetivo != "times") return;
     M.active = true;
     // a partida começa de manhã: o dia passa (manhã, tarde, noite) e volta a amanhecer até acabar o tempo
@@ -1487,6 +1550,7 @@ std::string hudJson(Engine* e) {
         for (int t = 0; t < M.times; ++t) if (t < int(M.colocacao.size()) && !M.colocacao[t]) ++timesVivos;
         for (const Fighter& f : M.f) if (!f.fora) ++vivos;
         br["times"] = timesVivos;
+        br["totalTimes"] = M.times;
         br["jogadores"] = vivos;
         br["fase"] = std::min(z.fase + 1, 6);
         br["fechando"] = z.fechando;
@@ -1656,6 +1720,7 @@ void netEvent(Engine* e, const std::string& evJson) {
         if (i < 0 || !M.f[i].remote) return;
         Fighter& f = M.f[i];
         f.left = true; f.dead = true;
+        if (M.modo == 1) f.fora = true;  // Ressurgência: saiu, está fora
         if (GameObject* g = e->scene.get(f.root)) {
             setSubtreeActive(*g, false);
             if (g->rigidBody) e->physics.setEnabled(*g->rigidBody, false);

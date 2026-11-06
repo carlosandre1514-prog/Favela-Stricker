@@ -54,7 +54,9 @@ struct TeamMatch {
                   int fase = 0; bool fechando = false; };
     Zona zona;
     int times = 2;
+    int tamanhoTime = 4;                  // Ressurgência: 1 solo, 2 duo, 3 trio, 4 squad
     std::vector<int> colocacao;
+    Rng zonaRng{1};                       // Ressurgência: sorteios da zona e da queda (online: mesma semente em todos)
     std::vector<Fighter> f;
     int score[2] = {0, 0};
     glm::vec3 base[2]{};                  // centro dos pontos de renascimento de cada time

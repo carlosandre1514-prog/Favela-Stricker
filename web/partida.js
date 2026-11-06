@@ -132,7 +132,7 @@ function telaCarga(modo, time, roupa, arma) {
 async function iniciarPartida(time, roupa, sala, armaPrincipal, modo = 0) {
   if (iniciandoPartida || partida) return;
   iniciandoPartida = true;
-  const carga = telaCarga(!sala && modo === 1 ? 1 : 0, time, roupa, armaPrincipal || armaInicial(time));
+  const carga = telaCarga(modo === 1 ? 1 : 0, time, roupa, armaPrincipal || armaInicial(time));
   if (!motor.mapaPronto()) {
     carga.status('Carregando o mapa da favela… (só na primeira partida)');
     await dorme(80);
@@ -140,15 +140,16 @@ async function iniciarPartida(time, roupa, sala, armaPrincipal, modo = 0) {
     while (!motor.mapaPronto()) await dorme(150);
   }
   iniciandoPartida = false;
-  carga.status(!sala && modo === 1 ? 'Caindo na favela com o seu time…' : 'Entrando na partida…');
+  carga.status(modo === 1 ? 'Caindo na favela com o seu time…' : 'Entrando na partida…');
   setTimeout(() => carga.el.remove(), 12000);  // nunca fica presa
   motor.girarMenu(false);
   ctxAudio();
-  const br = !sala && modo === 1;
+  const br = modo === 1;  // Ressurgência: online (sala da Ressurgência)
   partida = { time, sala, fim: false, agachado: false, mirando: false, danoAntes: false, modo: br ? 1 : 0 };
   ultimoHud = {};
   montarHud(!!sala, br);
-  motor.redeSala(sala ? sala.host : false, sala ? fb.uid : '', sala ? sala.roster() : '');
+  const rosterBR = br && sala ? sala.rosterBRpronto : null;
+  motor.redeSala(sala ? sala.host : false, sala ? fb.uid : '', sala ? (rosterBR ? JSON.stringify(rosterBR) : sala.roster()) : '');
   for (const a of ARMAS) motor.skinArma(a.key, conta.skinArma(a.key));
   const arma = armaPrincipal || armaInicial(time);
   if (motor.modo) motor.modo(br ? 1 : 0);
@@ -159,7 +160,7 @@ async function iniciarPartida(time, roupa, sala, armaPrincipal, modo = 0) {
   motor.play(true);
   // polícia olha para o morro; bandidos, para a rua de baixo
   motor.camera(0, 0, 0, time === 0 ? 0 : 3.14159, 0.05, 3);
-  if (sala) ligarAoVivo(sala, time);
+  if (sala) ligarAoVivo(sala, rosterBR ? rosterBR.meuTime : time, br);  // voz: só o meu time (na Ressurgência, o time de 4)
   if (!TOQUE) travarMouse();
   clearInterval(lacoHud);
   lacoHud = setInterval(() => {
@@ -818,13 +819,13 @@ function atualizarMedidor() {
 
 // ---------------- partida ao vivo (servidor) + chat de voz ----------------
 let ws = null, enviandoTimer = null, voz = null, viaFirebase = null, pingTimer = null;
-function ligarAoVivo(s, time) {
+function ligarAoVivo(s, time, br = false) {
   const rede = () => partida && partida.hud && $('#rede', partida.hud);
   const status = (txt, ok) => { const r = rede(); if (r) { r.textContent = '● ' + txt; r.style.color = ok ? '#86EFAC' : '#FCD34D'; } };
   status('conectando ao servidor…', false);
   voz = new ChatDeVoz((pcm) => { if (ws && ws.readyState === 1 && ws.bufferedAmount < 32768) ws.send(PROTO.codificarVoz(pcm)); });
   const base = SERVIDOR.replace(/^http/, 'ws');
-  const url = `${base}/partida?sala=${encodeURIComponent(s.codigo)}&id=${encodeURIComponent(fb.uid)}&time=${time}&v=${PROTO.VERSAO}`;
+  const url = `${base}/partida?sala=${encodeURIComponent(s.codigo)}&id=${encodeURIComponent(fb.uid)}&time=${time}&v=${PROTO.VERSAO}${br ? '&modo=br' : ''}`;
   let vagas = {};  // número da vaga no pacote -> id da pessoa (o servidor manda quando alguém entra ou sai)
   let tentativas = 0, abriuUmaVez = false;
   const inicio = Date.now();
