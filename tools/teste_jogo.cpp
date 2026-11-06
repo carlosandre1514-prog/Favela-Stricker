@@ -450,10 +450,11 @@ int main(int argc, char** argv) {
         std::printf(g_fail ? "FALHOU\n" : "OK\n");
         return g_fail ? 1 : 0;
     }
-    // Personagem da tela inicial (SO_LOBBY=1): em duas camadas para combinar qualquer roupa com qualquer arma/skin.
-    //   previa_p_<roupa>.png    o personagem segurando a arma, mas com a arma escondida (a pose fica)
-    //   previa_a_<arma>[_<skin>] só a arma: o que muda entre a foto com e sem a arma (a mão por cima fica de fora)
-    // Depois: python3 tools/recortar_lobby.py <saida> web/lobby
+    // Personagem da tela inicial (SO_LOBBY=1): em duas camadas para combinar qualquer roupa com qualquer arma/skin,
+    // em ANGULOS voltas (padrão 24, de 15 em 15 graus: a pessoa gira o personagem arrastando o dedo).
+    //   previa_p_<roupa>_<NN>.png     o personagem segurando a arma, mas com a arma escondida (a pose fica)
+    //   lobby_com/sem_<arma>_<NN>.png com e sem a arma: a diferença é só a arma (a mão por cima fica de fora)
+    // LOBBY_SO=p (só roupas) ou a (só armas). Depois: python3 tools/recortar_lobby.py <saida> app/src/main/assets/lobby
     if (std::getenv("SO_LOBBY")) {
         using nlohmann::json;
         eng::Engine* E = reinterpret_cast<eng::Engine*>(e);
@@ -462,14 +463,14 @@ int main(int argc, char** argv) {
                               std::getenv("CAM_DIST") ? float(std::atof(std::getenv("CAM_DIST"))) : 2.4f};
         auto camera = [&] { engine_set_camera(e, cam[0], cam[1], cam[2], cam[3], cam[4], cam[5]); };
         // um personagem com a arma na mão; devolve o objeto da arma (ou nulo)
-        auto montar = [&](int t, int k, const std::string& arma, const std::string& skin) -> eng::GameObject* {
+        auto montar = [&](int t, int k, const std::string& arma, const std::string& skin, float giro) -> eng::GameObject* {
             engine_new_scene(e);
             engine_set_time_of_day(e, 13.f);
             engine_set_quality(e, 0);
             camera();
             json look = json::parse(jogo_aparencia_roupa(t, k));
             const int id = engine_add_spec(e, json{{"tipo", "personagem"}, {"aparencia", look}, {"semente", 7}, {"pos", {0, 0, 0}},
-                                                   {"arma", arma}}.dump().c_str());
+                                                   {"rot", {0, giro, 0}}, {"arma", arma}}.dump().c_str());
             if (id < 0) { std::printf("  [ERRO] %s: %s\n", arma.c_str(), engine_last_error(e)); ++g_fail; return nullptr; }
             frames(e, 40);  // a pose assenta (sempre o mesmo número de quadros: a mesma pose em todas as fotos)
             for (const eng::CharacterInfo& c : E->characters)
@@ -490,30 +491,37 @@ int main(int argc, char** argv) {
         camera();
         frames(e, 3);
         save(out, "previa_fundo.png");
-        for (int t = 0; t < 2; ++t)
+        const int angulos = std::max(1, std::getenv("ANGULOS") ? std::atoi(std::getenv("ANGULOS")) : 24);
+        const std::string so = std::getenv("LOBBY_SO") ? std::getenv("LOBBY_SO") : "";
+        auto sufixo = [&](int i) { char b[8]; std::snprintf(b, sizeof(b), "_%02d", i); return std::string(b); };
+        for (int t = 0; t < 2 && so != "a"; ++t)
             for (int k = 0; k < 6; ++k) {
                 if (!keys[t][k][0]) continue;
-                eng::GameObject* w = montar(t, k, "m4a1", "");
-                esconder(w);
-                frames(e, 1, 0.f);
-                save(out, (std::string("previa_p_") + keys[t][k] + ".png").c_str());
+                for (int i = 0; i < angulos; ++i) {
+                    eng::GameObject* w = montar(t, k, "m4a1", "", 360.f * i / angulos);
+                    esconder(w);
+                    frames(e, 1, 0.f);
+                    save(out, (std::string("previa_p_") + keys[t][k] + sufixo(i) + ".png").c_str());
+                }
             }
         // armas (e as skins de cada uma): com a arma e sem ela, na mesma pose
         std::string lista = std::getenv("ARMAS_LOBBY") ? std::getenv("ARMAS_LOBBY") : "m4a1,m4colt,ak47,ak74,ak74_tatica";
         size_t a = 0;
-        while (a < lista.size()) {
+        while (a < lista.size() && so != "p") {
             size_t b = lista.find(',', a); if (b == std::string::npos) b = lista.size();
             std::string item = lista.substr(a, b - a); a = b + 1;
             size_t c = item.find(':');
             std::string arma = item.substr(0, c), skin = c == std::string::npos ? "" : item.substr(c + 1);
-            eng::GameObject* w = montar(0, 0, arma, skin);
-            if (!w) continue;
             const std::string nome = arma + (skin.empty() ? "" : "_" + skin);
-            frames(e, 1, 0.f);
-            save(out, ("lobby_com_" + nome + ".png").c_str());
-            esconder(w);
-            frames(e, 1, 0.f);
-            save(out, ("lobby_sem_" + nome + ".png").c_str());
+            for (int i = 0; i < angulos; ++i) {
+                eng::GameObject* w = montar(0, 0, arma, skin, 360.f * i / angulos);
+                if (!w) break;
+                frames(e, 1, 0.f);
+                save(out, ("lobby_com_" + nome + sufixo(i) + ".png").c_str());
+                esconder(w);
+                frames(e, 1, 0.f);
+                save(out, ("lobby_sem_" + nome + sufixo(i) + ".png").c_str());
+            }
         }
         engine_destroy(e);
         std::printf(g_fail ? "FALHOU\n" : "OK\n");
