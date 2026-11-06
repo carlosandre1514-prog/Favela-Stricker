@@ -125,7 +125,8 @@ function bonecoInicio() {
   const u = guardado.get('ultimo', null) || { time: guardado.get('lado', 0) };
   const time = u.time === 1 ? 1 : 0;
   const roupa = ROUPAS.find((r) => r.key === u.roupa && r.time === time) || conta.roupa(time);
-  const arma = ARMAS.some((a) => a.key === u.arma && a.key !== 'tt33') ? u.arma : armaPadrao(time);
+  // a arma usada por último na partida (com a skin equipada dela); sem partida ainda, a que tem skin
+  const arma = ARMAS.some((a) => a.key === u.arma && a.key !== 'tt33') ? u.arma : armaInicial(time);
   const skin = conta.skinArma(arma);
   const comSkin = SKINS_ARMA.some((s) => s.arma === arma && s.key === skin) ? `_${skin}` : '';
   return `<div class="boneco-inicio" id="boneco" style="aspect-ratio:${LOBBY.largura} / ${LOBBY.altura};--n:${LOBBY.quadros}" role="img"

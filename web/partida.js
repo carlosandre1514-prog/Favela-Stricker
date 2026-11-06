@@ -126,6 +126,12 @@ async function iniciarPartida(time, roupa, sala, armaPrincipal) {
     if (!j.ativo) return;
     if ((j.armas || []).length) { const en = document.getElementById('entrando'); if (en) en.remove(); }
     ultimoHud = j;
+    // a tela inicial mostra a arma usada por último (a de fogo: a pistola não entra), com a skin dela
+    const naMao = (j.armas || [])[j.slot];
+    if (naMao && naMao.arma !== 'tt33' && naMao.arma !== partida.armaUsada) {
+      partida.armaUsada = naMao.arma;
+      guardado.set('ultimo', { ...guardado.get('ultimo', {}), arma: naMao.arma });
+    }
     atualizarHud(j);
     if (partida.loja) atualizarLojaPartida();
     if (!partida.fim && j.estado) {
