@@ -153,6 +153,7 @@ JNI_FN(void, nativeTeamLoadout)(JNIEnv* env, jclass, jint team, jint skin, jstri
     env->ReleaseStringUTFChars(primary, p);
     env->ReleaseStringUTFChars(secondary, q);
 }
+JNI_FN(void, nativeGameMode)(JNIEnv*, jclass, jint modo) { if (g_engine) jogo_modo(g_engine, modo); }
 JNI_FN(void, nativeTeamGunSkin)(JNIEnv* env, jclass, jstring gun, jstring skin) {
     if (!g_engine) return;
     const char* g = env->GetStringUTFChars(gun, nullptr);

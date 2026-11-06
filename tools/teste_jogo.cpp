@@ -109,6 +109,127 @@ int main(int argc, char** argv) {
         if (!engine_import_project(e, lerProjeto(projPath).dump().c_str())) { std::printf("  [ERRO] o projeto da partida não abriu: %s\n", engine_last_error(e)); ++g_fail; }
     };
 
+    // Battle Royale Ressurgência (SO_BR=1): 10 times de 4, renascer perto do time, time eliminado, zona fechando e
+    // fim da partida (o jogador fica de pé o tempo todo para ver até o último time). PERFIL=n: tempo por quadro.
+    if (std::getenv("SO_BR")) {
+        eng::Engine* E = reinterpret_cast<eng::Engine*>(e);
+        abrirPartida();
+        jogo_modo(e, 1);
+        jogo_escolhas(e, 1, 2, "ak47", "tt33");
+        engine_set_first_person(e, 1);
+        engine_set_play(e, 1);
+        eng::TeamMatch& M = eng::matchOf(E);
+        // o jogador não cai durante o teste (o time dele fica no jogo até o fim): vida cheia a cada quadro
+        auto quadros = [&](int n, float dt) { for (int q = 0; q < n; ++q) { E->game.playerHp = E->game.playerMax; engine_frame(e, dt); } glFinish(); };
+        int times[10] = {0};
+        for (const eng::Fighter& f : M.f) if (f.team >= 0 && f.team < 10) ++times[f.team];
+        int certos = 0;
+        for (int t = 0; t < 10; ++t) certos += times[t] == 4;
+        const int pf = eng::playerFighter(E);
+        std::printf("  lutadores: %zu · times com 4: %d · jogador no time %d (roupa de %s) · nós de caminho: %zu\n", M.f.size(), certos,
+                    pf >= 0 ? M.f[pf].team + 1 : -1, pf >= 0 && M.f[pf].lado ? "bandido" : "polícia", M.nav.size());
+        if (M.f.size() != 40 || certos != 10 || pf < 0) { std::printf("  [ERRO] a partida não tem 10 times de 4\n"); ++g_fail; }
+        if (std::getenv("BR_LOG")) {  // os primeiros segundos: quem cai e por quê
+            size_t vistos = 0;
+            for (int k = 0; k < 30 * 20; ++k) {
+                frames(e, 1, 1.f / 30.f);
+                if (M.feed.size() != vistos || (k % 30 == 0)) {
+                    int mortos = 0;
+                    for (const eng::Fighter& f : M.f) mortos += f.dead;
+                    if (k % 30 == 0) std::printf("  %4.1f s: no chão %d\n", k / 30.f, mortos);
+                    for (size_t q = 0; q < M.feed.size(); ++q)
+                        if (M.feed[q].age < 0.05f) std::printf("     abate: %s -> %s (%s)\n", M.feed[q].killer.c_str(), M.feed[q].victim.c_str(), M.feed[q].weapon.c_str());
+                    vistos = M.feed.size();
+                }
+            }
+            engine_destroy(e);
+            return 0;
+        }
+        frames(e, 4);
+        save(out, "br_caindo.png");
+        quadros(90, 1.f / 30.f);
+        save(out, "br_inicio.png");
+        {  // todos pousaram em cima do chão (ninguém atravessou o mapa caindo do céu)
+            int abaixo = 0;
+            for (const eng::Fighter& f : M.f)
+                if (eng::GameObject* g = E->scene.get(f.root)) {
+                    const glm::vec3 p = g->transform.position;
+                    if (p.y < eng::mapHeight(E, p.x, p.z) - 1.5f) { ++abaixo; std::printf("     abaixo do chão: %s em (%.1f, %.1f, %.1f), chão %.1f\n", f.name.c_str(), p.x, p.y, p.z, eng::mapHeight(E, p.x, p.z)); }
+                }
+            std::printf("  pouso: %d de %zu abaixo do chão\n", abaixo, M.f.size());
+            if (abaixo) { std::printf("  [ERRO] alguém atravessou o chão caindo\n"); ++g_fail; }
+        }
+        if (std::getenv("PERFIL")) {
+            double w = 0, sb = 0, rd = 0;
+            const int nq = std::max(1, std::atoi(std::getenv("PERFIL")));
+            for (int k = 0; k < nq; ++k) {
+                engine_player_input(e, std::sin(k * 0.02f), 1.f, 1);
+                frames(e, 1, 1.f / 30.f);
+                float pr[3]; engine_get_profile(e, pr);
+                w += pr[0]; sb += pr[1]; rd += pr[2];
+            }
+            engine_player_input(e, 0.f, 0.f, 0);
+            std::printf("  CPU por quadro (40 lutadores): mundo %.2f ms · preparar desenho %.2f ms · desenhar %.2f ms\n", w / nq, sb / nq, rd / nq);
+        }
+        auto matar = [&](int i) { if (eng::GameObject* g = E->scene.get(M.f[i].root)) E->module->onDamage(E, g, 500.f); };
+        // renascer: um robô do time 4 cai com os companheiros de pé -> volta em 10 s
+        int alvo = -1;
+        for (size_t i = 0; i < M.f.size(); ++i) if (M.f[i].team == 3 && !M.f[i].dead) { alvo = int(i); break; }
+        if (alvo >= 0) {
+            matar(alvo);
+            const bool caiu = M.f[alvo].dead;
+            quadros(30 * 9, 1.f / 30.f);
+            const bool aindaNoChao = M.f[alvo].dead;
+            quadros(30 * 2, 1.f / 30.f);
+            std::printf("  renascer: caiu=%d, aos 9 s no chão=%d, aos 11 s de pé=%d, fora=%d\n", caiu, aindaNoChao, !M.f[alvo].dead, M.f[alvo].fora);
+            if (!caiu || !aindaNoChao || M.f[alvo].dead || M.f[alvo].fora) { std::printf("  [ERRO] não renasceu em 10 s\n"); ++g_fail; }
+        }
+        // time inteiro no chão ao mesmo tempo: eliminado
+        for (size_t i = 0; i < M.f.size(); ++i) if (M.f[i].team == 6) matar(int(i));
+        quadros(2, 1.f / 30.f);
+        std::printf("  time 7 todo no chão: colocação %d (0 = vivo)\n", M.colocacao[6]);
+        if (!M.colocacao[6]) { std::printf("  [ERRO] o time eliminado continua no jogo\n"); ++g_fail; }
+        // a zona fechando até o fim (o jogador não cai: vê até o último time)
+        float t = 0.f, raio0 = M.zona.r;
+        int ultimaFase = -1;
+        while (E->game.state == 0 && t < 700.f) {
+            E->game.playerHp = E->game.playerMax;
+            engine_frame(e, 0.1f);
+            t += 0.1f;
+            if (M.zona.fase != ultimaFase) {
+                ultimaFase = M.zona.fase;
+                int tv = 0, jv = 0;
+                for (int k = 0; k < 10; ++k) tv += M.colocacao[k] == 0;
+                for (const eng::Fighter& f : M.f) jv += !f.fora;
+                std::printf("  %4.0f s: fase %d da zona, raio %5.1f m, times vivos %d, jogadores %d\n", t, M.zona.fase + 1, M.zona.r, tv, jv);
+                if (M.zona.fase == 2) save(out, "br_fase3.png");
+                if (M.zona.fase == 1 && std::getenv("PAREDE")) {  // foto da parede da zona: perto da borda, olhando para fora
+                    const int pj = eng::playerFighter(E);
+                    if (eng::GameObject* g = E->scene.get(M.f[pj].root)) {
+                        const glm::vec2 dir = glm::normalize(glm::vec2(1.f, 0.4f));
+                        const glm::vec2 q = M.zona.c + dir * (M.zona.r - 9.f);
+                        g->transform.setPosition(glm::vec3(q.x, eng::mapHeight(E, q.x, q.y) + 12.f, q.y));
+                        if (g->rigidBody) E->physics.syncFromTransform(*g->rigidBody);
+                        E->editorCam.yaw = std::atan2(-dir.x, -dir.y);
+                        E->editorCam.pitch = 0.05f;
+                        for (int k = 0; k < 60; ++k) { E->game.playerHp = E->game.playerMax; engine_frame(e, 1.f / 30.f); }
+                        glFinish();
+                        save(out, "br_parede.png");
+                    }
+                }
+            }
+        }
+        glFinish();
+        save(out, "br_fim.png");
+        std::printf("  fim aos %.0f s: estado %d (%s) · raio da zona %.1f m (começou com %.0f)\n", t, E->game.state, E->game.message.c_str(), M.zona.r, raio0);
+        if (E->game.state != 1) { std::printf("  [ERRO] a partida não terminou com o último time de pé\n"); ++g_fail; }
+        std::string hud = jogo_hud(e);
+        if (hud.find("\"br\"") == std::string::npos) { std::printf("  [ERRO] HUD sem os dados da Ressurgência\n"); ++g_fail; }
+        engine_set_play(e, 0);
+        engine_destroy(e);
+        std::printf(g_fail ? "FALHOU\n" : "OK\n");
+        return g_fail ? 1 : 0;
+    }
     // Arma do jogador com skin na partida (SO_SKIN="ak47:dragao_azul", TIME=0/1): foto em primeira pessoa
     if (const char* sk = std::getenv("SO_SKIN")) {
         std::string a = sk, arma = a.substr(0, a.find(':')), skin = a.find(':') == std::string::npos ? "" : a.substr(a.find(':') + 1);

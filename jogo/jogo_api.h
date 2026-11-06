@@ -12,6 +12,7 @@ Engine* jogo_criar(const char* shader_dir);
 
 // Antes do Play: lado (0 polícia, 1 bandidos), roupa (0..4 do lado), arma principal e segunda ("" = só uma)
 void        jogo_escolhas(Engine*, int time, int roupa, const char* principal, const char* segunda);
+void        jogo_modo(Engine*, int modo);                                   // 0 Polícia x Bandidos, 1 Ressurgência
 void        jogo_skin_arma(Engine*, const char* arma, const char* skin);   // skin da arma do jogador ("" = padrão)
 const char* jogo_aparencia_roupa(int time, int roupa);                      // aparência do boneco da roupa (JSON)
 

@@ -162,7 +162,7 @@ std::string g_killWeapon;  // arma do abate em andamento ("" = a arma de quem at
 
 // Cria (ou recria, ao trocar de roupa) o personagem em jogo do lutador, em pos/yaw
 void spawnFighterBody(Engine* e, Fighter& f, glm::vec3 pos, float yaw) {
-    json spec = {{"tipo", "personagem"}, {"aparencia", fighterLook(f.team, f.skin, f.name)}, {"semente", 7}};
+    json spec = {{"tipo", "personagem"}, {"aparencia", fighterLook(f.lado, f.skin, f.name)}, {"semente", 7}};
     spec["pos"] = {pos.x, pos.y, pos.z};
     spec["rot_y"] = glm::degrees(yaw);
     spec["nome"] = f.name;
@@ -348,11 +348,19 @@ void killFighter(Engine* e, int vi, int ai) {
     }
     if (ai >= 0 && ai != vi && M.f[ai].team != v.team) {
         Fighter& a = M.f[ai];
-        ++M.score[a.team]; ++a.kills; a.money += 300;
-        msg = std::string(kTeamIcon[a.team]) + " " + a.name + " abateu " + kTeamIcon[v.team] + " " + v.name;
-        if (!a.bot) msg += "  (+$300)";
-    } else msg = std::string(kTeamIcon[v.team]) + " " + v.name + " caiu";
-    if (!v.bot) msg = "Você foi abatido! Renasce na base em 5 s";
+        ++a.kills;
+        if (M.modo == 0) { ++M.score[a.team]; a.money += 300; }
+        msg = std::string(kTeamIcon[a.lado]) + " " + a.name + " abateu " + kTeamIcon[v.lado] + " " + v.name;
+        if (!a.bot && M.modo == 0) msg += "  (+$300)";
+    } else msg = std::string(kTeamIcon[v.lado]) + " " + v.name + " caiu";
+    if (!v.bot) {
+        if (M.modo == 0) msg = "Você foi abatido! Renasce na base em 5 s";
+        else {
+            bool companheiro = false;
+            for (const Fighter& o : M.f) if (&o != &v && o.team == v.team && !o.dead && !o.fora) companheiro = true;
+            msg = companheiro && M.zona.fase < 4 ? "Você caiu! Renasce em 10 s perto do seu time" : "Você caiu!";
+        }
+    }
     e->game.message = msg;
     if (M.online && !v.remote)  // online: quem caiu aqui avisa os outros celulares
         M.netOut.push_back(json{{"t", "abate"}, {"v", v.netId}, {"a", ai >= 0 && ai < int(M.f.size()) ? M.f[ai].netId : ""},
@@ -395,9 +403,13 @@ glm::vec3 spawnPoint(Engine* e, int team) {
     return far;
 }
 
+void reviveAt(Engine* e, Fighter& f, glm::vec3 p, const char* aviso);
 void respawn(Engine* e, Fighter& f) {
     float a = e->fxRng.range(0.f, 6.2831853f), r = e->fxRng.range(0.5f, 2.5f);
-    glm::vec3 p = groundAt(e, spawnPoint(e, f.team) + glm::vec3(std::cos(a) * r, 0.f, std::sin(a) * r));
+    reviveAt(e, f, groundAt(e, spawnPoint(e, f.team) + glm::vec3(std::cos(a) * r, 0.f, std::sin(a) * r)), "De volta na base");
+}
+// Volta à vida em p (vida cheia, munição do começo)
+void reviveAt(Engine* e, Fighter& f, glm::vec3 p, const char* aviso) {
     GameObject* g = e->scene.get(f.root);
     int ci = charIndexOfRoot(e, f.root);
     if (!g || ci < 0) return;
@@ -408,7 +420,7 @@ void respawn(Engine* e, Fighter& f) {
     if (c.anim && c.clipMap[CC_Idle] >= 0) { c.anim->setClip(c.clipMap[CC_Idle]); c.anim->loop = true; c.anim->speed = 1.f; }
     f.dead = false; f.hp = 100.f; f.path.clear(); f.target = -1;
     if (!f.bot) {
-        e->game.playerHp = e->game.playerMax; e->game.message = "De volta na base";
+        e->game.playerHp = e->game.playerMax; e->game.message = aviso;
         int was = f.slot;
         f.slot = 0;
         fillAmmo(f);
@@ -464,6 +476,275 @@ bool visible(Engine* e, Fighter& a, Fighter& b) {
     return rootOf(e, obj) == gb;
 }
 
+// ======================= Battle Royale Ressurgência =======================
+// 10 times de 4 caem do céu espalhados pela favela. Quem cai renasce em 10 s perto de um companheiro vivo; o time
+// que fica todo no chão ao mesmo tempo está fora. A zona fecha em 6 fases (fora dela a vida vai embora) e nas duas
+// últimas ninguém renasce mais. Vence o último time de pé.
+struct FaseZona { float espera, fecha, raio, dano; };
+const FaseZona kFases[] = {{60.f, 45.f, 75.f, 2.f}, {50.f, 40.f, 50.f, 4.f}, {45.f, 35.f, 32.f, 6.f},
+                           {40.f, 30.f, 18.f, 10.f}, {35.f, 25.f, 8.f, 15.f}, {30.f, 30.f, 0.f, 25.f}};
+constexpr int kFasesN = 6;
+constexpr int kFaseSemRenascer = 4;  // da 5ª fase em diante, quem cai está fora
+constexpr int kTimesBR = 10, kPorTimeBR = 4;
+constexpr float kRenasceBR = 10.f, kZonaInicial = 110.f, kAlturaQueda = 22.f;
+const char* kNomesBR[] = {"Biel", "Dedé", "Neguin", "Tico", "Juninho", "Kaká", "Lipe", "Nando", "Rafa", "Tuta", "Vini", "Zé",
+                          "Bruninho", "Caio", "Davi", "Edu", "Fael", "Guto", "Hugo", "Igor", "Jow", "Kauã", "Léo", "Márcio",
+                          "Nico", "Pedrinho", "Quinho", "Rodrigo", "Sid", "Teteu", "Uri", "Valdo", "Wesley", "Xandi", "Yuri",
+                          "Zeca", "Batata", "Chico", "Duda"};
+
+bool naFavela(glm::vec3 n) {  // dentro da favela (o resto do mapa é morro e rua de fora)
+    const float ax = n.x / 64.f, az = n.z / 62.f;
+    return ax * ax * ax * ax + az * az * az * az <= 1.25f * 1.25f * 1.25f * 1.25f;
+}
+float distZona(const TeamMatch::Zona& z, glm::vec3 p) { return glm::length(glm::vec2(p.x, p.z) - z.c); }
+
+// centro do próximo círculo: um ponto de caminho da favela que deixa o círculo novo inteiro dentro do atual
+glm::vec2 proximoCentro(Engine* e, glm::vec2 c, float r, float rProx) {
+    const TeamMatch& M = matchOf(e);
+    const float folga = std::max(0.f, r - rProx);
+    for (int t = 0; t < 60 && !M.nav.empty(); ++t) {
+        const glm::vec3& n = M.nav[e->fxRng.irange(0, int(M.nav.size()) - 1)];
+        if (naFavela(n) && glm::length(glm::vec2(n.x, n.z) - c) <= folga) return {n.x, n.z};
+    }
+    return c;
+}
+
+// um lugar para ir: dentro do círculo seguro (o próximo, se já foi anunciado)
+glm::vec3 lugarNaZona(Engine* e) {
+    const TeamMatch& M = matchOf(e);
+    const auto& z = M.zona;
+    const glm::vec2 c = z.rPara > 0.f ? z.para : z.c;
+    const float r = std::max(3.f, (z.rPara > 0.f ? z.rPara : z.r) * 0.8f);
+    int perto = -1; float pd = 1e9f;
+    for (int t = 0; t < 40 && !M.nav.empty(); ++t) {
+        const int i = e->fxRng.irange(0, int(M.nav.size()) - 1);
+        const float d = glm::length(glm::vec2(M.nav[i].x, M.nav[i].z) - c);
+        if (d <= r) return M.nav[i];
+        if (d < pd) { pd = d; perto = i; }
+    }
+    return perto >= 0 ? M.nav[perto] : glm::vec3(c.x, 0.f, c.y);
+}
+
+void botUpdate(Engine* e, int fi, float dt);
+void updateNades(Engine* e, float dt);
+
+void brStart(Engine* e) {
+    TeamMatch& M = matchOf(e);
+    GameState& G = e->game;
+    M.times = kTimesBR;
+    M.colocacao.assign(kTimesBR, 0);
+    // pontos de queda: espalhados pela favela (cada novo, o mais longe possível dos já escolhidos)
+    std::vector<glm::vec3> cand;
+    for (const glm::vec3& n : M.nav) if (naFavela(n)) cand.push_back(n);
+    if (cand.empty()) cand.push_back(glm::vec3(0.f));
+    std::vector<glm::vec3> pousos{cand[e->fxRng.irange(0, int(cand.size()) - 1)]};
+    while (int(pousos.size()) < kTimesBR) {
+        int best = 0; float bd = -1.f;
+        for (size_t i = 0; i < cand.size(); ++i) {
+            float d = 1e9f;
+            for (const glm::vec3& p : pousos) d = std::min(d, glm::length(glm::vec2(cand[i].x - p.x, cand[i].z - p.z)));
+            if (d > bd) { bd = d; best = int(i); }
+        }
+        pousos.push_back(cand[best]);
+    }
+    static const char* armas[] = {"m4a1", "m4colt", "ak47", "ak74", "ak74_tatica"};
+    int nome = e->fxRng.irange(0, int(std::size(kNomesBR)) - 1);
+    for (int t = 0; t < kTimesBR; ++t)
+        for (int k = 0; k < kPorTimeBR; ++k) {
+            Fighter f;
+            f.team = t;
+            f.bot = !(t == 0 && k == 0);
+            f.lado = f.bot ? e->fxRng.irange(0, 1) : std::clamp(M.playerTeam, 0, 1);
+            f.skin = f.bot ? e->fxRng.irange(0, kSkinCount[f.lado] - 1) : clampSkin(f.lado, std::max(0, M.playerSkin));
+            f.name = f.bot ? kNomesBR[nome++ % int(std::size(kNomesBR))] : "Você";
+            f.money = 0;
+            if (f.bot) {
+                f.weapon = armas[e->fxRng.irange(0, 4)];
+                f.primary = f.weapon;
+                f.secondary = "tt33";
+            } else {  // começa com a arma escolhida (e a skin dela)
+                f.weapon = knownGun(M.playerPrimary) ? M.playerPrimary : "m4a1";
+                f.primary = f.weapon;
+                f.secondary = knownGun(M.playerSecondary) ? M.playerSecondary : "";
+                f.slot = 0;
+                fillAmmo(f);
+            }
+            const float a = 6.2831853f * k / kPorTimeBR + e->fxRng.range(0.f, 0.6f);
+            glm::vec3 p = groundAt(e, pousos[t] + glm::vec3(std::cos(a), 0.f, std::sin(a)) * 1.8f);
+            p.y += kAlturaQueda;  // cai do céu
+            M.f.push_back(f);
+            spawnFighterBody(e, M.f.back(), p, e->fxRng.range(0.f, 6.2831853f));
+            M.f.back().lastPos = p;
+        }
+    // a zona: começa cobrindo a favela inteira; o primeiro círculo já é anunciado
+    auto& z = M.zona;
+    z = TeamMatch::Zona{};
+    z.c = glm::vec2(0.f);
+    z.r = kZonaInicial;
+    z.rPara = kFases[0].raio;
+    z.para = proximoCentro(e, z.c, z.r, z.rPara);
+    G.playerHp = G.playerMax = 100.f;
+    G.message = "Ressurgência: 10 times de 4. Fique dentro da zona!";
+}
+
+// Volta perto de um companheiro vivo (dentro da zona, sem inimigo colado), caindo do céu
+void brRenascer(Engine* e, Fighter& f) {
+    TeamMatch& M = matchOf(e);
+    glm::vec3 alvo(1e9f);
+    for (const Fighter& o : M.f)
+        if (&o != &f && o.team == f.team && !o.dead && !o.fora)
+            if (GameObject* g = e->scene.get(o.root)) { alvo = g->transform.position; break; }
+    if (alvo.x > 1e8f) return;
+    std::vector<glm::vec3> spots;
+    for (const glm::vec3& n : M.nav) {
+        const float d = glm::length(glm::vec2(n.x - alvo.x, n.z - alvo.z));
+        if (d < 10.f || d > 40.f || distZona(M.zona, n) > M.zona.r - 4.f) continue;
+        if (enemyDist(e, f.team, n) > 18.f) spots.push_back(n);
+    }
+    glm::vec3 p = spots.empty() ? alvo + glm::vec3(e->fxRng.range(-3.f, 3.f), 0.f, e->fxRng.range(-3.f, 3.f))
+                                : spots[e->fxRng.irange(0, int(spots.size()) - 1)];
+    p = groundAt(e, p);
+    p.y += kAlturaQueda;
+    reviveAt(e, f, p, "De volta! Caiu perto do seu time");
+}
+
+void brUpdate(Engine* e, float dt) {
+    TeamMatch& M = matchOf(e);
+    GameState& G = e->game;
+    auto& z = M.zona;
+    updateNades(e, dt);
+    for (auto& fd : M.feed) fd.age += dt;
+    for (auto& f : M.f) f.shotAgo += dt;
+    M.lastDamage += dt;
+    updateDrops(e, dt);
+    if (G.state == 0) regenerate(e, dt);
+    // a zona fecha em fases: espera (o próximo círculo já aparece) e depois fecha até ele
+    if (G.state == 0 && z.fase < kFasesN) {
+        const FaseZona& F = kFases[z.fase];
+        z.t += dt;
+        if (!z.fechando) {
+            if (z.t >= F.espera) { z.fechando = true; z.t = 0.f; z.de = z.c; z.rDe = z.r; }
+        } else {
+            const float u = std::min(1.f, z.t / F.fecha);
+            z.c = glm::mix(z.de, z.para, u);
+            z.r = glm::mix(z.rDe, z.rPara, u);
+            if (u >= 1.f) {
+                z.fechando = false; z.t = 0.f; ++z.fase;
+                if (z.fase < kFasesN) { z.rPara = kFases[z.fase].raio; z.para = proximoCentro(e, z.c, z.r, z.rPara); }
+                else z.rPara = 0.f;
+                e->game.message = z.fase == kFaseSemRenascer ? "Zona final: quem cair agora está fora!" : "A zona fechou. Corra para o próximo círculo!";
+            }
+        }
+    }
+    // queda do céu (começo e renascer): cai devagar, como de paraquedas (rápido demais atravessava o chão);
+    // se mesmo assim alguém passar para baixo do mapa, volta para o chão ali em cima
+    for (Fighter& f : M.f) {
+        if (f.dead || f.remote) continue;
+        GameObject* g = e->scene.get(f.root);
+        if (!g || !g->rigidBody || !g->rigidBody->body) continue;
+        btRigidBody* b = g->rigidBody->body;
+        const btVector3 v = b->getLinearVelocity();
+        if (v.y() < -6.f) b->setLinearVelocity(btVector3(v.x(), -6.f, v.z()));
+        const glm::vec3 p = g->transform.position;
+        if (p.y < mapHeight(e, p.x, p.z) - 3.f) {
+            g->transform.setPosition(groundAt(e, glm::vec3(p.x, mapHeight(e, p.x, p.z) + 2.f, p.z)));
+            e->physics.syncFromTransform(*g->rigidBody);
+            g->rigidBody->setVelocity(glm::vec3(0.f));
+        }
+    }
+    // a parede da zona: fumaça vermelha subindo na borda do círculo, no pedaço perto do jogador
+    if (G.state == 0 && z.r > 0.5f) {
+        const int pf = playerFighter(e);
+        GameObject* pg = pf >= 0 ? e->scene.get(M.f[pf].root) : nullptr;
+        if (pg) {
+            const glm::vec3 pp = pg->transform.position;
+            const glm::vec2 d = glm::vec2(pp.x, pp.z) - z.c;
+            const float dist = glm::length(d);
+            if (std::abs(dist - z.r) < 70.f) {
+                const float ang = std::atan2(d.y, d.x), meia = std::min(3.14159f, 45.f / std::max(z.r, 1.f));
+                const int n = int(360.f * dt + e->fxRng.f());
+                for (int k = 0; k < n; ++k) {
+                    const float a = ang + e->fxRng.range(-meia, meia);
+                    ParticleSpawn s;
+                    s.pos = glm::vec3(z.c.x + std::cos(a) * z.r, pp.y + e->fxRng.range(-3.f, 12.f), z.c.y + std::sin(a) * z.r);
+                    s.vel = glm::vec3(0.f, e->fxRng.range(0.3f, 0.9f), 0.f);
+                    s.life = e->fxRng.range(1.8f, 2.8f);
+                    s.size0 = e->fxRng.range(2.2f, 3.f); s.size1 = e->fxRng.range(3.8f, 5.2f);
+                    s.color0 = glm::vec4(0.95f, 0.22f, 0.16f, 0.f); s.color1 = glm::vec4(0.75f, 0.12f, 0.1f, 0.f);
+                    s.color0.a = 0.24f;
+                    s.shape = PS_Smoke; s.additive = false; s.rot = e->fxRng.range(0.f, 6.28f);
+                    e->particles.emit(s);
+                }
+            }
+        }
+    }
+    // fora da zona perde vida (duas vezes por segundo)
+    if (G.state == 0 && (z.tick += dt) >= 0.5f) {
+        z.tick -= 0.5f;
+        const float dano = kFases[std::min(z.fase, kFasesN - 1)].dano * 0.5f;
+        for (size_t i = 0; i < M.f.size(); ++i) {
+            Fighter& f = M.f[i];
+            GameObject* g = f.dead || f.remote ? nullptr : e->scene.get(f.root);
+            if (!g || distZona(z, g->transform.position) <= z.r) continue;
+            if (!f.bot) {
+                hurtPlayer(e, dano);
+                M.lastDamage = 0.f;
+                if (G.playerHp <= 0.f) { g_killWeapon = "Zona"; killFighter(e, int(i), -1); g_killWeapon.clear(); }
+            } else {
+                f.hp -= dano;
+                f.hurtAgo = 0.f;
+                if (f.hp <= 0.f) { g_killWeapon = "Zona"; killFighter(e, int(i), -1); g_killWeapon.clear(); }
+            }
+        }
+    }
+    auto temVivo = [&](int t) {
+        for (const Fighter& o : M.f) if (o.team == t && !o.dead && !o.fora) return true;
+        return false;
+    };
+    for (size_t i = 0; i < M.f.size(); ++i) {
+        Fighter& f = M.f[i];
+        if (f.dead) {
+            if (f.fora) continue;
+            // sem ninguém do time de pé (ou zona final): fora da partida
+            if (!temVivo(f.team) || z.fase >= kFaseSemRenascer) { f.fora = true; continue; }
+            if ((f.deadTime += dt) >= kRenasceBR) brRenascer(e, f);
+            continue;
+        }
+        if (!f.bot) {
+            if (G.playerHp <= 0.f) killFighter(e, int(i), M.attacker);
+            continue;
+        }
+        if (G.state == 0) botUpdate(e, int(i), dt);
+    }
+    // times que ficaram todos fora: a colocação é quantos times ainda estavam vivos
+    int vivos = 0;
+    for (int t = 0; t < M.times; ++t) if (!M.colocacao[t]) ++vivos;
+    for (int t = 0; t < M.times; ++t) {
+        if (M.colocacao[t]) continue;
+        bool algum = false;
+        for (const Fighter& o : M.f) if (o.team == t && !o.fora) algum = true;
+        if (algum) continue;
+        M.colocacao[t] = vivos--;
+        TeamMatch::Feed fd;
+        fd.victim = "Time " + std::to_string(t + 1) + " eliminado";
+        fd.vt = t;
+        M.feed.push_back(fd);
+        if (M.feed.size() > 5) M.feed.erase(M.feed.begin());
+    }
+    if (G.state != 0) return;
+    const int pf = playerFighter(e);
+    if (pf < 0) return;
+    const int meu = M.f[pf].team;
+    if (M.colocacao[meu]) {
+        G.state = 2;
+        G.message = "Seu time ficou em " + std::to_string(M.colocacao[meu]) + "º lugar";
+    } else if (vivos <= 1) {
+        M.colocacao[meu] = 1;
+        G.state = 1;
+        G.message = "Vitória! Último time de pé";
+    }
+}
+
 void botUpdate(Engine* e, int fi, float dt) {
     TeamMatch& M = matchOf(e);
     Fighter& f = M.f[fi];
@@ -475,7 +756,7 @@ void botUpdate(Engine* e, int fi, float dt) {
     // escolhe o alvo: inimigo vivo mais perto que dá para ver
     if ((f.think -= dt) <= 0.f) {
         f.think = e->fxRng.range(0.2f, 0.35f);
-        int best = -1; float bd = 55.f;
+        int best = -1; float bd = M.modo == 1 ? 42.f : 55.f;  // Ressurgência: vê um pouco menos longe (são 40)
         for (size_t k = 0; k < M.f.size(); ++k) {
             Fighter& o = M.f[k];
             if (o.team == f.team || o.dead) continue;
@@ -484,7 +765,11 @@ void botUpdate(Engine* e, int fi, float dt) {
             float d = glm::length(og->transform.position - pos);
             if (d < bd && visible(e, f, o)) { bd = d; best = int(k); }
         }
-        if (best != f.target) f.burst = 0;
+        if (best != f.target) {
+            f.burst = 0;
+            // Ressurgência: viu alguém novo, leva um tempinho para reagir (como gente), e não já sai atirando
+            if (M.modo == 1 && best >= 0) f.fireTimer = std::max(f.fireTimer, e->fxRng.range(0.6f, 1.2f));
+        }
         f.target = best;
     }
     glm::vec3 move(0.f), face(0.f);
@@ -511,11 +796,15 @@ void botUpdate(Engine* e, int fi, float dt) {
     } else {
         // sem inimigo à vista: segue pelas escadarias até um objetivo
         if (!M.nav.empty()) {
+            // Ressurgência: destino que a zona engoliu (ou longe dela) é trocado por um lugar dentro da zona
+            if (M.modo == 1 && !f.path.empty() && glm::length(glm::vec2(f.goal.x, f.goal.z) - M.zona.c) > M.zona.r * 0.9f) f.path.clear();
             if (f.path.empty() || f.pathPos >= f.path.size()) {
                 glm::vec3 goal;
                 float pick = e->fxRng.f();
-                if (f.team == 0) goal = pick < 0.55f ? M.base[1] : M.nav[e->fxRng.irange(0, int(M.nav.size()) - 1)];
+                if (M.modo == 1) goal = lugarNaZona(e);
+                else if (f.team == 0) goal = pick < 0.55f ? M.base[1] : M.nav[e->fxRng.irange(0, int(M.nav.size()) - 1)];
                 else goal = pick < 0.2f ? M.base[0] : M.nav[e->fxRng.irange(0, int(M.nav.size()) - 1)];
+                f.goal = goal;
                 f.path = findPath(M, nearestNode(M, pos), nearestNode(M, goal));
                 f.pathPos = 0;
             }
@@ -552,10 +841,12 @@ void teamStart(Engine* e) {
     auto gunSkins = M.gunSkins;
     bool online = M.online, host = M.host;
     std::string localId = M.localId, roster = M.roster;
+    const int modo = M.modo;
     M = TeamMatch{};
     M.playerTeam = chosen; M.playerSkin = skin; M.playerPrimary = primary; M.playerSecondary = secondary;
     M.gunSkins = gunSkins;
     M.online = online; M.host = host; M.localId = localId; M.roster = roster;
+    M.modo = online ? 0 : modo;  // (Ressurgência online: depois)
     if (e->rules.objetivo != "times") return;
     M.active = true;
     // a partida começa de manhã: o dia passa (manhã, tarde, noite) e volta a amanhecer até acabar o tempo
@@ -625,10 +916,11 @@ void teamStart(Engine* e) {
         setSubtreeActive(*g, false);
         e->game.hidden.push_back(s.h);
         if (g->rigidBody) { e->physics.setEnabled(*g->rigidBody, false); e->game.disabledBodies.push_back(g->rigidBody); }
-        if (s.team < 0) continue;
+        if (s.team < 0 || M.modo == 1) continue;  // Ressurgência: os lutadores são criados depois (brStart)
         Fighter f;
         f.original = s.h;
         f.team = s.team;
+        f.lado = s.team;
         f.bot = !s.player;
         json r = recipeOf(e, *g);
         f.name = f.bot ? std::string(g->name) : "Você";
@@ -683,6 +975,7 @@ void teamStart(Engine* e) {
         for (int t = 0; t < 2; ++t) { bases.push_back(M.base[t]); for (const glm::vec3& sp : M.spawns[t]) bases.push_back(sp); }
         favelaNavGraph(e, M.nav, M.navAdj, bases);
     }
+    if (M.modo == 1) { brStart(e); return; }
     e->game.playerHp = e->game.playerMax = 100.f;
     char buf[160];
     int pf = -1;
@@ -822,6 +1115,7 @@ void updateNades(Engine* e, float dt) {
 void teamUpdate(Engine* e, float dt) {
     TeamMatch& M = matchOf(e);
     GameState& G = e->game;
+    if (M.modo == 1) { brUpdate(e, dt); return; }
     updateNades(e, dt);
     for (auto& fd : M.feed) fd.age += dt;
     for (auto& f : M.f) f.shotAgo += dt;
@@ -891,10 +1185,12 @@ void teamStop(Engine* e) {
     auto gunSkins = M.gunSkins;
     bool online = M.online, host = M.host;
     std::string localId = M.localId, roster = M.roster;
+    const int modo = M.modo;
     M = TeamMatch{};
     M.playerTeam = chosen; M.playerSkin = skin; M.playerPrimary = primary; M.playerSecondary = secondary;
     M.gunSkins = gunSkins;
     M.online = online; M.host = host; M.localId = localId; M.roster = roster;
+    M.modo = modo;
 }
 }  // namespace
 
@@ -920,9 +1216,11 @@ int playerFighter(Engine* e) {
     return -1;
 }
 void teamChoose(Engine* e, int team) { matchOf(e).playerTeam = team < 0 ? -1 : std::clamp(team, 0, 1); }
+void teamMode(Engine* e, int modo) { matchOf(e).modo = modo == 1 ? 1 : 0; }
 
 namespace {
 int nearShop(Engine* e) {
+    if (matchOf(e).modo != 0) return -1;  // Ressurgência: sem base nem loja
     int pf = playerFighter(e);
     if (pf < 0 || matchOf(e).f[pf].dead) return -1;
     GameObject* pg = e->scene.get(matchOf(e).f[pf].root);
@@ -1132,7 +1430,7 @@ std::string hudJson(Engine* e) {
         j["abates"] = f.kills;
         j["mortes"] = f.deaths;
         j["morto"] = f.dead;
-        j["renasce"] = f.dead ? std::max(0, int(std::ceil(5.f - f.deadTime))) : 0;
+        j["renasce"] = f.dead ? (f.fora ? -1 : std::max(0, int(std::ceil((M.modo == 1 ? 10.f : 5.f) - f.deadTime)))) : 0;
         j["granadas"] = f.grenades;
         j["dinheiro"] = f.money;
         j["slot"] = f.slot;
@@ -1179,6 +1477,46 @@ std::string hudJson(Engine* e) {
             }
         }
     j["mapa"] = mm;
+    j["modo"] = M.modo;
+    if (M.modo == 1 && pf >= 0) {  // Ressurgência: times vivos, zona e o meu time
+        static const float kEspera[] = {60.f, 50.f, 45.f, 40.f, 35.f, 30.f}, kFecha[] = {45.f, 40.f, 35.f, 30.f, 25.f, 30.f};
+        const auto& z = M.zona;
+        const Fighter& eu = M.f[pf];
+        json br;
+        int timesVivos = 0, vivos = 0;
+        for (int t = 0; t < M.times; ++t) if (t < int(M.colocacao.size()) && !M.colocacao[t]) ++timesVivos;
+        for (const Fighter& f : M.f) if (!f.fora) ++vivos;
+        br["times"] = timesVivos;
+        br["jogadores"] = vivos;
+        br["fase"] = std::min(z.fase + 1, 6);
+        br["fechando"] = z.fechando;
+        br["tempo"] = z.fase < 6 ? std::max(0, int(std::ceil((z.fechando ? kFecha[z.fase] : kEspera[z.fase]) - z.t))) : 0;
+        br["renascer"] = z.fase < 4;
+        br["colocacao"] = eu.team < int(M.colocacao.size()) ? M.colocacao[eu.team] : 0;
+        br["meuTime"] = eu.team + 1;
+        json time = json::array();
+        for (const Fighter& f : M.f)
+            if (f.team == eu.team)
+                time.push_back({{"nome", f.name}, {"voce", !f.bot}, {"vivo", !f.dead}, {"fora", f.fora},
+                                {"renasce", f.dead && !f.fora ? std::max(0, int(std::ceil(10.f - f.deadTime))) : 0},
+                                {"vida", f.bot ? int(std::ceil(std::max(0.f, f.hp))) : int(std::ceil(G.playerHp))}});
+        br["time"] = time;
+        // zona no minimapa (metros, com a frente do jogador para cima) e fora dela?
+        if (GameObject* pg = e->scene.get(eu.root)) {
+            glm::vec3 fw = glm::normalize(e->editorCam.forward() * glm::vec3(1, 0, 1) + glm::vec3(0, 0, 1e-4f));
+            glm::vec3 rt(-fw.z, 0.f, fw.x);
+            auto rel = [&](glm::vec2 c) {
+                glm::vec3 d = glm::vec3(c.x, 0.f, c.y) - pg->transform.position * glm::vec3(1, 0, 1);
+                return json::array({std::round(glm::dot(d, rt) * 10.f) / 10.f, std::round(glm::dot(d, fw) * 10.f) / 10.f});
+            };
+            br["zona"] = {{"c", rel(z.c)}, {"r", std::round(z.r * 10.f) / 10.f}};
+            if (z.rPara > 0.f || z.fase < 6) br["proxima"] = {{"c", rel(z.para)}, {"r", std::round(z.rPara * 10.f) / 10.f}};
+            const float d = glm::length(glm::vec2(pg->transform.position.x, pg->transform.position.z) - z.c);
+            br["fora"] = !eu.dead && d > z.r;
+            br["distancia"] = int(std::max(0.f, d - z.r));
+        }
+        j["br"] = br;
+    }
     j["interagir"] = interactLabel(e);
     j["acerto"] = e->hitMarker > 0.f;
     j["cabeca"] = e->hitHead;
@@ -1371,7 +1709,7 @@ void Partida::onProjectLoaded(Engine* e) {
     if (mapIs(e, "favela")) preloadMatchWeapons(e);
 }
 std::string Partida::statusText(Engine* e) {
-    if (e->rules.objetivo != "times" || !M.active) return "";
+    if (e->rules.objetivo != "times" || !M.active || M.modo != 0) return "";
     int pf = -1;
     for (size_t i = 0; i < M.f.size(); ++i) if (!M.f[i].bot) pf = int(i);
     int need = e->rules.quantidade > 0 ? e->rules.quantidade : 50;

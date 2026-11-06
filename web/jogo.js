@@ -169,7 +169,7 @@ function telaInicio() {
       <div class="coluna" style="gap:4px">
         <div class="logo-fs"><svg class="coroa" viewBox="0 0 40 26" aria-hidden="true"><path d="M3 23 L6 6 L14 15 L20 3 L26 15 L34 6 L37 23 Z" fill="none" stroke="#FBBF24" stroke-width="3" stroke-linejoin="round"/></svg>
         <span class="bebas favela">FAVELA</span><span class="bebas strike">STRIKE</span></div>
-        <span style="font-size:11px;color:#D1D5DB;letter-spacing:2px;font-weight:700">POLÍCIA x BANDIDOS · 5 CONTRA 5</span>
+        <span style="font-size:11px;color:#D1D5DB;letter-spacing:2px;font-weight:700">RESSURGÊNCIA · POLÍCIA x BANDIDOS</span>
       </div>
       <button class="btn btn-ouro btn-grande" id="i-jogar" style="width:260px">${ICONE.play} JOGAR</button>
       <button class="btn btn-ouro btn-medio" data-ir="multi" style="width:260px">${ICONE.grupo} MULTIPLAYER</button>
@@ -194,11 +194,40 @@ function telaInicio() {
   </div>`), 'inicio');
   ligarAtalhos(t);
   ligarGiroBoneco(t);
-  $('#i-jogar', t).onclick = telaLado;
+  $('#i-jogar', t).onclick = telaModo;
   $('#i-conta', t).onclick = () => telaConfig('conta');
 }
 
 // ---------------- escolha do lado ----------------
+// ---------------- escolha do modo ----------------
+function telaModo() {
+  motor.girarMenu(true);
+  const t = mostrar(html(`<div class="tela">
+    <div class="lados">
+      <button class="lado modo-br" data-modo="1">
+        <div class="linha" style="gap:12px"><div class="icone" style="background:#DC2626">${ICONE.grupo}</div>
+          <div class="coluna" style="gap:0"><span class="nome" style="color:#FCA5A5">RESSURGÊNCIA</span><span style="font-size:11px;font-weight:800;letter-spacing:2px;color:#FECACA">BATTLE ROYALE</span></div></div>
+        <span class="texto" style="color:#FEE2E2">10 times de 4 caem do céu na favela. Caiu? Volta em 10 s perto do seu time, enquanto alguém do time estiver de pé. A zona fecha: o último time de pé vence.</span>
+        <span class="cresce"></span>
+        <div class="linha" style="gap:6px;flex-wrap:wrap"><span class="tag" style="background:rgba(220,38,38,.22);color:#FEE2E2">40 jogadores</span>
+          <span class="tag" style="background:rgba(220,38,38,.22);color:#FEE2E2">zona em 6 fases</span><span class="tag" style="background:rgba(220,38,38,.22);color:#FEE2E2">qualquer roupa</span></div>
+        <div class="linha" style="justify-content:space-between"><span style="font-size:12px;color:#FECACA">~8 min · você + 3 robôs no time</span><span class="entrar" style="background:#DC2626">JOGAR</span></div>
+      </button>
+      <button class="lado pol" data-modo="0">
+        <div class="linha" style="gap:12px"><div class="icone" style="background:#3B82F6">${ICONE.escudo}</div>
+          <div class="coluna" style="gap:0"><span class="nome" style="color:#93C5FD">POLÍCIA x BANDIDOS</span><span style="font-size:11px;font-weight:800;letter-spacing:2px;color:#BFDBFE">5 CONTRA 5</span></div></div>
+        <span class="texto" style="color:#DBEAFE">Escolha o lado e tome o morro. Renasce na base, compra armas com o $ dos abates. Até 50 abates ou 20 min.</span>
+        <span class="cresce"></span>
+        <div class="linha" style="gap:6px;flex-wrap:wrap"><span class="tag" style="background:rgba(59,130,246,.22);color:#DBEAFE">10 jogadores</span>
+          <span class="tag" style="background:rgba(59,130,246,.22);color:#DBEAFE">loja na base</span></div>
+        <div class="linha" style="justify-content:space-between"><span style="font-size:12px;color:#BFDBFE">também no multiplayer</span><span class="entrar" style="background:#3B82F6">JOGAR</span></div>
+      </button>
+    </div></div>`), 'modo');
+  t.prepend(topo('ESCOLHA O MODO', telaInicio, '', ''));
+  $('[data-modo="1"]', t).onclick = () => { const u = guardado.get('ultimo', null); telaRoupa(u && u.time === 1 ? 1 : guardado.get('lado', 0), null, 1); };
+  $('[data-modo="0"]', t).onclick = telaLado;
+}
+
 function telaLado() {
   motor.girarMenu(true);
   const t = mostrar(html(`<div class="tela">
@@ -220,30 +249,31 @@ function telaLado() {
         <div class="linha" style="justify-content:space-between"><span style="font-size:12px;color:#FDE68A">4 robôs + você</span><span class="entrar" style="background:#F59E0B;color:#111827">ENTRAR</span></div>
       </button>
     </div></div>`), 'lado');
-  t.prepend(topo('ESCOLHA SEU LADO', telaInicio, '', '<span class="dica">Partida até 50 abates · 20 min</span>'));
+  t.prepend(topo('ESCOLHA SEU LADO', telaModo, '', '<span class="dica">Partida até 50 abates · 20 min</span>'));
   for (const b of $$('[data-time]', t)) b.onclick = () => telaRoupa(Number(b.dataset.time));
 }
 
 // ---------------- roupa do lado (antes de jogar). pronto != null: veio da sala do multiplayer ----------------
-function telaRoupa(time, pronto) {
+function telaRoupa(time, pronto, modo = 0) {
   motor.girarMenu(true);
-  const minhas = ROUPAS.filter((r) => r.time === time);
+  const br = modo === 1;
+  const minhas = br ? ROUPAS : ROUPAS.filter((r) => r.time === time);
   let sel = conta.roupa(time);
   const t = mostrar(html(`<div class="tela">
     <div class="linha cresce" style="align-items:stretch;gap:14px">
-      <div class="grade-itens cresce" id="r-grade" style="grid-template-columns:repeat(${minhas.length},minmax(0,1fr));grid-auto-rows:1fr;align-content:stretch;overflow:hidden"></div>
+      <div class="grade-itens cresce" id="r-grade" style="grid-template-columns:repeat(${br ? 6 : minhas.length},minmax(0,1fr));grid-auto-rows:1fr;align-content:stretch;overflow:hidden"></div>
     </div>
     <div class="linha" style="gap:8px;flex-wrap:wrap"><span class="dica">Arma inicial:</span><span id="r-armas" class="linha" style="gap:6px;flex-wrap:wrap"></span>
-      <span class="dica cresce">+ TT-33 · qualquer arma serve nos dois lados; as outras compra na base com o $ dos abates</span>
+      <span class="dica cresce">${br ? '+ TT-33 · você cai com ela (e a skin dela) e pega munição de quem abater' : '+ TT-33 · qualquer arma serve nos dois lados; as outras compra na base com o $ dos abates'}</span>
       <button class="btn btn-ouro btn-grande" id="r-ir" style="height:48px;font-size:24px;width:200px">${pronto ? 'PRONTO' : `${ICONE.play} COMEÇAR`}</button></div>
   </div>`), 'roupa');
-  t.prepend(topo(time ? 'SUA ROUPA · BANDIDOS' : 'SUA FARDA · POLÍCIA', () => (pronto ? telaSala() : telaLado())));
+  t.prepend(topo(br ? 'SUA ROUPA · RESSURGÊNCIA' : time ? 'SUA ROUPA · BANDIDOS' : 'SUA FARDA · POLÍCIA', () => (pronto ? telaSala() : br ? telaModo() : telaLado())));
   const desenhar = () => {
     $('#r-grade', t).innerHTML = minhas.map((r) => {
       const tem = conta.temRoupa(r);
       return `<button class="item ${r === sel ? 'sel' : ''} ${tem ? '' : 'travado'}" data-k="${r.key}" style="justify-content:flex-end">
         <img src="retratos/${r.key}.png" alt="" style="flex:1 1 0;min-height:0;height:0">
-        <span class="n" style="font-size:13px">${esc(r.nome)}</span>
+        <span class="n" style="font-size:13px">${esc(r.nome)}${br ? `<span class="dica" style="display:block;font-size:10px;font-weight:700">${r.time ? 'bandido' : 'polícia'}</span>` : ''}</span>
         <span class="p ${tem ? 'verde' : 'amarelo'}">${tem ? (r === sel ? 'equipada' : 'grátis') : `${ICONE.moeda(12)} ${fmt(r.preco)}`}</span></button>`;
     }).join('');
     for (const d of $$('.item', t)) d.onclick = async () => {
@@ -261,9 +291,10 @@ function telaRoupa(time, pronto) {
   };
   desenharArmas();
   $('#r-ir', t).onclick = () => {
-    conta.usarRoupa(time, sel.key);
-    guardado.set('lado', time);
-    if (pronto) pronto(); else iniciarPartida(time, sel, null);
+    const lado = br ? sel.time : time;
+    conta.usarRoupa(lado, sel.key);
+    guardado.set('lado', lado);
+    if (pronto) pronto(); else iniciarPartida(lado, sel, null, null, br ? 1 : 0);
   };
 }
 
@@ -560,7 +591,52 @@ function comecarOnline(s) {
 }
 
 // ---------------- fim de partida ----------------
+// Ressurgência: em que lugar o time ficou e os abates do time
+function fimRessurgencia(j) {
+  const br = j.br || {};
+  const lugar = br.colocacao | 0 || 10;
+  const lado = partida ? partida.time : 0;
+  pararPartida();
+  const xpAbates = (j.abates | 0) * XP_ABATE, xpResultado = lugar === 1 ? XP_VITORIA : lugar <= 3 ? XP_EMPATE : XP_DERROTA;
+  const xp = conta.ganharXp(xpAbates + xpResultado);
+  const subiu = xp.depois.nivel > xp.antes.nivel;
+  const pctXp = xp.depois.precisa ? Math.round(100 * xp.depois.noNivel / xp.depois.precisa) : 100;
+  const meus = (j.jogadores || []).filter((p) => p.time === j.time).sort((a, b) => b.abates - a.abates);
+  const cor = lugar === 1 ? '#FCD34D' : lugar <= 3 ? '#86EFAC' : '#FCA5A5';
+  const t = mostrar(html(`<div class="tela" style="padding:18px 26px">
+    <div class="linha" style="align-items:flex-start">
+      <div class="coluna cresce" style="gap:6px"><span style="font-size:12px;font-weight:800;letter-spacing:2px;color:${cor}">${lugar === 1 ? 'RESSURGÊNCIA · VITÓRIA' : 'RESSURGÊNCIA · SEU TIME FICOU EM'}</span>
+        <span class="bebas" style="font-size:52px;line-height:.92;color:${cor}">${lugar === 1 ? 'ÚLTIMO TIME DE PÉ' : lugar + 'º LUGAR'}</span>
+        <span class="dica">de 10 times · time ${br.meuTime || 1}</span></div>
+      <div class="cartao coluna" style="padding:8px 18px;gap:0;align-items:center"><span class="bebas ouro" style="font-size:46px;line-height:1">#${lugar}</span><span class="dica" style="font-size:11px">COLOCAÇÃO</span></div>
+    </div>
+    <div class="cartao linha fim-xp">
+      <span class="insignia">${insignia(xp.depois.patente, 34)}</span>
+      <div class="coluna cresce" style="gap:4px">
+        <div class="linha" style="gap:8px;flex-wrap:wrap"><b>${subiu ? 'SUBIU PARA O NÍVEL ' + xp.depois.nivel : 'NÍVEL ' + xp.depois.nivel}</b>
+          <span class="apagado">${esc(xp.depois.patente.nome)}${xp.depois.divisao ? ' ' + xp.depois.divisao : ''}</span>
+          ${xp.depois.patente !== xp.antes.patente ? '<span class="etiqueta fundo-lendaria">PATENTE NOVA</span>' : ''}</div>
+        <span class="barra-xp"><i style="width:${pctXp}%"></i></span>
+      </div>
+      <div class="coluna" style="gap:2px;align-items:flex-end;font-size:12px">
+        <b class="ouro" style="font-size:15px">+${fmt(xpAbates + xpResultado)} XP</b>
+        <span class="apagado">${j.abates | 0} abates: +${fmt(xpAbates)} · ${lugar}º lugar: +${fmt(xpResultado)}</span>
+      </div>
+    </div>
+    <div class="cartao coluna cresce" style="gap:2px;padding:12px;overflow:auto">
+      <div class="linha" style="font-size:11px;font-weight:800;letter-spacing:1px;padding:0 6px;color:#86EFAC"><span class="cresce">SEU TIME</span>
+        <span style="width:58px;text-align:right">ABATES</span><span style="width:58px;text-align:right">QUEDAS</span></div>
+      ${meus.map((p) => `<div class="linha" style="font-size:13px;padding:6px;border-radius:8px;${p.voce ? 'font-weight:800;background:rgba(255,255,255,.12)' : ''}">
+        <span class="cresce">${p.voce ? 'Você' : esc(p.nome)}</span><b style="width:58px;text-align:right">${p.abates}</b><span class="apagado" style="width:58px;text-align:right">${p.mortes}</span></div>`).join('')}</div>
+    <div class="linha" style="justify-content:flex-end"><button class="btn btn-escuro" id="f-menu" style="height:48px;font-size:14px">Menu inicial</button>
+      <button class="btn btn-ouro" id="f-novo" style="height:48px;font-size:15px;letter-spacing:1px;padding:0 22px">JOGAR DE NOVO</button></div>
+  </div>`), 'fim');
+  $('#f-menu', t).onclick = telaInicio;
+  $('#f-novo', t).onclick = () => telaRoupa(lado, null, 1);
+}
+
 function fimDePartida(j) {
+  if (j.modo === 1) { fimRessurgencia(j); return; }
   const sc = j.placar || [0, 0];
   const venceu = sc[0] > sc[1] ? 0 : sc[1] > sc[0] ? 1 : -1;
   const time = partida ? partida.time : 0;

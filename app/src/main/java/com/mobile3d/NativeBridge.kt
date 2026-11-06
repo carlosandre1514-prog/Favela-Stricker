@@ -35,6 +35,7 @@ object NativeBridge {
     // a partida (jogo): escolhas, HUD, loja e online
     @JvmStatic external fun nativeTeamLoadout(team: Int, skin: Int, primary: String, secondary: String)
     @JvmStatic external fun nativeTeamGunSkin(gun: String, skin: String)
+    @JvmStatic external fun nativeGameMode(modo: Int)
     @JvmStatic external fun nativeHudJson(): ByteArray
     @JvmStatic external fun nativeShopJson(): ByteArray
     @JvmStatic external fun nativeShopBuy(item: Int): ByteArray

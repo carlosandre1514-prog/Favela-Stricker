@@ -12,7 +12,9 @@ struct Fighter {
     Scene::Handle root;            // personagem em jogo
     Scene::Handle original;        // o do projeto (escondido durante o Play)
     std::string name;
-    int team = 0;                  // 0 polícia, 1 bandido
+    int team = 0;                  // time: 0 polícia, 1 bandido (Ressurgência: 0..9, o time de 4)
+    int lado = 0;                  // de que lado é a roupa (0 polícia, 1 bandido): na Ressurgência cada um escolhe
+    bool fora = false;             // Ressurgência: caiu sem companheiro vivo (ou na zona final): está fora
     bool bot = true, dead = false;
     float hp = 100.f, deadTime = 0.f;
     int kills = 0, deaths = 0, money = 800;
@@ -46,6 +48,13 @@ struct Fighter {
 struct ShopRT { Scene::Handle obj; int kind = 0; int team = 0; };  // kind 0 armas, 1 roupas
 struct TeamMatch {
     bool active = false;
+    int modo = 0;                         // 0 Polícia x Bandidos (5 x 5), 1 Battle Royale Ressurgência
+    // Ressurgência: a zona (círculo que fecha em fases), quantos times e em que lugar cada time ficou (0 = vivo)
+    struct Zona { glm::vec2 c{0.f}, de{0.f}, para{0.f}; float r = 0.f, rDe = 0.f, rPara = 0.f, t = 0.f, tick = 0.f;
+                  int fase = 0; bool fechando = false; };
+    Zona zona;
+    int times = 2;
+    std::vector<int> colocacao;
     std::vector<Fighter> f;
     int score[2] = {0, 0};
     glm::vec3 base[2]{};                  // centro dos pontos de renascimento de cada time
@@ -96,6 +105,7 @@ TeamMatch& matchOf(Engine* e);  // a partida do jogo instalado
 
 // Partida de times: escolha do lado, lojas (o app mostra a lista e compra), caminhos dos robôs
 void teamChoose(Engine* e, int team);
+void teamMode(Engine* e, int modo);   // antes do Play: 0 Polícia x Bandidos, 1 Ressurgência
 // Antes do Play: lado, roupa (0..4 na lista do lado) e arma principal ("m4a1", "ak47"...; "" = a do projeto)
 void teamLoadout(Engine* e, int team, int skin, const std::string& primary, const std::string& secondary = "");
 bool teamSwapWeapon(Engine* e);     // troca rápida principal <-> segunda arma

@@ -22,6 +22,7 @@ Engine* jogo_criar(const char* shader_dir) {
 void jogo_escolhas(Engine* e, int time, int roupa, const char* principal, const char* segunda) {
     if (e) eng::teamLoadout(e, time, roupa, principal ? principal : "", segunda ? segunda : "");
 }
+void jogo_modo(Engine* e, int modo) { if (e) eng::teamMode(e, modo); }
 void jogo_skin_arma(Engine* e, const char* arma, const char* skin) { if (e && arma) eng::teamGunSkin(e, arma, skin ? skin : ""); }
 const char* jogo_aparencia_roupa(int time, int roupa) { return texto(eng::teamSkinLook(time, roupa)); }
 

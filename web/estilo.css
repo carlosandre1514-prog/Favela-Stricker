@@ -114,6 +114,26 @@ input:focus { border-color: var(--ouro); }
   border-radius: 18px; background: rgba(11, 15, 23, 0.78); border: 1px solid rgba(252, 211, 77, 0.45); }
 #inicio .destaque img { width: 226px; height: 74px; object-fit: contain; }
 
+/* Ressurgência: modo, placar, meu time e aviso de fora da zona */
+.lado.modo-br { background: linear-gradient(160deg, #3B0D0D, #1A0B0B); border-color: rgba(248, 113, 113, .55); }
+#placar.placar-br .pol .num, #placar.placar-br .pol .rot { color: #FCA5A5; }
+#placar.placar-br .ban .num, #placar.placar-br .ban .rot { color: #86EFAC; }
+#placar .meta.alerta { color: #FCA5A5; font-weight: 800; animation: pisca-zona 1s ease-in-out infinite alternate; }
+@keyframes pisca-zona { from { opacity: 1; } to { opacity: .55; } }
+#meu-time { position: absolute; left: 14px; top: 46%; display: flex; flex-direction: column; gap: 4px; pointer-events: none; }
+#meu-time > div { display: flex; align-items: center; gap: 8px; min-width: 150px; padding: 4px 9px; border-radius: 9px;
+  background: rgba(11, 15, 23, .66); font-size: 12px; font-weight: 700; color: #E5E7EB; }
+#meu-time > div.voce { border-left: 3px solid #4ADE80; }
+#meu-time .n { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 90px; }
+#meu-time .vida-mini { width: 54px; height: 5px; border-radius: 3px; background: rgba(255, 255, 255, .15); overflow: hidden; }
+#meu-time .vida-mini b { display: block; height: 100%; }
+#meu-time i { font-style: normal; font-size: 11px; }
+#meu-time i.volta { color: #FCD34D; }
+#meu-time i.fora { color: #F87171; }
+#fora-zona { display: none; position: absolute; left: 50%; top: 92px; transform: translateX(-50%); padding: 7px 16px; border-radius: 10px;
+  background: rgba(127, 29, 29, .85); border: 1px solid #F87171; color: #FEE2E2; font-weight: 800; font-size: 13px; letter-spacing: .5px;
+  white-space: nowrap; animation: pisca-zona .6s ease-in-out infinite alternate; pointer-events: none; }
+
 /* escolha do lado */
 .lados { flex: 1 1 0; min-height: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
 .lado { display: flex; flex-direction: column; gap: 10px; padding: 18px 20px; border-radius: 18px; cursor: pointer; text-align: left; }
@@ -283,11 +303,39 @@ body.toque .so-teclado { display: none !important; }
   border: 1px solid var(--borda); font-weight: 700; font-size: 13px; z-index: 20; pointer-events: none; max-width: 80%; text-align: center; }
 
 /* tela de carregamento (só no site) */
-#carregando { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; background: var(--fundo); z-index: 10; text-align: center; padding: 20px; }
-#carregando .logo { font-family: 'Bebas Neue', Impact, sans-serif; font-size: 56px; display: flex; gap: 14px; }
-#carregando .barra { width: min(420px, 80vw); height: 10px; border-radius: 6px; background: rgba(255, 255, 255, 0.1); overflow: hidden; }
-#progresso { height: 100%; width: 0; background: var(--ouro); transition: width .2s; }
-#carregando .dica { color: var(--apagado); font-size: 12px; max-width: 460px; }
+#carregando { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; z-index: 10; text-align: center; padding: 20px;
+  background: linear-gradient(180deg, rgba(8,11,18,.55), rgba(8,11,18,.92)), #0B0F17 url(img/fundo_inicio.jpg) center / cover no-repeat; }
+#carregando .logo-fs.grande { align-items: center; font-family: 'Bebas Neue', Impact, sans-serif; }
+#carregando .logo-fs.grande .favela, #carregando .logo-fs.grande .strike { font-size: 72px; }
+#carregando .barra { width: min(440px, 80vw); height: 10px; border-radius: 6px; background: rgba(255, 255, 255, 0.12); overflow: hidden; box-shadow: 0 0 0 1px rgba(252,211,77,.25); }
+#progresso { height: 100%; width: 0; background: linear-gradient(90deg, #F59E0B, #FCD34D); transition: width .2s; }
+#status { font-weight: 700; letter-spacing: .5px; }
+#carregando .dica { color: #D1D5DB; font-size: 12px; max-width: 460px; }
+
+/* carregando a partida: foto da favela se aproximando, o modo em destaque, barra, dicas e o seu personagem */
+.carga { position: absolute; inset: 0; z-index: 30; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; padding: 26px 34px;
+  background: #0B0F17; isolation: isolate; }
+.carga::before { content: ""; position: absolute; inset: -4%; z-index: -2; background: url(img/fundo_inicio.jpg) center / cover no-repeat;
+  animation: carga-zoom 14s ease-out forwards; }
+.carga::after { content: ""; position: absolute; inset: 0; z-index: -1;
+  background: linear-gradient(90deg, rgba(8,11,18,.94) 0%, rgba(8,11,18,.7) 45%, rgba(8,11,18,.2) 75%), linear-gradient(0deg, rgba(8,11,18,.95) 0%, rgba(8,11,18,0) 45%); }
+.carga.modo-br::after { background: linear-gradient(90deg, rgba(36,6,6,.94) 0%, rgba(36,6,6,.7) 45%, rgba(36,6,6,.15) 75%), linear-gradient(0deg, rgba(14,4,4,.95) 0%, rgba(14,4,4,0) 45%); }
+@keyframes carga-zoom { from { transform: scale(1); } to { transform: scale(1.12) translate(-1%, 1%); } }
+.carga .logo-fs { position: absolute; left: 34px; top: 22px; transform: scale(.55); transform-origin: left top; }
+.carga .carga-modo { font-size: 12px; font-weight: 800; letter-spacing: 3px; color: #FCD34D; }
+.carga.modo-br .carga-modo { color: #FCA5A5; }
+.carga .carga-titulo { font-family: 'Bebas Neue', Impact, sans-serif; font-size: 64px; line-height: .9; color: #F9FAFB; text-shadow: 0 4px 18px rgba(0,0,0,.6); }
+.carga .carga-mapa { font-size: 13px; color: #D1D5DB; margin-top: 4px; letter-spacing: 1px; }
+.carga .carga-barra { width: min(520px, 62%); height: 8px; margin-top: 18px; border-radius: 5px; background: rgba(255,255,255,.14); overflow: hidden; }
+.carga .carga-barra i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #F59E0B, #FCD34D); transition: width .25s ease-out; }
+.carga.modo-br .carga-barra i { background: linear-gradient(90deg, #DC2626, #F87171); }
+.carga .carga-status { margin-top: 8px; font-size: 13px; font-weight: 700; color: #F3F4F6; }
+.carga .carga-dica { margin-top: 10px; max-width: 520px; font-size: 12px; color: #D1D5DB; min-height: 32px; transition: opacity .3s; }
+.carga .carga-dica b { color: #FCD34D; }
+.carga .carga-boneco { position: absolute; right: 6%; bottom: 0; height: 88%; aspect-ratio: 344 / 480; z-index: -1; filter: drop-shadow(0 10px 22px rgba(0,0,0,.6));
+  animation: carga-entra .6s ease-out both; }
+.carga .carga-boneco div { position: absolute; inset: 0; background-repeat: no-repeat; background-size: 2400% 100%; background-position: 0 0; }
+@keyframes carga-entra { from { opacity: 0; transform: translateX(30px); } to { opacity: 1; transform: none; } }
 .ouro { color: var(--ouro); } .azul { color: var(--azul-medio); } .verde { color: var(--verde); } .amarelo { color: var(--ouro-claro); } .vermelho { color: var(--vermelho); } .apagado { color: var(--apagado); }
 
 /* ---------- Ultra: acabamento extra da interface (só no nível Ultra, para não pesar nos outros) ---------- */

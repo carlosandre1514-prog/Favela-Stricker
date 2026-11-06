@@ -82,33 +82,76 @@ let lacoHud = null;
 
 // Na primeira partida o mapa carrega (a tela inicial não carrega nada de 3D, para ficar leve)
 let iniciandoPartida = false;
-async function iniciarPartida(time, roupa, sala, armaPrincipal) {
+// Tela de carregamento da partida: o modo, o mapa, uma barra, dicas que trocam e o seu personagem com a arma.
+// Fica até o seu boneco estar no chão com a arma na mão (o HUD tira ela: id "entrando").
+const DICAS = [
+  '<b>Ressurgência:</b> caiu? Você volta em 10 s perto do seu time, enquanto alguém do time estiver de pé.',
+  '<b>Zona:</b> o círculo tracejado no minimapa é a próxima zona. Fora dela a vida vai embora.',
+  '<b>Janela:</b> perto de uma janela, aperte pular para atravessar, de frente ou de lado.',
+  '<b>Porta:</b> um tiro abre a porta para o lado da bala.',
+  '<b>Vida:</b> 5 s sem levar tiro nem atirar e a vida volta sozinha.',
+  '<b>Munição:</b> quem você abate derruba uma caixa de munição. Passe por cima para pegar.',
+  '<b>Luneta:</b> a M4 Colt tem luneta. Mire para dar zoom.',
+  '<b>Granada:</b> jogue para tirar alguém de trás da parede.',
+  '<b>Skins:</b> a skin da sua arma aparece na mão, nas costas e no abate.',
+];
+function telaCarga(modo, time, roupa, arma) {
+  const br = modo === 1;
+  const skin = conta.skinArma(arma);
+  const comSkin = SKINS_ARMA.some((s) => s.arma === arma && s.key === skin) ? `_${skin}` : '';
+  const el = html(`<div class="carga fixo ${br ? 'modo-br' : ''}" id="entrando">
+    <div class="logo-fs"><svg class="coroa" viewBox="0 0 40 26" aria-hidden="true"><path d="M3 23 L6 6 L14 15 L20 3 L26 15 L34 6 L37 23 Z" fill="none" stroke="#FBBF24" stroke-width="3" stroke-linejoin="round"/></svg>
+      <span class="bebas favela">FAVELA</span><span class="bebas strike">STRIKE</span></div>
+    ${roupa && arma && arma !== 'tt33' ? `<div class="carga-boneco" aria-hidden="true"><div style="background-image:url(lobby/p_${roupa.key}.webp)"></div>
+      <div style="background-image:url(lobby/a_${arma}${comSkin}.webp),url(lobby/a_${arma}.webp)"></div></div>` : ''}
+    <span class="carga-modo">${br ? 'BATTLE ROYALE · 10 TIMES DE 4' : 'POLÍCIA x BANDIDOS · 5 CONTRA 5'}</span>
+    <span class="carga-titulo">${br ? 'RESSURGÊNCIA' : time ? 'BANDIDOS' : 'POLÍCIA'}</span>
+    <span class="carga-mapa">MAPA · FAVELA</span>
+    <div class="carga-barra"><i></i></div>
+    <span class="carga-status">Preparando…</span>
+    <span class="carga-dica"></span>
+  </div>`);
+  palco.appendChild(el);
+  const dica = $('.carga-dica', el), barra = $('.carga-barra i', el);
+  const ordem = br ? DICAS : DICAS.filter((d) => !/Ressurgência|Zona/.test(d));
+  let i = Math.floor(Math.random() * ordem.length), p = 4;
+  dica.innerHTML = ordem[i];
+  const timer = setInterval(() => {
+    if (!el.isConnected) { clearInterval(timer); return; }
+    p += (92 - p) * 0.05;  // sobe sozinha até perto do fim; completa quando o boneco entra
+    barra.style.width = p.toFixed(1) + '%';
+  }, 100);
+  const timerDica = setInterval(() => {
+    if (!el.isConnected) { clearInterval(timerDica); return; }
+    i = (i + 1) % ordem.length;
+    dica.innerHTML = ordem[i];
+  }, 3800);
+  return { el, status: (t) => { $('.carga-status', el).textContent = t; } };
+}
+
+async function iniciarPartida(time, roupa, sala, armaPrincipal, modo = 0) {
   if (iniciandoPartida || partida) return;
   iniciandoPartida = true;
+  const carga = telaCarga(!sala && modo === 1 ? 1 : 0, time, roupa, armaPrincipal || armaInicial(time));
   if (!motor.mapaPronto()) {
-    const c = html(`<div class="camada fixo"><div class="janela" style="align-items:center;text-align:center">
-      <span class="t">CARREGANDO A FAVELA…</span><span class="m">Só na primeira partida. Depois entra na hora.</span></div></div>`);
-    palco.appendChild(c);
+    carga.status('Carregando o mapa da favela… (só na primeira partida)');
     await dorme(80);
     motor.prepararPartida();
     while (!motor.mapaPronto()) await dorme(150);
-    c.remove();
   }
   iniciandoPartida = false;
-  // até o meu boneco estar no chão com a arma na mão, fica a tela de "entrando" (em vez do mapa visto de cima
-  // com o HUD vazio)
-  const entrando = html(`<div class="camada fixo" id="entrando"><div class="janela" style="align-items:center;text-align:center">
-    <span class="t">ENTRANDO NA PARTIDA…</span></div></div>`);
-  palco.appendChild(entrando);
-  setTimeout(() => entrando.remove(), 12000);  // nunca fica presa
+  carga.status(!sala && modo === 1 ? 'Caindo na favela com o seu time…' : 'Entrando na partida…');
+  setTimeout(() => carga.el.remove(), 12000);  // nunca fica presa
   motor.girarMenu(false);
   ctxAudio();
-  partida = { time, sala, fim: false, agachado: false, mirando: false, danoAntes: false };
+  const br = !sala && modo === 1;
+  partida = { time, sala, fim: false, agachado: false, mirando: false, danoAntes: false, modo: br ? 1 : 0 };
   ultimoHud = {};
-  montarHud(!!sala);
+  montarHud(!!sala, br);
   motor.redeSala(sala ? sala.host : false, sala ? fb.uid : '', sala ? sala.roster() : '');
   for (const a of ARMAS) motor.skinArma(a.key, conta.skinArma(a.key));
   const arma = armaPrincipal || armaInicial(time);
+  if (motor.modo) motor.modo(br ? 1 : 0);
   motor.escolhas(time, roupa.i, arma, 'tt33');
   // a tela inicial mostra o personagem desta partida (lado, roupa e arma), mesmo depois de fechar o jogo
   guardado.set('ultimo', { time, roupa: roupa.key, arma });
@@ -164,17 +207,24 @@ function pararPartida() {
 }
 
 // ---------------- HUD ----------------
-function montarHud(online) {
+function montarHud(online, br = false) {
   const ids = Object.keys(PECAS).filter((k) => online || !PECAS[k].online);
+  // Ressurgência: no lugar do placar Polícia x Bandidos, times vivos, a zona e os jogadores de pé
+  const placar = br
+    ? `<div id="placar" class="placar-br"><div class="faixa"><div class="pol"><span class="rot">TIMES</span><span class="num" id="br-times">10</span></div>
+      <div class="relogio" id="relogio">1:00</div><div class="ban"><span class="num" id="br-vivos">40</span><span class="rot">DE PÉ</span></div></div>
+      <span class="meta" id="meta">a zona fecha em</span></div>
+      <div id="meu-time"></div><div id="fora-zona">FORA DA ZONA · volte para o círculo</div>`
+    : `<div id="placar"><div class="faixa"><div class="pol"><span class="rot">POLÍCIA</span><span class="num" id="pt-pol">0</span></div>
+      <div class="relogio" id="relogio">10:00</div><div class="ban"><span class="num" id="pt-ban">0</span><span class="rot">BANDIDOS</span></div></div>
+      <span class="meta" id="meta">até 50 abates</span></div>`;
   const t = mostrar(html(`<div id="hud">
     <div id="zona-andar" class="toque so-toque"></div><div id="zona-olhar" class="toque so-toque"></div>
     <canvas id="luneta"></canvas><div id="dano"></div>
     <canvas id="mira" width="160" height="160" style="width:80px;height:80px"></canvas>
     <div id="vida" class="caixa">${ICONE.coracao}<div class="trilho"><div class="barra"></div></div><b id="hp">100</b></div>
     <div id="info"><span id="dinheiro">$ 0</span><span id="kd">0 abates · 0 mortes</span></div>
-    <div id="placar"><div class="faixa"><div class="pol"><span class="rot">POLÍCIA</span><span class="num" id="pt-pol">0</span></div>
-      <div class="relogio" id="relogio">10:00</div><div class="ban"><span class="num" id="pt-ban">0</span><span class="rot">BANDIDOS</span></div></div>
-      <span class="meta" id="meta">até 50 abates</span></div>
+    ${placar}
     <div id="rede" style="display:${online ? '' : 'none'}"></div>
     <div id="medidor" aria-hidden="true"></div>
     <div id="abates"></div>
@@ -264,21 +314,36 @@ function desenharLuneta(cv) {
   c.fillStyle = '#FF2A1F'; c.beginPath(); c.arc(cx, cy, 4, 0, 7); c.fill();
 }
 
-function desenharMinimapa(cv, pontos, meuTime) {
+function desenharMinimapa(cv, pontos, meuTime, br) {
   if (!cv) return;
   const c = cv.getContext('2d'), w = cv.width, cx = w / 2, cy = w / 2, r = w / 2;
   c.clearRect(0, 0, w, w);
   c.fillStyle = 'rgba(11,15,23,.72)'; c.beginPath(); c.arc(cx, cy, r - 2, 0, 7); c.fill();
   c.strokeStyle = 'rgba(255,255,255,.25)'; c.lineWidth = 4; c.beginPath(); c.arc(cx, cy, r - 2, 0, 7); c.stroke();
   const k = (r - 12) / 45;
+  if (br && br.zona) {  // Ressurgência: fora da zona em vermelho; o círculo atual (branco) e o próximo (tracejado)
+    c.save();
+    c.beginPath(); c.arc(cx, cy, r - 4, 0, 7); c.clip();
+    const zx = cx + br.zona.c[0] * k, zy = cy - br.zona.c[1] * k;
+    c.fillStyle = 'rgba(220,38,38,.28)';
+    c.beginPath(); c.rect(0, 0, w, w); c.arc(zx, zy, Math.max(0, br.zona.r * k), 0, 7, true); c.fill();
+    c.strokeStyle = '#F9FAFB'; c.lineWidth = 3; c.beginPath(); c.arc(zx, zy, Math.max(0, br.zona.r * k), 0, 7); c.stroke();
+    if (br.proxima && br.proxima.r > 0) {
+      c.setLineDash([8, 7]); c.strokeStyle = 'rgba(255,255,255,.75)'; c.lineWidth = 2;
+      c.beginPath(); c.arc(cx + br.proxima.c[0] * k, cy - br.proxima.c[1] * k, br.proxima.r * k, 0, 7); c.stroke();
+      c.setLineDash([]);
+    }
+    c.restore();
+  }
   for (const p of pontos || []) {  // companheiros na cor do time; inimigo (que atirou agora há pouco) em vermelho
-    c.fillStyle = p[2] === 1 ? '#F87171' : meuTime === 0 ? '#60A5FA' : '#FBBF24';
+    c.fillStyle = p[2] === 1 ? '#F87171' : br ? '#4ADE80' : meuTime === 0 ? '#60A5FA' : '#FBBF24';
     c.beginPath(); c.arc(cx + p[0] * k, cy - p[1] * k, 6, 0, 7); c.fill();
   }
   c.fillStyle = '#fff'; c.beginPath(); c.moveTo(cx, cy - 11); c.lineTo(cx - 7, cy + 7); c.lineTo(cx + 7, cy + 7); c.fill();
 }
 
-const corTime = (t) => (t === 0 ? '#93C5FD' : '#FCD34D');
+// cor do time no quadro de abates; na Ressurgência: o meu time em verde, os outros em vermelho
+const corTime = (t) => (partida && partida.modo === 1 ? (t === (ultimoHud.time | 0) ? '#86EFAC' : '#FCA5A5') : t === 0 ? '#93C5FD' : '#FCD34D');
 
 // Skins com abate próprio: frase e visual próprios no quadro de abates (chave "arma:skin")
 const ABATES_SKIN = {
@@ -293,13 +358,16 @@ function atualizarHud(j) {
   barra.style.width = (100 * hp / max) + '%';
   barra.style.background = hp > 50 ? '#4ADE80' : hp > 25 ? '#FBBF24' : '#F87171';
   $('#hp', t).textContent = hp;
-  $('#dinheiro', t).textContent = '$ ' + fmt(j.dinheiro | 0);
+  $('#dinheiro', t).textContent = j.modo === 1 ? (j.br ? `TIME ${j.br.meuTime}` : '') : '$ ' + fmt(j.dinheiro | 0);
   $('#kd', t).textContent = `${j.abates | 0} abate${(j.abates | 0) === 1 ? '' : 's'} · ${j.mortes | 0} morte${(j.mortes | 0) === 1 ? '' : 's'}`;
-  const pl = j.placar || [0, 0];
-  $('#pt-pol', t).textContent = pl[0];
-  $('#pt-ban', t).textContent = pl[1];
-  $('#relogio', t).textContent = j.tempo < 0 ? '--:--' : `${Math.floor(j.tempo / 60)}:${String(j.tempo % 60).padStart(2, '0')}`;
-  $('#meta', t).textContent = `até ${j.meta || 25} abates`;
+  if (j.modo === 1 && j.br) atualizarHudBR(t, j);
+  else {
+    const pl = j.placar || [0, 0];
+    $('#pt-pol', t).textContent = pl[0];
+    $('#pt-ban', t).textContent = pl[1];
+    $('#relogio', t).textContent = j.tempo < 0 ? '--:--' : `${Math.floor(j.tempo / 60)}:${String(j.tempo % 60).padStart(2, '0')}`;
+    $('#meta', t).textContent = `até ${j.meta || 25} abates`;
+  }
   const ng = $('#n-granadas', t);
   if (ng) ng.textContent = j.granadas | 0;
   // armas: imagem com a skin escolhida, balas no pente / reserva
@@ -339,7 +407,10 @@ function atualizarHud(j) {
   if (j.dano && !partida.danoAntes && config.vibrar) motor.vibrar(35);
   partida.danoAntes = !!j.dano;
   const centro = $('#centro', t);
-  const msg = j.morto ? `Você foi abatido<br><span style="font-size:13px;font-weight:600">Renasce em ${j.renasce} s</span>` : j.estado ? esc(j.msg) : '';
+  const msg = j.morto
+    ? (j.renasce < 0 ? `Você está fora<br><span style="font-size:13px;font-weight:600">${j.br && j.br.time && j.br.time.some((m) => m.vivo) ? 'seu time continua: torça por eles' : 'seu time caiu'}</span>`
+      : `Você foi abatido<br><span style="font-size:13px;font-weight:600">${j.modo === 1 ? `Volta em ${j.renasce} s perto do seu time` : `Renasce em ${j.renasce} s`}</span>`)
+    : j.estado ? esc(j.msg) : '';
   centro.innerHTML = msg;
   centro.style.display = msg ? 'block' : 'none';
   // botão do meio: loja de armas na base (ou outra interação perto)
@@ -351,12 +422,36 @@ function atualizarHud(j) {
   // abates (últimos 4)
   const feed = (j.abatidos || []).slice(-4);
   $('#abates', t).innerHTML = feed.map((f) => {
-    if (!f.a) return `<span><b style="color:${corTime(f.vt)}">${esc(f.v)}</b> caiu</span>`;
+    if (!f.a) return / eliminado$/.test(f.v) ? `<span><b style="color:${corTime(f.vt)}">${esc(f.v)}</b></span>` : `<span><b style="color:${corTime(f.vt)}">${esc(f.v)}</b> caiu</span>`;
     const s = ABATES_SKIN[f.skin];
     if (s) return `<span class="abate-${s.classe}"><b style="color:${corTime(f.at)}">${f.voce ? 'Você' : esc(f.a)}</b> <i>${s.frase}</i> <b style="color:${corTime(f.vt)}">${esc(f.v)}</b> · <em>${s.arma}</em></span>`;
     return `<span><b style="color:${corTime(f.at)}">${f.voce ? 'Você' : esc(f.a)}</b> abateu <b style="color:${corTime(f.vt)}">${esc(f.v)}</b>${f.arma ? ' · ' + esc(f.arma) : ''}</span>`;
   }).join('');
-  desenharMinimapa($('#minimapa', t), j.mapa, j.time | 0);
+  desenharMinimapa($('#minimapa', t), j.mapa, j.time | 0, j.modo === 1 ? j.br : null);
+}
+
+// HUD da Ressurgência: times vivos, quem está de pé, a zona (tempo e se está fechando) e o meu time
+function atualizarHudBR(t, j) {
+  const b = j.br;
+  $('#br-times', t).textContent = b.times | 0;
+  $('#br-vivos', t).textContent = b.jogadores | 0;
+  $('#relogio', t).textContent = `${Math.floor((b.tempo | 0) / 60)}:${String((b.tempo | 0) % 60).padStart(2, '0')}`;
+  const meta = $('#meta', t);
+  meta.textContent = b.fase > 6 || !b.tempo && !b.fechando ? 'zona final' : b.fechando ? `ZONA FECHANDO · fase ${b.fase}` : `a zona fecha em · fase ${b.fase}/6`;
+  meta.classList.toggle('alerta', !!b.fechando);
+  const sem = $('#placar', t);
+  sem.classList.toggle('sem-renascer', !b.renascer);
+  if (!b.renascer) meta.textContent += ' · sem renascer';
+  const mt = $('#meu-time', t);
+  const html = (b.time || []).map((m) => {
+    const estado = m.fora ? '<i class="fora">fora</i>' : !m.vivo ? `<i class="volta">volta em ${m.renasce}s</i>`
+      : `<span class="vida-mini"><b style="width:${Math.max(0, Math.min(100, m.vida))}%;background:${m.vida > 50 ? '#4ADE80' : m.vida > 25 ? '#FBBF24' : '#F87171'}"></b></span>`;
+    return `<div class="${m.voce ? 'voce' : ''} ${m.fora ? 'apagado' : ''}"><span class="n">${m.voce ? 'Você' : esc(m.nome)}</span>${estado}</div>`;
+  }).join('');
+  if (mt.dataset.html !== html) { mt.innerHTML = html; mt.dataset.html = html; }
+  const fz = $('#fora-zona', t);
+  fz.style.display = b.fora ? 'block' : 'none';
+  if (b.fora) fz.textContent = `FORA DA ZONA · volte para o círculo (${b.distancia | 0} m)`;
 }
 
 // ---------------- controles de toque: metade esquerda anda, metade direita olha ----------------
