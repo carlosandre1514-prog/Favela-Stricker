@@ -116,17 +116,41 @@ function cartaoConta() {
       <span class="xp">${n.precisa ? `${fmt(n.noNivel)} / ${fmt(n.precisa)} XP` : 'NÍVEL MÁXIMO'}</span></span>
   </button>`;
 }
-// Personagem da tela inicial: o da última partida (lado, roupa e arma com a skin equipada). Duas camadas do
-// mesmo tamanho (tools/recortar_lobby.py): o personagem na pose de segurar e a arma por cima.
+// Personagem da tela inicial: o da última partida (lado, roupa e arma com a skin equipada), que gira 360 graus
+// arrastando o dedo. Duas camadas do mesmo tamanho (tools/recortar_lobby.py), cada uma uma tira com os ângulos
+// lado a lado: o personagem na pose de segurar e a arma por cima.
+const LOBBY = { quadros: 24, largura: 344, altura: 480 };
+let anguloBoneco = 0;  // quadro mostrado (fica onde a pessoa deixou enquanto o app está aberto)
 function bonecoInicio() {
   const u = guardado.get('ultimo', null) || { time: guardado.get('lado', 0) };
   const time = u.time === 1 ? 1 : 0;
   const roupa = ROUPAS.find((r) => r.key === u.roupa && r.time === time) || conta.roupa(time);
   const arma = ARMAS.some((a) => a.key === u.arma && a.key !== 'tt33') ? u.arma : armaPadrao(time);
   const skin = conta.skinArma(arma);
-  const base = `lobby/a_${arma}.png`;
-  return `<div class="boneco-inicio" aria-hidden="true"><img src="lobby/p_${roupa.key}.png" alt="">
-    <img src="${skin ? `lobby/a_${arma}_${skin}.png` : base}" alt="" onerror="this.onerror=null;this.src='${base}'"></div>`;
+  const comSkin = SKINS_ARMA.some((s) => s.arma === arma && s.key === skin) ? `_${skin}` : '';
+  return `<div class="boneco-inicio" id="boneco" style="aspect-ratio:${LOBBY.largura} / ${LOBBY.altura};--n:${LOBBY.quadros}" role="img"
+      aria-label="${esc(roupa.nome)} com ${esc(armaPorKey(arma).nome)} · arraste para girar">
+    <div class="boneco-camada" style="background-image:url(lobby/p_${roupa.key}.webp)"></div>
+    <div class="boneco-camada" style="background-image:url(lobby/a_${arma}${comSkin}.webp),url(lobby/a_${arma}.webp)"></div>
+    <span class="dica-girar">⟲ arraste para girar</span></div>`;
+}
+// arrastar para os lados gira o personagem (um ângulo a cada 14 px); a dica some depois do primeiro giro
+function ligarGiroBoneco(raiz) {
+  const el = $('#boneco', raiz);
+  if (!el) return;
+  const camadas = $$('.boneco-camada', el);
+  const mostrar = (i) => {
+    anguloBoneco = ((i % LOBBY.quadros) + LOBBY.quadros) % LOBBY.quadros;
+    const x = LOBBY.quadros > 1 ? (anguloBoneco / (LOBBY.quadros - 1)) * 100 : 0;
+    for (const c of camadas) c.style.backgroundPosition = `${x}% 0`;
+  };
+  mostrar(anguloBoneco);
+  let x0 = null, a0 = 0;
+  el.addEventListener('pointerdown', (ev) => { x0 = ev.clientX; a0 = anguloBoneco; el.setPointerCapture(ev.pointerId); el.classList.add('girou'); });
+  el.addEventListener('pointermove', (ev) => { if (x0 !== null) mostrar(a0 + Math.round((ev.clientX - x0) / 14)); });
+  const soltar = () => { x0 = null; };
+  el.addEventListener('pointerup', soltar);
+  el.addEventListener('pointercancel', soltar);
 }
 let mapaAdiantado = false;
 function telaInicio() {
@@ -168,6 +192,7 @@ function telaInicio() {
     </button>
   </div>`), 'inicio');
   ligarAtalhos(t);
+  ligarGiroBoneco(t);
   $('#i-jogar', t).onclick = telaLado;
   $('#i-conta', t).onclick = () => telaConfig('conta');
 }

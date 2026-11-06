@@ -257,7 +257,7 @@ class JogoActivity : Activity() {
         val nome = caminho.trimStart('/').ifEmpty { "index.html" }
         val tipo = when (nome.substringAfterLast('.', "").lowercase()) {
             "html" -> "text/html"; "js" -> "application/javascript"; "css" -> "text/css"; "json" -> "application/json"
-            "png" -> "image/png"; "jpg", "jpeg" -> "image/jpeg"; "svg" -> "image/svg+xml"; "woff2" -> "font/woff2"
+            "png" -> "image/png"; "webp" -> "image/webp"; "jpg", "jpeg" -> "image/jpeg"; "svg" -> "image/svg+xml"; "woff2" -> "font/woff2"
             "wav" -> "audio/wav"; else -> "application/octet-stream"
         }
         val texto = tipo.startsWith("text/") || tipo.endsWith("javascript") || tipo.endsWith("json")
