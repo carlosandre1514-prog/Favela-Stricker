@@ -1,0 +1,977 @@
+// Favela Stricker — a partida: HUD, controles, sensibilidade, editor do HUD, loja de armas da partida,
+// partida ao vivo pelo servidor (WebSocket) e chat de voz do time.
+'use strict';
+
+// ---------------- peças do HUD que o jogador pode mover e redimensionar ----------------
+// x, y: centro da peça em fração da tela (0 a 1). Padrão = o modelo das telas.
+const PECAS = {
+  analogico: { nome: 'Analógico', x: 0.107, y: 0.805 },
+  tiro2: { nome: 'Atirar (esquerda)', x: 0.090, y: 0.555 },  // abaixo do minimapa
+  tiro: { nome: 'Atirar', x: 0.925, y: 0.777 },
+  mira: { nome: 'Mirar', x: 0.828, y: 0.803 },
+  pular: { nome: 'Pular', x: 0.949, y: 0.562 },
+  agachar: { nome: 'Agachar', x: 0.873, y: 0.603 },
+  granada: { nome: 'Granada', x: 0.797, y: 0.628 },
+  recarregar: { nome: 'Recarregar', x: 0.751, y: 0.795 },
+  correr: { nome: 'Correr', x: 0.215, y: 0.615 },
+  zoom: { nome: 'Zoom da luneta', x: 0.700, y: 0.640 },
+  armas: { nome: 'Armas', x: 0.444, y: 0.895 },
+  minimapa: { nome: 'Minimapa', x: 0.066, y: 0.308 },
+  falar: { nome: 'Falar (voz)', x: 0.949, y: 0.385, online: true },
+  ouvir: { nome: 'Som da voz', x: 0.949, y: 0.21, online: true },
+};
+function carregarLayout() {
+  const g = guardado.get('hud_layout', {});
+  const l = {};
+  for (const k in PECAS) l[k] = Object.assign({ x: PECAS[k].x, y: PECAS[k].y, s: 1, o: 1 }, g[k] || {});
+  return l;
+}
+let layout = carregarLayout();
+function salvarLayout() { guardado.set('hud_layout', layout); }
+function posicionarPeca(el, id) {
+  const p = layout[id];
+  el.style.left = (p.x * larguraPalco()).toFixed(1) + 'px';
+  el.style.top = (p.y * alturaPalco()).toFixed(1) + 'px';
+  el.style.transform = `translate(-50%, -50%) scale(${p.s})`;
+  el.style.opacity = p.o;
+}
+function posicionarTodas(raiz) { for (const el of $$('.peca[data-peca]', raiz)) posicionarPeca(el, el.dataset.peca); }
+
+function pecaHtml(id) {
+  switch (id) {
+    case 'analogico': return '<div class="peca so-toque" data-peca="analogico" id="analogico" style="width:108px;height:108px"><div class="bola"></div></div>';
+    case 'tiro2': return `<button class="peca so-toque redondo tiro esq" data-peca="tiro2" id="b-tiro2" style="width:56px;height:56px" aria-label="Atirar (lado esquerdo)">${ICONE.alvo(24)}</button>`;
+    case 'tiro': return `<button class="peca so-toque redondo tiro" data-peca="tiro" id="b-tiro" style="width:82px;height:82px" aria-label="Atirar">${ICONE.alvo(34)}</button>`;
+    case 'mira': return '<button class="peca so-toque redondo" data-peca="mira" id="b-mira" style="width:54px;height:54px;font-size:11px">MIRA</button>';
+    case 'pular': return `<button class="peca so-toque redondo" data-peca="pular" id="b-pular" style="width:54px;height:54px">${ICONE.cima}<span class="r">PULAR</span></button>`;
+    case 'agachar': return `<button class="peca so-toque redondo" data-peca="agachar" id="b-agachar" style="width:54px;height:54px">${ICONE.baixo}<span class="r">AGACHAR</span></button>`;
+    case 'granada': return `<button class="peca so-toque redondo" data-peca="granada" id="b-granada" style="width:54px;height:54px;border-color:rgba(252,211,77,.8)">${ICONE.granada}<span class="contador" id="n-granadas">2</span></button>`;
+    case 'correr': return `<button class="peca so-toque redondo" data-peca="correr" id="b-correr" style="width:54px;height:54px"><span style="font-size:20px;font-weight:900;line-height:1">»</span><span class="r">CORRER</span></button>`;
+    case 'zoom': return '<div class="peca so-toque" data-peca="zoom" id="zoom-luneta" style="flex-direction:column;align-items:center;gap:6px;visibility:hidden"><button class="redondo" id="b-zoom-mais" style="width:44px;height:44px;font-size:24px;font-weight:800">+</button><span id="zoom-nivel" style="font-size:11px;font-weight:800;text-shadow:0 1px 2px #000">1,7x</span><button class="redondo" id="b-zoom-menos" style="width:44px;height:44px;font-size:24px;font-weight:800">−</button></div>';
+    case 'recarregar': return `<button class="peca so-toque redondo" data-peca="recarregar" id="b-recarregar" style="width:48px;height:48px">${ICONE.recarregar}</button>`;
+    case 'armas': return `<div class="peca" data-peca="armas" id="armas"><button class="slot ativa" data-slot="0"><img alt=""><span>–</span></button><button class="slot" data-slot="1"><img alt=""><span>–</span></button><button class="troca" id="b-trocar" aria-label="Troca rápida de arma">${ICONE.trocar}</button></div>`;
+    case 'minimapa': return '<canvas class="peca" data-peca="minimapa" id="minimapa" width="168" height="168" style="width:84px;height:84px"></canvas>';
+    case 'falar': return `<button class="peca redondo" data-peca="falar" id="b-falar" style="width:48px;height:48px" aria-label="Segure para falar">${ICONE.microfone}</button>`;
+    case 'ouvir': return `<button class="peca redondo" data-peca="ouvir" id="b-ouvir" style="width:40px;height:40px" aria-label="Som da voz">${ICONE.altofalante}</button>`;
+  }
+  return '';
+}
+
+// computador: o mouse some e vira a câmera (o navegador pode recusar sem um clique; tenta de novo no próximo)
+function travarMouse() {
+  try { const r = document.getElementById('tela').requestPointerLock(); if (r && r.catch) r.catch(() => {}); } catch (_) {}
+}
+
+// prende o dedo no elemento (alguns navegadores recusam quando o toque já acabou)
+function capturar(el, id) { try { el.setPointerCapture(id); } catch (_) {} }
+
+// ---------------- sensibilidade ----------------
+let ultimoHud = {};
+function fatorOlhar() {
+  const mirando = ultimoHud.mirando;
+  return config.sens * (mirando ? (ultimoHud.luneta ? config.sensLuneta : config.sensMira) : 1);
+}
+function olharTela(dx, dy) {  // dx, dy em pixels de tela (CSS)
+  const k = 2.2 * fatorOlhar();
+  motor.olhar(dx * k, (config.inverterY ? -dy : dy) * k);
+}
+
+// ---------------- partida ----------------
+let partida = null;  // {time, sala, hud, fim, loja}
+let lacoHud = null;
+
+// Na primeira partida o mapa carrega (a tela inicial não carrega nada de 3D, para ficar leve)
+let iniciandoPartida = false;
+// Tela de carregamento da partida: o modo, o mapa, uma barra, dicas que trocam e o seu personagem com a arma.
+// Fica até o seu boneco estar no chão com a arma na mão (o HUD tira ela: id "entrando").
+const DICAS = [
+  '<b>Ressurgência:</b> caiu? Você volta em 10 s perto do seu time, enquanto alguém do time estiver de pé.',
+  '<b>Zona:</b> o círculo tracejado no minimapa é a próxima zona. Fora dela a vida vai embora.',
+  '<b>Janela:</b> perto de uma janela, aperte pular para atravessar, de frente ou de lado.',
+  '<b>Porta:</b> um tiro abre a porta para o lado da bala.',
+  '<b>Vida:</b> 5 s sem levar tiro nem atirar e a vida volta sozinha.',
+  '<b>Munição:</b> quem você abate derruba uma caixa de munição. Passe por cima para pegar.',
+  '<b>Luneta:</b> a M4 Colt tem luneta. Mire para dar zoom.',
+  '<b>Granada:</b> jogue para tirar alguém de trás da parede.',
+  '<b>Skins:</b> a skin da sua arma aparece na mão, nas costas e no abate.',
+];
+function telaCarga(modo, time, roupa, arma) {
+  const br = modo === 1;
+  const skin = conta.skinArma(arma);
+  const comSkin = SKINS_ARMA.some((s) => s.arma === arma && s.key === skin) ? `_${skin}` : '';
+  const el = html(`<div class="carga fixo ${br ? 'modo-br' : ''}" id="entrando">
+    <div class="logo-fs"><svg class="coroa" viewBox="0 0 40 26" aria-hidden="true"><path d="M3 23 L6 6 L14 15 L20 3 L26 15 L34 6 L37 23 Z" fill="none" stroke="#FBBF24" stroke-width="3" stroke-linejoin="round"/></svg>
+      <span class="bebas favela">FAVELA</span><span class="bebas strike">STRIKE</span></div>
+    ${roupa && arma && arma !== 'tt33' ? `<div class="carga-boneco" aria-hidden="true"><div style="background-image:url(lobby/p_${roupa.key}.webp)"></div>
+      <div style="background-image:url(lobby/a_${arma}${comSkin}.webp),url(lobby/a_${arma}.webp)"></div></div>` : ''}
+    <span class="carga-modo">${br ? 'BATTLE ROYALE · 10 TIMES DE 4' : 'POLÍCIA x BANDIDOS · 5 CONTRA 5'}</span>
+    <span class="carga-titulo">${br ? 'RESSURGÊNCIA' : time ? 'BANDIDOS' : 'POLÍCIA'}</span>
+    <span class="carga-mapa">MAPA · FAVELA</span>
+    <div class="carga-barra"><i></i></div>
+    <span class="carga-status">Preparando…</span>
+    <span class="carga-dica"></span>
+  </div>`);
+  palco.appendChild(el);
+  const dica = $('.carga-dica', el), barra = $('.carga-barra i', el);
+  const ordem = br ? DICAS : DICAS.filter((d) => !/Ressurgência|Zona/.test(d));
+  let i = Math.floor(Math.random() * ordem.length), p = 4;
+  dica.innerHTML = ordem[i];
+  const timer = setInterval(() => {
+    if (!el.isConnected) { clearInterval(timer); return; }
+    p += (92 - p) * 0.05;  // sobe sozinha até perto do fim; completa quando o boneco entra
+    barra.style.width = p.toFixed(1) + '%';
+  }, 100);
+  const timerDica = setInterval(() => {
+    if (!el.isConnected) { clearInterval(timerDica); return; }
+    i = (i + 1) % ordem.length;
+    dica.innerHTML = ordem[i];
+  }, 3800);
+  return { el, status: (t) => { $('.carga-status', el).textContent = t; } };
+}
+
+async function iniciarPartida(time, roupa, sala, armaPrincipal, modo = 0) {
+  if (iniciandoPartida || partida) return;
+  iniciandoPartida = true;
+  const carga = telaCarga(modo === 1 ? 1 : 0, time, roupa, armaPrincipal || armaInicial(time));
+  if (!motor.mapaPronto()) {
+    carga.status('Carregando o mapa da favela… (só na primeira partida)');
+    await dorme(80);
+    motor.prepararPartida();
+    while (!motor.mapaPronto()) await dorme(150);
+  }
+  iniciandoPartida = false;
+  carga.status(modo === 1 ? 'Caindo na favela com o seu time…' : 'Entrando na partida…');
+  setTimeout(() => carga.el.remove(), 12000);  // nunca fica presa
+  motor.girarMenu(false);
+  ctxAudio();
+  const br = modo === 1;  // Ressurgência: online (sala da Ressurgência)
+  partida = { time, sala, fim: false, agachado: false, mirando: false, danoAntes: false, modo: br ? 1 : 0 };
+  ultimoHud = {};
+  montarHud(!!sala, br);
+  const rosterBR = br && sala ? sala.rosterBRpronto : null;
+  motor.redeSala(sala ? sala.host : false, sala ? fb.uid : '', sala ? (rosterBR ? JSON.stringify(rosterBR) : sala.roster()) : '');
+  for (const a of ARMAS) motor.skinArma(a.key, conta.skinArma(a.key));
+  const arma = armaPrincipal || armaInicial(time);
+  if (motor.modo) motor.modo(br ? 1 : 0);
+  motor.escolhas(time, roupa.i, arma, 'tt33');
+  // a tela inicial mostra o personagem desta partida (lado, roupa e arma), mesmo depois de fechar o jogo
+  guardado.set('ultimo', { time, roupa: roupa.key, arma });
+  motor.primeiraPessoa(true);
+  motor.play(true);
+  // polícia olha para o morro; bandidos, para a rua de baixo
+  motor.camera(0, 0, 0, time === 0 ? 0 : 3.14159, 0.05, 3);
+  if (sala) ligarAoVivo(sala, rosterBR ? rosterBR.meuTime : time, br);  // voz: só o meu time (na Ressurgência, o time de 4)
+  if (!TOQUE) travarMouse();
+  clearInterval(lacoHud);
+  lacoHud = setInterval(() => {
+    if (!partida) return;
+    atualizarMedidor();
+    const j = motor.hud();
+    if (!j.ativo) return;
+    if ((j.armas || []).length) { const en = document.getElementById('entrando'); if (en) en.remove(); }
+    ultimoHud = j;
+    // a tela inicial mostra a arma usada por último (a de fogo: a pistola não entra), com a skin dela
+    const naMao = (j.armas || [])[j.slot];
+    if (naMao && naMao.arma !== 'tt33' && naMao.arma !== partida.armaUsada) {
+      partida.armaUsada = naMao.arma;
+      guardado.set('ultimo', { ...guardado.get('ultimo', {}), arma: naMao.arma });
+    }
+    atualizarHud(j);
+    if (partida.loja) atualizarLojaPartida();
+    if (!partida.fim && j.estado) {
+      partida.fim = true;
+      motor.atirar(false);
+      setTimeout(() => fimDePartida(j), 2500);
+    }
+  }, 100);
+}
+
+function pararPartida() {
+  if (!partida) return;
+  const en = document.getElementById('entrando');
+  if (en) en.remove();
+  clearInterval(lacoHud);
+  lacoHud = null;
+  motor.atirar(false);
+  desligarAoVivo();
+  motor.andar(0, 0, false);
+  motor.mirar(false);
+  motor.agachar(false);
+  motor.lojaFechar();
+  motor.play(false);
+  motor.primeiraPessoa(false);
+  motor.redeSala(false, '', '');
+  motor.visaoGeral();
+  motor.girarMenu(true);
+  partida = null;
+  if (document.pointerLockElement) document.exitPointerLock();
+}
+
+// ---------------- HUD ----------------
+function montarHud(online, br = false) {
+  const ids = Object.keys(PECAS).filter((k) => online || !PECAS[k].online);
+  // Ressurgência: no lugar do placar Polícia x Bandidos, times vivos, a zona e os jogadores de pé
+  const placar = br
+    ? `<div id="placar" class="placar-br"><div class="faixa"><div class="pol"><span class="rot">TIMES</span><span class="num" id="br-times">10</span></div>
+      <div class="relogio" id="relogio">1:00</div><div class="ban"><span class="num" id="br-vivos">40</span><span class="rot">DE PÉ</span></div></div>
+      <span class="meta" id="meta">a zona fecha em</span></div>
+      <div id="meu-time"></div><div id="fora-zona">FORA DA ZONA · volte para o círculo</div>`
+    : `<div id="placar"><div class="faixa"><div class="pol"><span class="rot">POLÍCIA</span><span class="num" id="pt-pol">0</span></div>
+      <div class="relogio" id="relogio">10:00</div><div class="ban"><span class="num" id="pt-ban">0</span><span class="rot">BANDIDOS</span></div></div>
+      <span class="meta" id="meta">até 50 abates</span></div>`;
+  const t = mostrar(html(`<div id="hud">
+    <div id="zona-andar" class="toque so-toque"></div><div id="zona-olhar" class="toque so-toque"></div>
+    <canvas id="luneta"></canvas><div id="dano"></div>
+    <canvas id="mira" width="160" height="160" style="width:80px;height:80px"></canvas>
+    <div id="vida" class="caixa">${ICONE.coracao}<div class="trilho"><div class="barra"></div></div><b id="hp">100</b></div>
+    <div id="info"><span id="dinheiro">$ 0</span><span id="kd">0 abates · 0 mortes</span></div>
+    ${placar}
+    <div id="rede" style="display:${online ? '' : 'none'}"></div>
+    <div id="medidor" aria-hidden="true"></div>
+    <div id="abates"></div>
+    <button id="pausar" aria-label="Pausar">${ICONE.pausa}</button>
+    <div id="centro"></div>
+    <button id="botao-loja">${ICONE.sacola}<span>Loja de armas</span></button>
+    ${ids.map(pecaHtml).join('')}
+    <div id="teclas" class="so-teclado">WASD andar · Shift correr · mouse olhar · clique atirar · botão direito mirar · Espaço pular · C agachar · R recarregar · Q trocar arma · G granada · E loja${online ? ' · V falar (segure)' : ''} · Esc pausa</div>
+  </div>`), 'hud');
+  partida.hud = t;
+  posicionarTodas(t);
+  $('#pausar', t).onclick = pausar;
+  $('#botao-loja', t).onclick = () => {
+    const rot = ultimoHud.interagir || '';
+    if (/Loja de armas/.test(rot)) abrirLojaPartida();
+    else motor.interagir();
+  };
+  ligarControlesToque(t);
+  // trocar arma no toque (pointerdown): funciona com outros dedos na tela (andando, mirando, atirando);
+  // o "click" só vinha com um dedo só
+  const toque = (el, f) => { if (el) el.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); f(); }); };
+  for (const s of $$('.slot', t)) toque(s, () => { if (Number(s.dataset.slot) !== ultimoHud.slot) motor.trocar(); });
+  toque($('#b-trocar', t), () => motor.trocar());
+  if (online) {
+    const fala = $('#b-falar', t);
+    const on = (e) => { e.preventDefault(); falar(true); fala.classList.add('ligado'); };
+    const off = (e) => { e.preventDefault(); falar(false); fala.classList.remove('ligado'); };
+    fala.addEventListener('pointerdown', on);
+    for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) fala.addEventListener(ev, off);
+    $('#b-ouvir', t).onclick = () => {
+      if (!voz) return;
+      voz.ouvindo = !voz.ouvindo;
+      $('#b-ouvir', t).innerHTML = voz.ouvindo ? ICONE.altofalante : ICONE.mudo;
+      aviso(voz.ouvindo ? 'Voz do time ligada' : 'Voz do time desligada');
+    };
+  }
+  desenharLuneta($('#luneta', t));
+  desenharMira($('#mira', t), false, false, false);
+}
+aoRedimensionar.push(() => {
+  if (partida && partida.hud) { posicionarTodas(partida.hud); desenharLuneta($('#luneta', partida.hud)); }
+  const ed = $('#editor-hud');
+  if (ed) posicionarTodas(ed);
+});
+
+function desenharMira(cv, mirando, acerto, cabeca) {
+  const c = cv.getContext('2d'), w = cv.width, cx = w / 2, cy = w / 2, k = w / 80;
+  c.clearRect(0, 0, w, w);
+  c.lineCap = 'round';
+  if (mirando) {  // mirando: a bolinha vermelha é onde a bala vai
+    c.fillStyle = 'rgba(0,0,0,.75)'; c.beginPath(); c.arc(cx, cy, 2.2 * k, 0, 7); c.fill();
+    c.fillStyle = '#FF2A1F'; c.beginPath(); c.arc(cx, cy, 1.5 * k, 0, 7); c.fill();
+  } else {  // cruz pequena (com contorno escuro para ver em fundo claro)
+    const g = 2.6 * k, l = 4.6 * k;
+    for (const [cor, lw] of [['rgba(0,0,0,.5)', 2.6 * k], ['#fff', 1.3 * k]]) {
+      c.strokeStyle = cor; c.lineWidth = lw; c.beginPath();
+      c.moveTo(cx, cy - g - l); c.lineTo(cx, cy - g); c.moveTo(cx, cy + g); c.lineTo(cx, cy + g + l);
+      c.moveTo(cx - g - l, cy); c.lineTo(cx - g, cy); c.moveTo(cx + g, cy); c.lineTo(cx + g + l, cy); c.stroke();
+    }
+    c.fillStyle = 'rgba(0,0,0,.5)'; c.beginPath(); c.arc(cx, cy, 1.4 * k, 0, 7); c.fill();
+    c.fillStyle = '#fff'; c.beginPath(); c.arc(cx, cy, 0.8 * k, 0, 7); c.fill();
+  }
+  if (acerto) {  // marca de acerto (cabeça: maior e vermelha)
+    c.strokeStyle = cabeca ? '#FF3B30' : '#fff'; c.lineWidth = 2 * k;
+    const a = (cabeca ? 9 : 7) * k, b = 3.5 * k;
+    c.beginPath();
+    c.moveTo(cx - a, cy - a); c.lineTo(cx - b, cy - b); c.moveTo(cx + a, cy - a); c.lineTo(cx + b, cy - b);
+    c.moveTo(cx - a, cy + a); c.lineTo(cx - b, cy + b); c.moveTo(cx + a, cy + a); c.lineTo(cx + b, cy + b); c.stroke();
+  }
+}
+
+// Luneta da M4 Colt: tela preta com o círculo da lente, a cruz fina e o ponto vermelho
+function desenharLuneta(cv) {
+  if (!cv) return;
+  const w = cv.width = Math.round(larguraPalco() * 2), h = cv.height = Math.round(alturaPalco() * 2), c = cv.getContext('2d');
+  const cx = w / 2, cy = h / 2, r = Math.min(w, h) * 0.47;
+  c.fillStyle = '#000'; c.beginPath(); c.rect(0, 0, w, h); c.arc(cx, cy, r, 0, Math.PI * 2, true); c.fill();
+  const grad = c.createRadialGradient(cx, cy, r * 0.86, cx, cy, r);
+  grad.addColorStop(0, 'rgba(0,0,0,0)'); grad.addColorStop(1, 'rgba(0,0,0,.8)');
+  c.fillStyle = grad; c.beginPath(); c.arc(cx, cy, r, 0, 7); c.fill();
+  c.strokeStyle = 'rgba(16,16,16,.95)';
+  c.lineWidth = 6; c.beginPath(); c.moveTo(cx - r, cy); c.lineTo(cx - r * 0.45, cy); c.moveTo(cx + r * 0.45, cy); c.lineTo(cx + r, cy); c.moveTo(cx, cy + r * 0.45); c.lineTo(cx, cy + r); c.stroke();
+  const gap = r * 0.06;
+  c.lineWidth = 2.4; c.beginPath(); c.moveTo(cx - r * 0.45, cy); c.lineTo(cx - gap, cy); c.moveTo(cx + gap, cy); c.lineTo(cx + r * 0.45, cy);
+  c.moveTo(cx, cy + gap); c.lineTo(cx, cy + r * 0.45); c.moveTo(cx, cy - r * 0.3); c.lineTo(cx, cy - gap); c.stroke();
+  c.fillStyle = 'rgba(255,42,31,.35)'; c.beginPath(); c.arc(cx, cy, 8, 0, 7); c.fill();
+  c.fillStyle = '#FF2A1F'; c.beginPath(); c.arc(cx, cy, 4, 0, 7); c.fill();
+}
+
+function desenharMinimapa(cv, pontos, meuTime, br) {
+  if (!cv) return;
+  const c = cv.getContext('2d'), w = cv.width, cx = w / 2, cy = w / 2, r = w / 2;
+  c.clearRect(0, 0, w, w);
+  c.fillStyle = 'rgba(11,15,23,.72)'; c.beginPath(); c.arc(cx, cy, r - 2, 0, 7); c.fill();
+  c.strokeStyle = 'rgba(255,255,255,.25)'; c.lineWidth = 4; c.beginPath(); c.arc(cx, cy, r - 2, 0, 7); c.stroke();
+  const k = (r - 12) / 45;
+  if (br && br.zona) {  // Ressurgência: fora da zona em vermelho; o círculo atual (branco) e o próximo (tracejado)
+    c.save();
+    c.beginPath(); c.arc(cx, cy, r - 4, 0, 7); c.clip();
+    const zx = cx + br.zona.c[0] * k, zy = cy - br.zona.c[1] * k;
+    c.fillStyle = 'rgba(220,38,38,.28)';
+    c.beginPath(); c.rect(0, 0, w, w); c.arc(zx, zy, Math.max(0, br.zona.r * k), 0, 7, true); c.fill();
+    c.strokeStyle = '#F9FAFB'; c.lineWidth = 3; c.beginPath(); c.arc(zx, zy, Math.max(0, br.zona.r * k), 0, 7); c.stroke();
+    if (br.proxima && br.proxima.r > 0) {
+      c.setLineDash([8, 7]); c.strokeStyle = 'rgba(255,255,255,.75)'; c.lineWidth = 2;
+      c.beginPath(); c.arc(cx + br.proxima.c[0] * k, cy - br.proxima.c[1] * k, br.proxima.r * k, 0, 7); c.stroke();
+      c.setLineDash([]);
+    }
+    c.restore();
+  }
+  for (const p of pontos || []) {  // companheiros na cor do time; inimigo (que atirou agora há pouco) em vermelho
+    c.fillStyle = p[2] === 1 ? '#F87171' : br ? '#4ADE80' : meuTime === 0 ? '#60A5FA' : '#FBBF24';
+    c.beginPath(); c.arc(cx + p[0] * k, cy - p[1] * k, 6, 0, 7); c.fill();
+  }
+  c.fillStyle = '#fff'; c.beginPath(); c.moveTo(cx, cy - 11); c.lineTo(cx - 7, cy + 7); c.lineTo(cx + 7, cy + 7); c.fill();
+}
+
+// cor do time no quadro de abates; na Ressurgência: o meu time em verde, os outros em vermelho
+const corTime = (t) => (partida && partida.modo === 1 ? (t === (ultimoHud.time | 0) ? '#86EFAC' : '#FCA5A5') : t === 0 ? '#93C5FD' : '#FCD34D');
+
+// Skins com abate próprio: frase e visual próprios no quadro de abates (chave "arma:skin")
+const ABATES_SKIN = {
+  'ak47:dragao_azul': { classe: 'dragao', frase: 'devorou', arma: 'AK-47 Dragão Azul' },
+  'm4colt:carmesim': { classe: 'carmesim', frase: 'destronou', arma: 'M4 Colt Vermelho Carmesim' },
+};
+function atualizarHud(j) {
+  const t = partida && partida.hud;
+  if (!t || !t.isConnected) return;
+  const hp = j.vida | 0, max = Math.max(1, j.vidaMax | 0);
+  const barra = $('#vida .barra', t);
+  barra.style.width = (100 * hp / max) + '%';
+  barra.style.background = hp > 50 ? '#4ADE80' : hp > 25 ? '#FBBF24' : '#F87171';
+  $('#hp', t).textContent = hp;
+  $('#dinheiro', t).textContent = j.modo === 1 ? (j.br ? `TIME ${j.br.meuTime}` : '') : '$ ' + fmt(j.dinheiro | 0);
+  $('#kd', t).textContent = `${j.abates | 0} abate${(j.abates | 0) === 1 ? '' : 's'} · ${j.mortes | 0} morte${(j.mortes | 0) === 1 ? '' : 's'}`;
+  if (j.modo === 1 && j.br) atualizarHudBR(t, j);
+  else {
+    const pl = j.placar || [0, 0];
+    $('#pt-pol', t).textContent = pl[0];
+    $('#pt-ban', t).textContent = pl[1];
+    $('#relogio', t).textContent = j.tempo < 0 ? '--:--' : `${Math.floor(j.tempo / 60)}:${String(j.tempo % 60).padStart(2, '0')}`;
+    $('#meta', t).textContent = `até ${j.meta || 25} abates`;
+  }
+  const ng = $('#n-granadas', t);
+  if (ng) ng.textContent = j.granadas | 0;
+  // armas: imagem com a skin escolhida, balas no pente / reserva
+  const armas = j.armas || [];
+  $$('.slot', t).forEach((s, i) => {
+    const a = armas[i];
+    s.style.display = a ? '' : 'none';
+    if (!a) return;
+    s.classList.toggle('ativa', i === j.slot);
+    const sk = conta.skinArma(a.arma);
+    const src = `armas/${a.arma}${sk ? '_' + sk : ''}.png`;
+    const img = s.querySelector('img');
+    if (img.getAttribute('src') !== src) img.src = src;
+    const recarregando = j.recarregando && i === j.slot;
+    const sp = s.querySelector('span');
+    sp.textContent = recarregando ? 'recarregando…' : `${a.balas} / ${a.reserva < 0 ? '∞' : a.reserva}`;
+    sp.style.color = a.balas === 0 && !recarregando ? '#F87171' : '#F3F4F6';
+  });
+  const bt = $('#b-trocar', t);
+  if (bt) bt.style.display = armas.length > 1 ? '' : 'none';
+  // mira e luneta
+  const luneta = j.mirando && j.luneta;
+  $('#luneta', t).style.display = luneta ? 'block' : 'none';
+  const zl = $('#zoom-luneta', t);  // botões + e - da luneta: só mirando com ela
+  if (zl) {
+    zl.style.visibility = luneta ? 'visible' : 'hidden';  // (display não serve: .so-toque força display com !important)
+    $('#zoom-nivel', t).textContent = ['1,7x', '2,4x', '3,6x'][j.zoom | 0] || '1,7x';
+  }
+  if (j.morto && partida.correAuto) pararCorrida(t);
+  const mira = $('#mira', t);
+  mira.style.visibility = luneta ? 'hidden' : 'visible';
+  desenharMira(mira, j.mirando, j.acerto, j.cabeca);
+  const bm = $('#b-mira', t);
+  if (bm) bm.classList.toggle('ligado', !!j.mirando);
+  // dano: tela vermelha nas bordas (e vibra, se ligado)
+  $('#dano', t).style.display = j.dano ? 'block' : 'none';
+  if (j.dano && !partida.danoAntes && config.vibrar) motor.vibrar(35);
+  partida.danoAntes = !!j.dano;
+  const centro = $('#centro', t);
+  const msg = j.morto
+    ? (j.renasce < 0 ? `Você está fora<br><span style="font-size:13px;font-weight:600">${j.br && j.br.time && j.br.time.some((m) => m.vivo) ? 'seu time continua: torça por eles' : 'seu time caiu'}</span>`
+      : `Você foi abatido<br><span style="font-size:13px;font-weight:600">${j.modo === 1 ? `Volta em ${j.renasce} s perto do seu time` : `Renasce em ${j.renasce} s`}</span>`)
+    : j.estado ? esc(j.msg) : '';
+  centro.innerHTML = msg;
+  centro.style.display = msg ? 'block' : 'none';
+  // botão do meio: loja de armas na base (ou outra interação perto)
+  const rot = (j.interagir || '').replace(/^[^\p{L}🔒]+/u, '');
+  const bl = $('#botao-loja', t);
+  bl.style.display = rot && !j.morto && !partida.loja ? 'flex' : 'none';
+  bl.classList.toggle('outro', !/Loja de armas/.test(rot));
+  bl.querySelector('span').textContent = rot;
+  // abates (últimos 4)
+  const feed = (j.abatidos || []).slice(-4);
+  $('#abates', t).innerHTML = feed.map((f) => {
+    if (!f.a) return / eliminado$/.test(f.v) ? `<span><b style="color:${corTime(f.vt)}">${esc(f.v)}</b></span>` : `<span><b style="color:${corTime(f.vt)}">${esc(f.v)}</b> caiu</span>`;
+    const s = ABATES_SKIN[f.skin];
+    if (s) return `<span class="abate-${s.classe}"><b style="color:${corTime(f.at)}">${f.voce ? 'Você' : esc(f.a)}</b> <i>${s.frase}</i> <b style="color:${corTime(f.vt)}">${esc(f.v)}</b> · <em>${s.arma}</em></span>`;
+    return `<span><b style="color:${corTime(f.at)}">${f.voce ? 'Você' : esc(f.a)}</b> abateu <b style="color:${corTime(f.vt)}">${esc(f.v)}</b>${f.arma ? ' · ' + esc(f.arma) : ''}</span>`;
+  }).join('');
+  desenharMinimapa($('#minimapa', t), j.mapa, j.time | 0, j.modo === 1 ? j.br : null);
+}
+
+// HUD da Ressurgência: times vivos, quem está de pé, a zona (tempo e se está fechando) e o meu time
+function atualizarHudBR(t, j) {
+  const b = j.br;
+  $('#br-times', t).textContent = b.times | 0;
+  $('#br-vivos', t).textContent = b.jogadores | 0;
+  $('#relogio', t).textContent = `${Math.floor((b.tempo | 0) / 60)}:${String((b.tempo | 0) % 60).padStart(2, '0')}`;
+  const meta = $('#meta', t);
+  meta.textContent = b.fase > 6 || !b.tempo && !b.fechando ? 'zona final' : b.fechando ? `ZONA FECHANDO · fase ${b.fase}` : `a zona fecha em · fase ${b.fase}/6`;
+  meta.classList.toggle('alerta', !!b.fechando);
+  const sem = $('#placar', t);
+  sem.classList.toggle('sem-renascer', !b.renascer);
+  if (!b.renascer) meta.textContent += ' · sem renascer';
+  const mt = $('#meu-time', t);
+  const html = (b.time || []).map((m) => {
+    const estado = m.fora ? '<i class="fora">fora</i>' : !m.vivo ? `<i class="volta">volta em ${m.renasce}s</i>`
+      : `<span class="vida-mini"><b style="width:${Math.max(0, Math.min(100, m.vida))}%;background:${m.vida > 50 ? '#4ADE80' : m.vida > 25 ? '#FBBF24' : '#F87171'}"></b></span>`;
+    return `<div class="${m.voce ? 'voce' : ''} ${m.fora ? 'apagado' : ''}"><span class="n">${m.voce ? 'Você' : esc(m.nome)}</span>${estado}</div>`;
+  }).join('');
+  if (mt.dataset.html !== html) { mt.innerHTML = html; mt.dataset.html = html; }
+  const fz = $('#fora-zona', t);
+  fz.style.display = b.fora ? 'block' : 'none';
+  if (b.fora) fz.textContent = `FORA DA ZONA · volte para o círculo (${b.distancia | 0} m)`;
+}
+
+// ---------------- controles de toque: metade esquerda anda, metade direita olha ----------------
+function ligarControlesToque(t) {
+  const analog = $('#analogico', t), bola = analog && analog.querySelector('.bola');
+  const zonaA = $('#zona-andar', t), zonaO = $('#zona-olhar', t);
+  let dedoAndar = null, ox = 0, oy = 0;
+  const raio = () => 54 * layout.analogico.s;
+  const pontoPalco = (e) => [e.clientX / escala, e.clientY / escala];
+  const soltarAnalogico = () => {
+    dedoAndar = null;
+    motor.andar(0, 0, false);
+    if (bola) bola.style.transform = '';
+    if (analog) posicionarPeca(analog, 'analogico');
+  };
+  const inicioAndar = (e) => {
+    if (dedoAndar !== null) return;
+    if (partida.correAuto) pararCorrida(t);  // mexeu no analógico: para de correr sozinho
+    ctxAudio();
+    dedoAndar = e.pointerId;
+    [ox, oy] = pontoPalco(e);
+    // analógico flutuante: aparece onde o dedo encostou e fica parado ali enquanto o dedo não soltar
+    analog.style.left = ox + 'px';
+    analog.style.top = oy + 'px';
+    capturar(e.currentTarget, e.pointerId);
+    e.preventDefault();
+  };
+  const moverAndar = (e) => {
+    if (e.pointerId !== dedoAndar) return;
+    const [px, py] = pontoPalco(e);
+    const R = raio();
+    let dx = (px - ox) / R, dy = (py - oy) / R;
+    const len = Math.hypot(dx, dy);
+    // a base fica parada onde o dedo encostou (até soltar); o dedo pode ir para qualquer lugar da tela e a
+    // bolinha fica na borda, apontando para o lado do dedo
+    if (len > 1) { dx /= len; dy /= len; }
+    bola.style.transform = `translate(${dx * R * 0.55 / layout.analogico.s}px, ${dy * R * 0.55 / layout.analogico.s}px)`;
+    partida.dedoXY = [dx, dy];
+    if (partida.correAuto) {  // apertou correr com o dedo no analógico: mexendo o dedo, volta ao normal
+      if (Math.hypot(dx - partida.correAuto.dx, dy - partida.correAuto.dy) < 0.25) return;
+      pararCorrida(t);
+    }
+    motor.andar(dx, -dy, Math.hypot(dx, dy) > 0.93);  // empurrando até a borda (para qualquer lado): corre
+  };
+  const fimAndar = (e) => {
+    if (e.pointerId !== dedoAndar) return;
+    if (partida.correAuto) {  // correndo sozinho: soltar o dedo não para
+      dedoAndar = null;
+      if (bola) bola.style.transform = '';
+      if (analog) posicionarPeca(analog, 'analogico');
+      return;
+    }
+    soltarAnalogico();
+  };
+  for (const alvo of [zonaA, analog]) {
+    if (!alvo) continue;
+    alvo.addEventListener('pointerdown', inicioAndar);
+    alvo.addEventListener('pointermove', moverAndar);
+    alvo.addEventListener('pointerup', fimAndar);
+    alvo.addEventListener('pointercancel', fimAndar);
+  }
+  // olhar: arrastar na metade direita (vários dedos ao mesmo tempo)
+  const ult = new Map();
+  zonaO.addEventListener('pointerdown', (e) => { ctxAudio(); ult.set(e.pointerId, [e.clientX, e.clientY]); capturar(zonaO, e.pointerId); });
+  zonaO.addEventListener('pointermove', (e) => {
+    const p = ult.get(e.pointerId);
+    if (!p) return;
+    olharTela(e.clientX - p[0], e.clientY - p[1]);
+    ult.set(e.pointerId, [e.clientX, e.clientY]);
+  });
+  const soltaO = (e) => ult.delete(e.pointerId);
+  zonaO.addEventListener('pointerup', soltaO);
+  zonaO.addEventListener('pointercancel', soltaO);
+  // atirar: segurar atira; arrastar o mesmo dedo também mira
+  for (const id of ['#b-tiro', '#b-tiro2']) {
+    const b = $(id, t);
+    if (!b) continue;
+    let px = 0, py = 0, dedo = null;
+    b.addEventListener('pointerdown', (e) => {
+      ctxAudio(); dedo = e.pointerId; px = e.clientX; py = e.clientY;
+      capturar(b, e.pointerId); b.style.filter = 'brightness(1.3)'; motor.atirar(true);
+    });
+    b.addEventListener('pointermove', (e) => {
+      if (e.pointerId !== dedo) return;
+      olharTela(e.clientX - px, e.clientY - py); px = e.clientX; py = e.clientY;
+    });
+    const solta = (e) => { if (e.pointerId !== dedo) return; dedo = null; b.style.filter = ''; motor.atirar(false); };
+    b.addEventListener('pointerup', solta);
+    b.addEventListener('pointercancel', solta);
+  }
+  const botao = (id, f) => { const b = $(id, t); if (b) b.addEventListener('pointerdown', (e) => { e.preventDefault(); f(b); }); };
+  botao('#b-mira', () => { partida.mirando = !ultimoHud.mirando; motor.mirar(partida.mirando); });
+  botao('#b-pular', () => motor.pular());
+  botao('#b-agachar', (b) => { partida.agachado = !partida.agachado; motor.agachar(partida.agachado); b.classList.toggle('ligado', partida.agachado); });
+  botao('#b-granada', () => { if (!motor.granada() && (ultimoHud.granadas | 0) === 0) aviso('Sem granadas: compre na loja da base ($ 300)'); });
+  botao('#b-recarregar', () => motor.recarregar());
+  // correr: um toque e o boneco corre para a frente sozinho (para onde se olha); mexer no analógico ou tocar de novo, para
+  botao('#b-correr', (b) => {
+    if (partida.correAuto) { pararCorrida(t); return; }
+    const [dx, dy] = dedoAndar !== null && partida.dedoXY ? partida.dedoXY : [0, 0];
+    partida.correAuto = { dx, dy };
+    b.classList.add('ligado');
+    motor.andar(0, 1, true);
+  });
+  botao('#b-zoom-mais', () => motor.zoom(1));
+  botao('#b-zoom-menos', () => motor.zoom(-1));
+}
+
+function pararCorrida(t) {
+  if (!partida || !partida.correAuto) return;
+  partida.correAuto = null;
+  const b = t && $('#b-correr', t);
+  if (b) b.classList.remove('ligado');
+  motor.andar(0, 0, false);
+}
+
+// ---------------- teclado e mouse (computador) ----------------
+const teclas = new Set();
+function enviarAndar() {
+  if (!partida) return;
+  const x = (teclas.has('KeyD') ? 1 : 0) - (teclas.has('KeyA') ? 1 : 0);
+  const y = (teclas.has('KeyW') ? 1 : 0) - (teclas.has('KeyS') ? 1 : 0);
+  const n = Math.hypot(x, y) || 1;
+  motor.andar(x / n, y / n, teclas.has('ShiftLeft') || teclas.has('ShiftRight'));  // Shift corre para qualquer lado
+}
+addEventListener('keydown', (e) => {
+  if (!partida || e.target.tagName === 'INPUT') return;
+  if (e.code === 'Escape') { if (partida.loja) fecharLojaPartida(); else pausar(); return; }
+  if (e.repeat) return;
+  teclas.add(e.code);
+  switch (e.code) {
+    case 'Space': motor.pular(); e.preventDefault(); break;
+    case 'KeyC': case 'ControlLeft': partida.agachado = !partida.agachado; motor.agachar(partida.agachado); break;
+    case 'KeyR': motor.recarregar(); break;
+    case 'KeyQ': case 'Digit1': case 'Digit2': motor.trocar(); break;
+    case 'KeyG': motor.granada(); break;
+    case 'KeyE': if (/Loja de armas/.test(ultimoHud.interagir || '')) abrirLojaPartida(); else motor.interagir(); break;
+    case 'KeyV': falar(true); break;
+  }
+  enviarAndar();
+});
+addEventListener('keyup', (e) => {
+  teclas.delete(e.code);
+  if (e.code === 'KeyV') falar(false);
+  enviarAndar();
+});
+addEventListener('blur', () => { teclas.clear(); if (partida) { motor.atirar(false); enviarAndar(); } });
+(() => {
+  const tela = document.getElementById('tela');
+  const travado = () => document.pointerLockElement === tela;
+  document.addEventListener('mousedown', (e) => {
+    if (!partida || TOQUE || partida.loja || $('.camada')) return;
+    if (e.target.closest('button, input, .slot')) return;
+    ctxAudio();
+    if (!travado()) { travarMouse(); return; }
+    if (e.button === 0) motor.atirar(true);
+    if (e.button === 2) motor.mirar(true);
+  });
+  addEventListener('mouseup', (e) => { if (!partida) return; if (e.button === 0) motor.atirar(false); if (e.button === 2) motor.mirar(false); });
+  addEventListener('contextmenu', (e) => { if (partida) e.preventDefault(); });
+  addEventListener('mousemove', (e) => {
+    if (!partida || !travado()) return;
+    const k = 0.9 * fatorOlhar();
+    motor.olhar(e.movementX * k, (config.inverterY ? -e.movementY : e.movementY) * k);
+  });
+})();
+
+// ---------------- pausa ----------------
+function pausar() {
+  if (!partida || partida.fim || $('.camada')) return;
+  motor.atirar(false);
+  if (document.pointerLockElement) document.exitPointerLock();
+  const c = html(`<div class="camada fixo"><div class="janela" style="width:400px">
+    <span class="t">PAUSA</span>
+    ${ajusteHtml('sens', 'Câmera', 0.2, 3, 0.05)}${ajusteHtml('sensMira', 'Mirando', 0.2, 2, 0.05)}${ajusteHtml('sensLuneta', 'Luneta', 0.1, 1.5, 0.05)}
+    <div class="linha" style="margin-top:4px"><button class="btn btn-fraco" id="p-sair">Sair da partida</button><span class="cresce"></span><button class="btn btn-ouro" id="p-voltar">Continuar</button></div>
+  </div></div>`);
+  palco.appendChild(c);
+  ligarAjustes(c);
+  $('#p-voltar', c).onclick = () => { c.remove(); if (!TOQUE) travarMouse(); };
+  $('#p-sair', c).onclick = async () => {
+    c.remove();
+    if (await confirmar('Sair da partida?', partida.sala ? 'Você sai da sala também.' : 'O progresso desta partida não conta.', 'Sair')) {
+      pararPartida(); sairDaSala(); telaInicio();
+    }
+  };
+}
+
+// controle deslizante de configuração (usado na pausa e nas configurações)
+function ajusteHtml(chave, nome, min, max, passo, dica = '', fmtValor = (v) => v.toFixed(2)) {
+  return `<div class="ajuste" data-ajuste="${chave}" data-min="${min}" data-max="${max}"><span class="nome">${esc(nome)}${dica ? `<small>${esc(dica)}</small>` : ''}</span>
+    <input type="range" min="${min}" max="${max}" step="${passo}" value="${config[chave]}"><span class="valor">${fmtValor(config[chave])}</span></div>`;
+}
+function ligarAjustes(raiz, fmtValores = {}) {
+  for (const a of $$('[data-ajuste]', raiz)) {
+    const k = a.dataset.ajuste, r = a.querySelector('input'), v = a.querySelector('.valor');
+    r.oninput = () => {
+      config[k] = parseFloat(r.value);
+      v.textContent = (fmtValores[k] || ((x) => x.toFixed(2)))(config[k]);
+      salvarConfig();
+      if (k === 'volume') motor.volume(config.volume);
+    };
+  }
+}
+
+// ---------------- loja de armas da partida (compra com o $ dos abates) ----------------
+let lojaSel = null;
+function abrirLojaPartida() {
+  if (!partida) return;
+  motor.interagir();
+  motor.atirar(false);
+  motor.andar(0, 0, false);
+  const j = motor.loja();
+  if (!j) { aviso('Vá até a base do seu time para abrir a loja'); return; }
+  if (document.pointerLockElement) document.exitPointerLock();
+  partida.loja = html(`<div id="loja-partida" class="fixo">
+    <div class="linha"><span class="bebas" style="font-size:36px">LOJA DE ARMAS</span>
+      <span class="etiqueta" style="background:${partida.time ? '#B45309' : '#1D4ED8'};color:#fff">${partida.time ? 'BANDIDOS' : 'POLÍCIA'}</span>
+      <span class="dica">compra com o $ ganho na partida</span><span class="cresce"></span>
+      <span class="chip" id="lp-dinheiro" style="color:#86EFAC;font-weight:800;font-size:14px">$ 0</span>
+      <button class="voltar" id="lp-fechar" aria-label="Fechar">${ICONE.fechar}</button></div>
+    <div class="linha cresce" style="align-items:stretch;gap:14px"><div class="lista-armas" id="lp-lista"></div><div class="detalhe cresce" id="lp-det"></div></div>
+  </div>`);
+  palco.appendChild(partida.loja);
+  $('#lp-fechar', partida.loja).onclick = fecharLojaPartida;
+  lojaSel = null;
+  atualizarLojaPartida(true);
+}
+function fecharLojaPartida() {
+  if (!partida || !partida.loja) return;
+  partida.loja.remove();
+  partida.loja = null;
+  motor.lojaFechar();
+  if (!TOQUE) travarMouse();
+}
+function atualizarLojaPartida(redesenhar) {
+  const el = partida && partida.loja;
+  if (!el) return;
+  const j = motor.loja();
+  if (!j) { fecharLojaPartida(); return; }
+  const din = j.dinheiro | 0;
+  $('#lp-dinheiro', el).textContent = '$ ' + fmt(din);
+  const chave = JSON.stringify(j.itens) + din;
+  if (!redesenhar && el.dataset.chave === chave) return;
+  el.dataset.chave = chave;
+  const itens = j.itens || [];
+  if (lojaSel === null || !itens.some((i) => i.id === lojaSel)) lojaSel = (itens.find((i) => i.usando) || itens[0] || {}).id;
+  const img = (it) => (it.arma === 'granada' ? '' : `armas/${it.arma}${conta.skinArma(it.arma) ? '_' + conta.skinArma(it.arma) : ''}.png`);
+  $('#lp-lista', el).innerHTML = itens.map((it) => {
+    const estado = it.usando ? '<span class="azul" style="font-size:12px">usando</span>'
+      : it.tem ? '<span class="verde" style="font-size:12px">sua</span>'
+      : `<span style="color:${din >= it.preco ? '#86EFAC' : '#FCA5A5'}">$ ${fmt(it.preco)}</span>`;
+    const icone = it.arma === 'granada' ? `<span style="width:68px;display:flex;justify-content:center">${ICONE.granada}</span>` : `<img src="${img(it)}" alt="">`;
+    return `<div class="linha-arma ${it.id === lojaSel ? 'sel' : ''}" data-id="${it.id}">${icone}<span class="cresce">${esc(it.nome)}</span>${estado}</div>`;
+  }).join('');
+  for (const d of $$('.linha-arma', el)) d.onclick = () => { lojaSel = Number(d.dataset.id); atualizarLojaPartida(true); };
+  const it = itens.find((i) => i.id === lojaSel);
+  if (!it) return;
+  const det = $('#lp-det', el);
+  const ficha = it.arma === 'granada'
+    ? `Até 4 m: abate na hora · 4 a 8 m: 100 até 20 de dano · explode 3 s depois de jogar · você tem ${it.qtd}/${it.max}`
+    : `${it.dano} de dano no corpo, ${it.cabeca} na cabeça · ${it.tiros} tiros para abater · pente ${it.pente}`;
+  const barras = it.arma === 'granada' ? '' : `<div class="barras">
+      <span>Dano</span><span class="t"><i style="width:${Math.round(it.barra_dano * 100)}%;background:#F87171"></i></span>
+      <span>Cadência</span><span class="t"><i style="width:${Math.round(it.barra_cadencia * 100)}%;background:#FBBF24"></i></span>
+      <span>Precisão</span><span class="t"><i style="width:${Math.round(it.barra_precisao * 100)}%;background:#60A5FA"></i></span></div>`;
+  let botao;
+  if (it.arma === 'granada') botao = it.qtd >= it.max ? '<button class="btn btn-escuro" disabled>JÁ TEM 2 GRANADAS</button>'
+    : din >= it.preco ? `<button class="btn btn-ouro" id="lp-acao">COMPRAR POR $ ${fmt(it.preco)}</button>` : `<button class="btn" disabled style="background:#4B1D1D;color:#FCA5A5">FALTAM $ ${fmt(it.preco - din)}</button>`;
+  else if (it.usando) botao = '<button class="btn btn-escuro" disabled>USANDO</button>';
+  else if (it.tem) botao = '<button class="btn btn-azul" id="lp-acao">USAR</button>';
+  else if (din >= it.preco) botao = `<button class="btn btn-ouro" id="lp-acao">COMPRAR POR $ ${fmt(it.preco)}</button>`;
+  else botao = `<button class="btn" disabled style="background:#4B1D1D;color:#FCA5A5;font-weight:800">FALTAM $ ${fmt(it.preco - din)}</button>`;
+  det.innerHTML = `<div class="linha"><span class="bebas cresce" style="font-size:34px">${esc(it.nome.toUpperCase())}</span>
+      <span style="font-weight:800;font-size:16px;color:${it.tem ? '#93C5FD' : din >= it.preco ? '#86EFAC' : '#FCA5A5'}">${it.tem && it.arma !== 'granada' ? 'SUA' : '$ ' + fmt(it.preco)}</span></div>
+    <div class="previa">${it.arma === 'granada' ? ICONE.granada.replace(/width="24" height="24"/, 'width="90" height="90"') : `<img src="${img(it)}" alt="${esc(it.nome)}">`}</div>
+    <span class="dica">${esc(ficha)}</span>${barras}${botao}`;
+  const acao = $('#lp-acao', det);
+  if (acao) acao.onclick = () => { aviso(motor.lojaComprar(it.id) || 'Pronto'); atualizarLojaPartida(true); };
+}
+
+// ---------------- editor do HUD: arrastar, tamanho e transparência de cada botão ----------------
+function abrirEditorHud(aoSair) {
+  const ed = mostrar(html(`<div id="editor-hud" class="tela" style="background:rgba(8,11,18,.55);padding:0">
+    <div id="hud" style="pointer-events:none">
+      <div id="vida" class="caixa">${ICONE.coracao}<div class="trilho"><div class="barra" style="width:72%"></div></div><b>72</b></div>
+      <div id="placar"><div class="faixa"><div class="pol"><span class="rot">POLÍCIA</span><span class="num">6</span></div><div class="relogio">7:42</div><div class="ban"><span class="num">4</span><span class="rot">BANDIDOS</span></div></div></div>
+      <canvas id="mira" width="160" height="160" style="width:80px;height:80px"></canvas>
+    </div>
+    ${Object.keys(PECAS).map((id) => pecaHtml(id).replace('class="peca', 'class="peca editavel')).join('')}
+    <div class="barra"><span class="dica" id="ed-nome" style="width:110px;color:#F3F4F6;font-weight:800">Toque num botão</span>
+      <span class="dica">Tamanho</span><input type="range" id="ed-tam" min="0.6" max="1.6" step="0.05" value="1">
+      <span class="dica">Visível</span><input type="range" id="ed-opa" min="0.3" max="1" step="0.05" value="1">
+      <button class="btn btn-fraco" id="ed-padrao" style="height:36px">Padrão</button>
+      <button class="btn btn-fraco" id="ed-cancelar" style="height:36px">Cancelar</button>
+      <button class="btn btn-ouro" id="ed-salvar" style="height:36px">Salvar</button></div>
+  </div>`), 'editor-hud');
+  const copia = JSON.parse(JSON.stringify(layout));
+  desenharMira($('#mira', ed), false, false, false);
+  desenharMinimapa($('#minimapa', ed), [[-8, 10, 0], [12, -6, 0], [4, 26, 1]], 0);
+  $$('.slot', ed).forEach((sl, i) => { sl.querySelector('img').src = i ? 'armas/tt33.png' : 'armas/m4a1.png'; sl.querySelector('span').textContent = i ? '8 / 32' : '30 / 90'; });
+  let sel = null;
+  const pecas = $$('.peca[data-peca]', ed);
+  for (const p of pecas) {
+    p.classList.remove('so-toque');  // no editor aparecem todas, até no computador
+    p.style.display = 'flex';
+    p.style.pointerEvents = 'auto';
+    for (const filho of $$('*', p)) filho.style.pointerEvents = 'none';
+  }
+  posicionarTodas(ed);
+  const escolher = (p) => {
+    sel = p ? p.dataset.peca : null;
+    for (const q of pecas) q.classList.toggle('sel', q === p);
+    $('#ed-nome', ed).textContent = sel ? PECAS[sel].nome : 'Toque num botão';
+    $('#ed-tam', ed).value = sel ? layout[sel].s : 1;
+    $('#ed-opa', ed).value = sel ? layout[sel].o : 1;
+  };
+  for (const p of pecas) {
+    let arrastando = null;
+    p.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      escolher(p);
+      const L = larguraPalco(), A = alturaPalco();
+      arrastando = { id: e.pointerId, dx: e.clientX / escala - layout[p.dataset.peca].x * L, dy: e.clientY / escala - layout[p.dataset.peca].y * A };
+      capturar(p, e.pointerId);
+    });
+    p.addEventListener('pointermove', (e) => {
+      if (!arrastando || e.pointerId !== arrastando.id) return;
+      const L = larguraPalco(), A = alturaPalco(), id = p.dataset.peca;
+      layout[id].x = Math.min(0.98, Math.max(0.02, (e.clientX / escala - arrastando.dx) / L));
+      layout[id].y = Math.min(0.97, Math.max(0.03, (e.clientY / escala - arrastando.dy) / A));
+      posicionarPeca(p, id);
+    });
+    const solta = () => { arrastando = null; };
+    p.addEventListener('pointerup', solta);
+    p.addEventListener('pointercancel', solta);
+  }
+  $('#ed-tam', ed).oninput = (e) => { if (!sel) return; layout[sel].s = parseFloat(e.target.value); posicionarPeca($(`[data-peca="${sel}"]`, ed), sel); };
+  $('#ed-opa', ed).oninput = (e) => { if (!sel) return; layout[sel].o = parseFloat(e.target.value); posicionarPeca($(`[data-peca="${sel}"]`, ed), sel); };
+  $('#ed-padrao', ed).onclick = () => {
+    for (const k in PECAS) layout[k] = { x: PECAS[k].x, y: PECAS[k].y, s: 1, o: 1 };
+    posicionarTodas(ed);
+    escolher(null);
+  };
+  $('#ed-cancelar', ed).onclick = () => { layout = copia; aoSair(); };
+  $('#ed-salvar', ed).onclick = () => { salvarLayout(); aviso('HUD salvo'); aoSair(); };
+}
+
+// ---------------- medidor: FPS, tempo do quadro (média e o pior do último segundo) e ping ----------------
+let pingMs = null, ultimoMedidor = 0;
+function atualizarMedidor() {
+  const el = partida && partida.hud && $('#medidor', partida.hud);
+  if (!el) return;
+  el.style.display = config.medidor ? '' : 'none';
+  if (!config.medidor || Date.now() - ultimoMedidor < 500) return;
+  ultimoMedidor = Date.now();
+  const d = motor.desempenho && motor.desempenho();
+  if (!d) return;
+  const cor = d.fps >= 28 ? '#86EFAC' : d.fps >= 20 ? '#FCD34D' : '#F87171';
+  const corPior = d.pior > 60 ? '#F87171' : d.pior > 45 ? '#FCD34D' : '#D1D5DB';
+  const ping = partida.sala ? ` · <span style="color:${pingMs == null ? '#9CA3AF' : pingMs < 120 ? '#86EFAC' : pingMs < 250 ? '#FCD34D' : '#F87171'}">ping ${pingMs == null ? '—' : Math.round(pingMs) + ' ms'}</span>` : '';
+  el.innerHTML = `<b style="color:${cor}">${d.fps} FPS</b> · ${d.ms.toFixed(1)} ms · <span style="color:${corPior}">pior ${Math.round(d.pior)} ms</span>${ping}`;
+}
+
+// ---------------- partida ao vivo (servidor) + chat de voz ----------------
+let ws = null, enviandoTimer = null, voz = null, viaFirebase = null, pingTimer = null;
+function ligarAoVivo(s, time, br = false) {
+  const rede = () => partida && partida.hud && $('#rede', partida.hud);
+  const status = (txt, ok) => { const r = rede(); if (r) { r.textContent = '● ' + txt; r.style.color = ok ? '#86EFAC' : '#FCD34D'; } };
+  status('conectando ao servidor…', false);
+  voz = new ChatDeVoz((pcm) => { if (ws && ws.readyState === 1 && ws.bufferedAmount < 32768) ws.send(PROTO.codificarVoz(pcm)); });
+  const base = SERVIDOR.replace(/^http/, 'ws');
+  const url = `${base}/partida?sala=${encodeURIComponent(s.codigo)}&id=${encodeURIComponent(fb.uid)}&time=${time}&v=${PROTO.VERSAO}${br ? '&modo=br' : ''}`;
+  let vagas = {};  // número da vaga no pacote -> id da pessoa (o servidor manda quando alguém entra ou sai)
+  let tentativas = 0, abriuUmaVez = false;
+  const inicio = Date.now();
+  const conectar = () => {
+    if (!partida || viaFirebase) return;
+    ws = new WebSocket(url);
+    ws.binaryType = 'arraybuffer';
+    ws.onopen = () => { tentativas = 0; abriuUmaVez = true; status('ao vivo', true); };
+    // ping: o servidor devolve só para quem mandou ({"k":"pg"}); mede ida e volta
+    clearInterval(pingTimer);
+    pingTimer = setInterval(() => { if (ws && ws.readyState === 1) ws.send(JSON.stringify({ k: 'pg', t: performance.now(), de: fb.uid })); }, 2000);
+    ws.onmessage = (ev) => {
+      if (typeof ev.data !== 'string') {
+        const b = new Uint8Array(ev.data);
+        if (b[0] === PROTO.T_ESTADO && b.length > 2) {  // os lutadores da sala que mudaram, num pacote só
+          const out = PROTO.decodificarEstados(b, vagas);
+          for (const k in out) { motor.redeAplicar(JSON.stringify(out)); break; }
+        } else if (b[0] === PROTO.T_VOZ && b.length > 2 && voz) voz.receber(b[1], b.subarray(2));
+        return;
+      }
+      try {
+        const j = JSON.parse(ev.data);
+        if (j.k === 'pg') { if (j.de === fb.uid) pingMs = performance.now() - j.t; return; }
+        if (j.k === 'vagas') vagas = j.d || {};
+        else if (j.k === 'ev') motor.redeEvento(JSON.stringify(j.d));
+      } catch (_) {}
+    };
+    ws.onclose = (ev) => {
+      if (!partida || viaFirebase) return;
+      if (ev.code === 4003) { status('atualize o jogo para jogar online', false); aviso('Atualize o Favela Strike para jogar online'); return; }
+      if (ev.code === 4004) { status('servidores cheios, tentando de novo…', false); setTimeout(conectar, 8000); return; }
+      status('reconectando…', false);
+      if (!abriuUmaVez && Date.now() - inicio > 25000) { usarFirebase(s); return; }  // servidor dormindo/fora: Firebase
+      if (++tentativas <= 12) setTimeout(conectar, Math.min(5000, 800 * tentativas));
+    };
+  };
+  conectar();
+  // 20 vezes por segundo: o meu estado (22 bytes; parado não manda de novo, só a cada 250 ms) e os eventos
+  // (tiros que acertaram, abates, granadas)
+  let ultimoEstado = null, ultimoEnvio = 0;
+  enviandoTimer = setInterval(() => {
+    if (!ws || ws.readyState !== 1) return;
+    try {
+      const st = JSON.parse(motor.redeColetar() || '{}');
+      const meu = st[fb.uid] || Object.values(st)[0];
+      if (meu) {
+        const b = PROTO.codificarEstado(meu), agora = Date.now();
+        const igual = ultimoEstado && ultimoEstado.length === b.length && ultimoEstado.every((x, i) => x === b[i]);
+        if ((!igual || agora - ultimoEnvio >= 250) && ws.bufferedAmount < 32768) { ws.send(b); ultimoEstado = b; ultimoEnvio = agora; }
+      }
+    } catch (_) {}
+    try { for (const e of JSON.parse(motor.redeEventos() || '[]')) ws.send(JSON.stringify({ k: 'ev', d: e })); } catch (_) {}
+  }, 50);
+}
+
+// Sem o servidor: estado e eventos pelo Firebase (mais devagar, sem voz)
+function usarFirebase(s) {
+  viaFirebase = { ouvintes: [] };
+  if (ws) { try { ws.close(); } catch (_) {} ws = null; }
+  clearInterval(enviandoTimer);
+  const r = partida && partida.hud && $('#rede', partida.hud);
+  if (r) { r.textContent = '● ao vivo (Firebase, sem voz)'; r.style.color = '#86EFAC'; }
+  viaFirebase.ouvintes.push(fb.ouvir(`salas/${s.codigo}/est`, (ev, sub, dado) => {
+    const out = {};
+    if (sub === '/') Object.assign(out, dado || {});
+    else if (!sub.slice(1).includes('/') && dado) out[sub.slice(1)] = dado;
+    if (Object.keys(out).length) motor.redeAplicar(JSON.stringify(out));
+  }));
+  const vistos = new Set();
+  viaFirebase.ouvintes.push(fb.ouvir(`salas/${s.codigo}/ev`, (_ev, sub, dado) => {
+    const itens = sub === '/' ? Object.entries(dado || {}).sort() : dado ? [[sub.slice(1), dado]] : [];
+    for (const [k, v] of itens) { if (vistos.has(k) || v.cel === fb.uid) continue; vistos.add(k); motor.redeEvento(JSON.stringify(v)); }
+  }));
+  enviandoTimer = setInterval(() => {
+    const st = motor.redeColetar();
+    if (st && st.length > 2) fb.patch(`salas/${s.codigo}/est`, JSON.parse(st)).catch(() => {});
+    try { for (const e of JSON.parse(motor.redeEventos() || '[]')) fb.post(`salas/${s.codigo}/ev`, { ...e, cel: fb.uid }).catch(() => {}); } catch (_) {}
+  }, 150);
+}
+
+function desligarAoVivo() {
+  clearInterval(enviandoTimer);
+  clearInterval(pingTimer);
+  pingMs = null;
+  enviandoTimer = null;
+  if (ws) { try { ws.close(1000, 'saiu'); } catch (_) {} ws = null; }
+  if (viaFirebase) { for (const o of viaFirebase.ouvintes) o.fechar(); viaFirebase = null; }
+  if (voz) { voz.desligar(); voz = null; }
+}
+
+function falar(on) { if (voz) voz.falar(on); }
+
+// Chat de voz: 8 kHz μ-law, pacotes de 20 ms (o mesmo formato do servidor). Microfone só enquanto aperta para falar.
+class ChatDeVoz {
+  constructor(enviar) { this.enviar = enviar; this.ouvindo = true; this.falando = false; this.prox = {}; this.mic = null; }
+  static dec(u) { u = ~u & 0xFF; let s = ((u & 0x0F) << 3) + 0x84; s <<= (u & 0x70) >> 4; return (u & 0x80 ? 0x84 - s : s - 0x84) / 32768; }
+  static cod(x) {
+    let s = Math.max(-32635, Math.min(32635, Math.round(x * 32767))), sinal = 0;
+    if (s < 0) { s = -s; sinal = 0x80; }
+    s += 0x84;
+    let exp = 7;
+    for (let m = 0x4000; exp > 0 && !(s & m); m >>= 1) exp--;
+    return ~(sinal | (exp << 4) | ((s >> (exp + 3)) & 0x0F)) & 0xFF;
+  }
+  receber(quem, dados) {
+    const a = ctxAudio();
+    if (!a || !this.ouvindo || config.volumeVoz <= 0) return;
+    const buf = a.createBuffer(1, dados.length, 8000);
+    const ch = buf.getChannelData(0);
+    for (let i = 0; i < dados.length; i++) ch[i] = ChatDeVoz.dec(dados[i]) * config.volumeVoz;
+    const src = a.createBufferSource();
+    src.buffer = buf;
+    src.connect(a.destination);
+    const quando = Math.max(this.prox[quem] || 0, a.currentTime + 0.06);  // folga contra a internet oscilando
+    src.start(quando);
+    this.prox[quem] = quando + buf.duration;
+  }
+  async falar(on) {
+    this.falando = on;
+    if (!on || this.mic) return;
+    try {
+      const a = ctxAudio();
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+      const fonte = a.createMediaStreamSource(stream);
+      const proc = a.createScriptProcessor(2048, 1, 1);
+      const passo = a.sampleRate / 8000;
+      let pos = 0, n = 0;
+      const quadro = new Uint8Array(160);
+      proc.onaudioprocess = (ev) => {
+        if (!this.falando) return;
+        const x = ev.inputBuffer.getChannelData(0);
+        for (; pos < x.length; pos += passo) {
+          quadro[n++] = ChatDeVoz.cod(x[Math.floor(pos)]);
+          if (n === 160) { this.enviar(quadro.slice(0)); n = 0; }
+        }
+        pos -= x.length;
+      };
+      fonte.connect(proc);
+      const mudo = a.createGain();
+      mudo.gain.value = 0;
+      proc.connect(mudo).connect(a.destination);
+      this.mic = { stream, proc, fonte };
+    } catch (e) { aviso('Microfone bloqueado: libere o microfone para falar'); }
+  }
+  desligar() {
+    this.falando = false;
+    if (this.mic) { this.mic.stream.getTracks().forEach((t) => t.stop()); this.mic.proc.disconnect(); this.mic = null; }
+  }
+}
