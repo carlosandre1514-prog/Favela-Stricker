@@ -68,9 +68,9 @@ def main():
         filtro = ['-vf', f"drawbox=x=0:y=ih*0.38:w=iw:h=ih*0.24:color=black@0.55:t=fill:enable='lt(t,2.5)',"
                          f"drawtext=fontfile={fonte}:text='{texto}':fontcolor=white:fontsize=h/14:x=(w-tw)/2:y=(h-th)/2:enable='lt(t,2.5)'"]
     cmd = ['ffmpeg', '-loglevel', 'error', '-y', '-i', video, '-i', wav_tmp, *filtro,
-           '-c:v', 'libx264' if filtro else 'copy', '-preset', 'veryfast', '-crf', '21', '-c:a', 'aac', '-b:a', '160k', '-shortest', saida]
+           '-c:v', 'libx264' if filtro else 'copy', '-preset', 'veryfast', '-crf', '25', '-c:a', 'aac', '-b:a', '160k', '-shortest', saida]
     if not filtro:
-        cmd = [c for c in cmd if c not in ('-preset', 'veryfast', '-crf', '21')]
+        cmd = [c for c in cmd if c not in ('-preset', 'veryfast', '-crf', '25')]
     subprocess.check_call(cmd)
     os.remove(wav_tmp)
     print(f'{n} sons mixados em {saida}')
