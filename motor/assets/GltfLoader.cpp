@@ -177,7 +177,8 @@ bool loadGltf(const char* path, LoadContext& ctx, LoadedModel& out) {
     {
         TextureManager& tm = TextureManager::instance();
         const std::string arquivo = path;
-        const int limite = std::strstr(path, "/personagens/") ? tm.charMax : tm.modelMax;
+        // "_alta" (a versão detalhada da arma na mão do jogador, skins da Meshy): textura no tamanho original
+        const int limite = std::strstr(path, "_alta.") ? 0 : std::strstr(path, "/personagens/") ? tm.charMax : tm.modelMax;
         loader.SetImageLoader([&tm, arquivo, limite](tinygltf::Image* im, const int idx, std::string* e, std::string* w, int rw, int rh,
                                                      const unsigned char* bytes, int size, void* ud) {
             const std::string nome = arquivo + "#img" + std::to_string(idx);
@@ -241,7 +242,8 @@ bool loadGltf(const char* path, LoadContext& ctx, LoadedModel& out) {
             const std::string outra = named.substr(0, named.size() - 2) + (srgb ? "#l" : "#s");
             if (GLuint id = tex.named(outra)) return texCache[key] = id;
         }
-        GLuint id = im.image.empty() ? fallback : tex.fromPixels(im.image.data(), im.width, im.height, im.component, srgb, personagem ? tex.charMax : tex.modelMax);
+        GLuint id = im.image.empty() ? fallback : tex.fromPixels(im.image.data(), im.width, im.height, im.component, srgb,
+                                                                 std::strstr(path, "_alta.") ? 0 : personagem ? tex.charMax : tex.modelMax);
         if (!named.empty() && !im.image.empty()) tex.setNamed(named, id);
         texCache[key] = id;
         return id;
@@ -339,7 +341,9 @@ bool loadGltf(const char* path, LoadContext& ctx, LoadedModel& out) {
             const auto& prim = model.meshes[mi].primitives[pi];
             // personagens: a fração do nível; o resto (armas aparecem de perto) no máximo pela metade; a versão de
             // longe das armas pede a sua (simplifyOverride)
+            // "_alta" (arma detalhada da mão do jogador): todos os triângulos do arquivo, em qualquer nível
             const float fracao = renderer.simplifyOverride > 0.f ? renderer.simplifyOverride
+                               : std::strstr(path, "_alta.") ? 1.f
                                : personagem ? renderer.simplify : std::max(renderer.simplify, renderer.simplify <= 0.25f ? 0.3f : 0.5f);  // Leve: 30%
             const std::string cacheKey = std::string(path) + "#" + std::to_string(mi) + "#" + std::to_string(pi) + "#" +
                                          std::to_string(int(fracao * 1000.f));

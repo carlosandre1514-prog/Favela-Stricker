@@ -258,7 +258,7 @@ void applyMaterialTo(Engine* e, GameObject& g, bool subtree, const json& spec) {
             int w, h, comp;
             unsigned char* px = t ? nullptr : stbi_load(file.c_str(), &w, &h, &comp, 4);
             if (px) {
-                t = tm.fromPixels(px, w, h, 4, srgb, tm.modelMax);
+                t = tm.fromPixels(px, w, h, 4, srgb, file.find("_alta") != std::string::npos ? 0 : tm.modelMax);  // _alta: original
                 tm.setNamed(chave, t);
                 stbi_image_free(px);
             }

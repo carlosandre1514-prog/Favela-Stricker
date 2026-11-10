@@ -120,18 +120,21 @@ void equipGun(Engine* e, Fighter& f) {
         return it == skins->end() ? std::string() : it->second;
     };
     WeaponLook look;
-    look.file = gunModelFile(e, gunOf(k).key, skinDe(gunOf(k).key));  // skin com modelo próprio: a arma inteira troca
+    // skin com modelo próprio: a arma inteira troca; na mão do jogador deste aparelho, a versão detalhada
+    look.file = gunModelFile(e, gunOf(k).key, skinDe(gunOf(k).key), !f.remote && !f.bot && e->nivel >= 1);
     int w = createWeapon(e, kind, ci, look);
-    auto pintar = [&](GameObject& wg, const std::string& gun) {
+    // pintura da skin; a de modelo próprio tem a dela (o UV de cada modelo é outro): armas/skins/<modelo>.jpg
+    auto pintar = [&](GameObject& wg, const std::string& gun, const std::string& arquivo) {
         const std::string sk = skinDe(gun);
         if (sk.empty()) return;
         float metal = -1.f, rough = -1.f;
         gunSkinFinish(gun, sk, metal, rough);
-        applyKitTexture(e, wg, std::string("armas/skins/") + gun + "_" + sk + ".jpg", metal, rough);
+        const std::string nome = arquivo != "kit:armas/" + gun ? arquivo.substr(10) : gun + "_" + sk;
+        applyKitTexture(e, wg, "armas/skins/" + nome + ".jpg", metal, rough);
     };
     if (GameObject* wg = objectById(e, w)) {
         e->game.spawned.push_back(Scene::handleOf(*wg));
-        pintar(*wg, gunOf(k).key);
+        pintar(*wg, gunOf(k).key, look.file);
     }
     // a outra arma fica guardada no corpo: fuzil nas costas, pistola na coxa
     const std::string outra = k == f.primary ? f.secondary : f.primary;
@@ -139,7 +142,7 @@ void equipGun(Engine* e, Fighter& f) {
         WeaponLook guardada;
         guardada.file = gunModelFile(e, gunOf(outra).key, skinDe(gunOf(outra).key));
         int hw = holsterWeapon(e, ci, outra == "tt33" ? WK_Pistol : WK_Rifle, guardada);
-        if (GameObject* hg = objectById(e, hw)) pintar(*hg, gunOf(outra).key);
+        if (GameObject* hg = objectById(e, hw)) pintar(*hg, gunOf(outra).key, guardada.file);
     } else {
         holsterWeapon(e, ci, -1, {});
     }
@@ -1268,17 +1271,21 @@ void preloadMatchWeapons(Engine* e) {
     for (const GunDef& g : kGuns) warmWeaponModel(e, std::string("kit:armas/") + g.key, std::string(g.key) == "tt33" ? int(WK_Pistol) : int(WK_Rifle));
     // as minhas skins com modelo próprio também (a partida não trava na hora de aparecer com elas)
     for (const auto& [gun, skin] : matchOf(e).gunSkins) {
-        const std::string f = gunModelFile(e, gun, skin);
+        const std::string f = gunModelFile(e, gun, skin, e->nivel >= 1);
         if (f != std::string("kit:armas/") + gun) warmWeaponModel(e, f, gun == "tt33" ? int(WK_Pistol) : int(WK_Rifle));
     }
 }
 
-std::string gunModelFile(Engine* e, const std::string& gun, const std::string& skin) {
+std::string gunModelFile(Engine* e, const std::string& gun, const std::string& skin, bool alta) {
     if (!skin.empty() && skin.find_first_of("/.\\") == std::string::npos) {
-        if (FILE* f = std::fopen(kitPath(e, "armas/" + gun + "_" + skin + ".glb").c_str(), "rb")) {
-            std::fclose(f);
-            return "kit:armas/" + gun + "_" + skin;
-        }
+        auto existe = [&](const std::string& nome) {
+            FILE* f = std::fopen(kitPath(e, "armas/" + nome + ".glb").c_str(), "rb");
+            if (f) std::fclose(f);
+            return f != nullptr;
+        };
+        const std::string nome = gun + "_" + skin;
+        if (alta && existe(nome + "_alta")) return "kit:armas/" + nome + "_alta";  // (o site não leva a versão alta)
+        if (existe(nome)) return "kit:armas/" + nome;
     }
     return "kit:armas/" + gun;
 }

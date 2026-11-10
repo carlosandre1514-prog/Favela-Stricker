@@ -336,31 +336,34 @@ int main(int argc, char** argv) {
         std::vector<float> P, N;
         for (const Vertex& v : lv) { P.insert(P.end(), {v.pos.x, v.pos.y, v.pos.z}); N.insert(N.end(), {v.normal.x, v.normal.y, v.normal.z}); }
         float tpu = 0.f;
-        for (int tent = 0; tent < 8; ++tent) {
-            xatlas::Atlas* at = xatlas::Create();
-            xatlas::MeshDecl md;
-            md.vertexCount = uint32_t(lv.size());
-            md.vertexPositionData = P.data(); md.vertexPositionStride = 12;
-            md.vertexNormalData = N.data(); md.vertexNormalStride = 12;
-            md.indexCount = uint32_t(li.size()); md.indexData = li.data(); md.indexFormat = xatlas::IndexFormat::UInt32;
-            if (xatlas::AddMesh(at, md) != xatlas::AddMeshError::Success) { std::printf("erro no xatlas\n"); return 1; }
-            xatlas::ChartOptions co;
-            co.maxIterations = 2;
+        // os pedaços (charts) são calculados uma vez só (a parte demorada em malhas grandes); o encaixe na textura
+        // é que se repete até usar a textura toda sem passar dela
+        xatlas::Atlas* at = xatlas::Create();
+        xatlas::MeshDecl md;
+        md.vertexCount = uint32_t(lv.size());
+        md.vertexPositionData = P.data(); md.vertexPositionStride = 12;
+        md.vertexNormalData = N.data(); md.vertexNormalStride = 12;
+        md.indexCount = uint32_t(li.size()); md.indexData = li.data(); md.indexFormat = xatlas::IndexFormat::UInt32;
+        if (xatlas::AddMesh(at, md) != xatlas::AddMeshError::Success) { std::printf("erro no xatlas\n"); return 1; }
+        xatlas::ChartOptions co;
+        co.maxIterations = li.size() / 3 > 100000 ? 1 : 2;
+        xatlas::ComputeCharts(at, co);
+        std::printf("  pedaços do UV: %u\n", at->chartCount);
+        std::fflush(stdout);
+        for (int tent = 0; tent < 20; ++tent) {
             xatlas::PackOptions po;
             po.resolution = uint32_t(T);
             po.padding = 3;
             po.texelsPerUnit = tpu;
             po.bilinear = true;
-            xatlas::Generate(at, co, po);
+            xatlas::PackCharts(at, po);
             if (at->atlasCount > 1 || at->width > uint32_t(T) || at->height > uint32_t(T)) {  // não coube: diminui
-                tpu = at->texelsPerUnit * 0.93f;
-                xatlas::Destroy(at);
+                tpu = at->texelsPerUnit * (at->atlasCount > 1 ? 0.8f : 0.93f);
                 continue;
             }
             const uint32_t lado = std::max(at->width, at->height);
-            if (tent < 7 && lado < uint32_t(T) * 9 / 10) {  // sobrou muito espaço: aumenta para usar a textura toda
+            if (tent < 19 && lado < uint32_t(T) * 9 / 10) {  // sobrou muito espaço: aumenta para usar a textura toda
                 tpu = at->texelsPerUnit * float(T) / float(lado) * 0.97f;
-                xatlas::Destroy(at);
                 continue;
             }
             const xatlas::Mesh& m = at->meshes[0];
@@ -371,9 +374,9 @@ int main(int argc, char** argv) {
             }
             fi.assign(m.indexArray, m.indexArray + m.indexCount);
             std::printf("  UV novo: %u pedaços, %.0f%% da textura usada\n", at->chartCount, at->utilization ? at->utilization[0] * 100.f : 0.f);
-            xatlas::Destroy(at);
             break;
         }
+        xatlas::Destroy(at);
         if (fv.empty()) { std::printf("erro: UV não coube\n"); return 1; }
     }
     eng::generateTangents(fv, fi);  // a mesma conta do motor: o normal map assado fica no espaço tangente que o motor usa

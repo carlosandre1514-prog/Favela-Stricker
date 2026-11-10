@@ -589,6 +589,11 @@ static Scene::Handle spawnWeaponModel(Engine* e, int kind, const WeaponLook& loo
         muzzle = glm::vec3(0.f, (rb.min.y + rb.max.y) * 0.5f + (rb.max.y - rb.min.y) * 0.2f - grip.y, rb.max.z - grip.z);
         wb = AABB{rb.min - grip, rb.max - grip};
         h = spawnParts(e, parts, fix, weaponName(kind), pos);
+        // versão detalhada (_alta, centenas de milhares de triângulos, só na mão do jogador): sem sombra, que
+        // desenharia a arma de novo em cada faixa do mapa de sombra (a sombra de uma arma na mão quase não aparece)
+        if (look.file.size() > 5 && look.file.compare(look.file.size() - 5, 5, "_alta") == 0)
+            if (GameObject* wg = e->scene.get(h))
+                Scene::forEachInSubtree(*wg, [](GameObject& o) { if (o.meshRenderer && o.meshRenderer->lodNear <= 0.f) o.meshRenderer->castShadows = false; });
     } else {
         Geo g;
         g.place(glm::vec3(0.f), 0.f);
