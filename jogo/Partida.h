@@ -115,6 +115,8 @@ bool teamSwapWeapon(Engine* e);     // troca rápida principal <-> segunda arma
 std::string teamSkinLook(int team, int skin);  // aparência do boneco da roupa (JSON)
 void teamGunSkin(Engine* e, const std::string& gun, const std::string& skin);  // skin da arma do jogador ("" = padrão)
 void gunSkinFinish(const std::string& gun, const std::string& skin, float& metal, float& rough);  // acabamento da skin de arma
+// modelo da arma com a skin: "kit:armas/<arma>_<skin>" se a skin tem modelo próprio (armas da Meshy), senão o da arma
+std::string gunModelFile(Engine* e, const std::string& gun, const std::string& skin);
 bool teamThrowGrenade(Engine* e);   // joga granada para onde a câmera olha
 std::string hudJson(Engine* e);     // estado da partida para o HUD do jogo (JSON)
 // Online (antes do Play): sala com jogadores [{"id","nome","time","skin","arma"}]; "" sai do modo online

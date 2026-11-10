@@ -382,7 +382,15 @@ int main(int argc, char** argv) {
         engine_set_play(e, 1);
         frames(e, 60);
         std::printf("  hora no começo da partida: %.2f h\n", engine_get_time_of_day(e));
-        save(out, ("skin_fp_" + arma + ".png").c_str());
+        const std::string nomeSkin = arma + (skin.empty() ? "" : "_" + skin);
+        save(out, ("skin_fp_" + nomeSkin + ".png").c_str());
+        if (std::getenv("MIRAR")) {  // mirando (a alça e a massa de mira na linha do olhar)
+            engine_player_aim(e, 1);
+            frames(e, 40);
+            save(out, ("skin_mira_" + nomeSkin + ".png").c_str());
+            engine_player_aim(e, 0);
+            frames(e, 20);
+        }
         if (std::getenv("PERFIL")) {  // tempo de CPU por quadro na partida (média de 300 quadros, correndo)
             double w = 0, sb = 0, rd = 0;
             const int nq = std::max(1, std::atoi(std::getenv("PERFIL")));
@@ -403,7 +411,7 @@ int main(int argc, char** argv) {
         if (std::getenv("CORRER")) {  // correndo e atirando: o clarão tem que ficar na boca do cano
             for (int k = 0; k < 40; ++k) { engine_player_input(e, 0.f, 1.f, 1); frames(e, 1); }
             for (int k = 0; k < 3; ++k) { engine_player_input(e, 0.f, 1.f, 1); engine_player_fire(e); frames(e, 1); }
-            save(out, ("correndo_" + arma + ".png").c_str());
+            save(out, ("correndo_" + nomeSkin + ".png").c_str());
         }
         std::printf(g_fail ? "FALHOU\n" : "OK\n");
         return g_fail ? 1 : 0;
@@ -733,6 +741,9 @@ int main(int argc, char** argv) {
             json look = json::parse(jogo_aparencia_roupa(t, k));
             const int id = engine_add_spec(e, json{{"tipo", "personagem"}, {"aparencia", look}, {"semente", 7}, {"pos", {0, 0, 0}},
                                                    {"rot", {0, giro, 0}}, {"arma", arma}}.dump().c_str());
+            const std::string modelo = eng::gunModelFile(E, arma, skin);  // skin com modelo próprio: troca a arma
+            if (id >= 0 && modelo != "kit:armas/" + arma)
+                engine_add_spec(e, json{{"tipo", "arma"}, {"arma", arma}, {"arquivo", modelo}, {"portador", id}}.dump().c_str());
             if (id < 0) { std::printf("  [ERRO] %s: %s\n", arma.c_str(), engine_last_error(e)); ++g_fail; return nullptr; }
             frames(e, 40);  // a pose assenta (sempre o mesmo número de quadros: a mesma pose em todas as fotos)
             for (const eng::CharacterInfo& c : E->characters)
@@ -852,7 +863,7 @@ int main(int argc, char** argv) {
             std::string item = l.substr(a, b - a); a = b + 1;
             size_t c = item.find(':');
             std::string g = item.substr(0, c), sk = c == std::string::npos ? "" : item.substr(c + 1);
-            json spec = {{"tipo", "arma"}, {"arma", g}, {"pos", {0, 1.0, 0}}};
+            json spec = {{"tipo", "arma"}, {"arma", g}, {"pos", {0, 1.0, 0}}, {"arquivo", eng::gunModelFile(reinterpret_cast<eng::Engine*>(e), g, sk)}};
             if (!sk.empty()) spec["textura"] = "kit:armas/skins/" + g + "_" + sk + ".jpg";
             float metal = -1.f, rough = -1.f;
             eng::gunSkinFinish(g, sk, metal, rough);

@@ -112,18 +112,22 @@ void equipGun(Engine* e, Fighter& f) {
     if (ci < 0) return;
     const std::string& k = f.weapon;
     int kind = k == "tt33" ? WK_Pistol : WK_Rifle;
-    WeaponLook look;
-    look.file = std::string("kit:armas/") + gunOf(k).key;
-    int w = createWeapon(e, kind, ci, look);
     // skin de arma: a minha (jogador deste aparelho) ou a de outra pessoa da sala; robô não tem
     const std::map<std::string, std::string>* skins = f.remote ? &f.gunSkins : !f.bot ? &matchOf(e).gunSkins : nullptr;
-    auto pintar = [&](GameObject& wg, const std::string& gun) {
-        if (!skins) return;
+    auto skinDe = [&](const std::string& gun) -> std::string {
+        if (!skins) return {};
         auto it = skins->find(gun);
-        if (it == skins->end() || it->second.empty()) return;
+        return it == skins->end() ? std::string() : it->second;
+    };
+    WeaponLook look;
+    look.file = gunModelFile(e, gunOf(k).key, skinDe(gunOf(k).key));  // skin com modelo próprio: a arma inteira troca
+    int w = createWeapon(e, kind, ci, look);
+    auto pintar = [&](GameObject& wg, const std::string& gun) {
+        const std::string sk = skinDe(gun);
+        if (sk.empty()) return;
         float metal = -1.f, rough = -1.f;
-        gunSkinFinish(gun, it->second, metal, rough);
-        applyKitTexture(e, wg, std::string("armas/skins/") + gun + "_" + it->second + ".jpg", metal, rough);
+        gunSkinFinish(gun, sk, metal, rough);
+        applyKitTexture(e, wg, std::string("armas/skins/") + gun + "_" + sk + ".jpg", metal, rough);
     };
     if (GameObject* wg = objectById(e, w)) {
         e->game.spawned.push_back(Scene::handleOf(*wg));
@@ -133,7 +137,7 @@ void equipGun(Engine* e, Fighter& f) {
     const std::string outra = k == f.primary ? f.secondary : f.primary;
     if (!outra.empty() && outra != k && knownGun(outra)) {
         WeaponLook guardada;
-        guardada.file = std::string("kit:armas/") + gunOf(outra).key;
+        guardada.file = gunModelFile(e, gunOf(outra).key, skinDe(gunOf(outra).key));
         int hw = holsterWeapon(e, ci, outra == "tt33" ? WK_Pistol : WK_Rifle, guardada);
         if (GameObject* hg = objectById(e, hw)) pintar(*hg, gunOf(outra).key);
     } else {
@@ -1262,6 +1266,21 @@ void teamStop(Engine* e) {
 // Armas da partida carregadas junto com o mapa (a partida começa e as compras trocam a arma na hora)
 void preloadMatchWeapons(Engine* e) {
     for (const GunDef& g : kGuns) warmWeaponModel(e, std::string("kit:armas/") + g.key, std::string(g.key) == "tt33" ? int(WK_Pistol) : int(WK_Rifle));
+    // as minhas skins com modelo próprio também (a partida não trava na hora de aparecer com elas)
+    for (const auto& [gun, skin] : matchOf(e).gunSkins) {
+        const std::string f = gunModelFile(e, gun, skin);
+        if (f != std::string("kit:armas/") + gun) warmWeaponModel(e, f, gun == "tt33" ? int(WK_Pistol) : int(WK_Rifle));
+    }
+}
+
+std::string gunModelFile(Engine* e, const std::string& gun, const std::string& skin) {
+    if (!skin.empty() && skin.find_first_of("/.\\") == std::string::npos) {
+        if (FILE* f = std::fopen(kitPath(e, "armas/" + gun + "_" + skin + ".glb").c_str(), "rb")) {
+            std::fclose(f);
+            return "kit:armas/" + gun + "_" + skin;
+        }
+    }
+    return "kit:armas/" + gun;
 }
 
 // Acabamento das skins de fuzil: Dourada = metal polido; as outras = pintura (pouco metal).

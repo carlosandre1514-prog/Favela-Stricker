@@ -119,7 +119,7 @@ function cartaoConta() {
 // Personagem da tela inicial: o da última partida (lado, roupa e arma com a skin equipada), que gira 360 graus
 // arrastando o dedo. Duas camadas do mesmo tamanho (tools/recortar_lobby.py), cada uma uma tira com os ângulos
 // lado a lado: o personagem na pose de segurar e a arma por cima.
-const LOBBY = { quadros: 24, largura: 344, altura: 480 };
+const LOBBY = { quadros: 24, largura: 350, altura: 480 };
 let anguloBoneco = 0;  // quadro mostrado (fica onde a pessoa deixou enquanto o app está aberto)
 function bonecoInicio() {
   const u = guardado.get('ultimo', null) || { time: guardado.get('lado', 0) };
@@ -321,7 +321,7 @@ function itensMercado(aba) {
   const armas = aba === 'personagem' ? [] : SKINS_ARMA.map((s) => ({
     id: `skin_arma:${s.arma}:${s.key}`, nome: s.nome, raridade: s.raridade, preco: s.preco, img: `armas/${s.arma}_${s.key}.png`,
     tem: conta.temSkinArma(s), usando: conta.skinArma(s.arma) === s.key, arma: s.arma, key: s.key,
-    desc: s.arma === 'tt33' ? 'Skin de pistola' : 'Skin de arma · vale nos dois lados',
+    desc: s.arma === 'tt33' ? 'Skin de pistola' : s.modelo ? 'Arma com modelo próprio · vale nos dois lados' : 'Skin de arma · vale nos dois lados',
   }));
   const roupas = aba === 'armas' ? [] : ROUPAS.map((r) => ({
     id: 'skin:' + r.key, nome: r.nome, raridade: r.raridade, preco: r.preco, img: `retratos/${r.key}.png`, tem: conta.temRoupa(r),

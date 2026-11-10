@@ -679,6 +679,13 @@ int createWeapon(Engine* e, int kind, int ch, const WeaponLook& look) {
                           : fl.find("ak47") != std::string::npos ? 0.0138f : fl.find("m4a1") != std::string::npos ? 0.0055f : 0.f;
                 if (look.flip) c.sight.x = -c.sight.x;
             }
+            // skin com modelo próprio (armas da Meshy: kit:armas/<arma>_<skin>): a alça de mira é um bloco sem furo,
+            // que tampava o centro da tela mirando; o olho passa rente por cima da arma toda, no meio da largura
+            {
+                static const char* kBase[] = {"kit:armas/m4a1", "kit:armas/m4colt", "kit:armas/ak47", "kit:armas/ak74", "kit:armas/ak74_tatica"};
+                const bool base = std::any_of(std::begin(kBase), std::end(kBase), [&](const char* b2) { return look.file == b2; });
+                if (!base && look.file.rfind("kit:armas/", 0) == 0) c.sight = glm::vec3((wb.min.x + wb.max.x) * 0.5f, wb.max.y + 0.004f, wb.min.z + len * 0.3f);
+            }
             c.butt = glm::vec3(0.f, wb.min.y + hgt * 0.62f, wb.min.z + 0.01f);
             c.gripPt = glm::vec3(0.f, wb.min.y + hgt * 0.4f, wb.min.z + len * 0.315f);
             c.guardPt = glm::vec3(0.f, wb.min.y + hgt * 0.68f, wb.min.z + len * 0.63f);

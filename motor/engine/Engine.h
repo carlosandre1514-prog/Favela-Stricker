@@ -444,6 +444,7 @@ void atualizarAncoras(Engine* e, float dt);
 bool tiroNasPortas(Engine* e, glm::vec3 de, glm::vec3 ate);  // bala que passa por uma porta: ela abre para o lado do tiro  // depois de posicionar as armas, antes de desenhar
 void bulletFx(Engine* e, Scene::Handle weapon, glm::vec3 from, glm::vec3 to);
 void applyKitTexture(Engine* e, GameObject& g, const std::string& kitName, float metal = -1.f, float rough = -1.f);  // textura de cor do kit no objeto
+std::string kitPath(Engine* e, const std::string& name);  // caminho de um arquivo do kit ("armas/ak47" -> .../kit/armas/ak47.glb)
 
 // ---- mundo (World.cpp)
 void loadMap(Engine* e, int kind, uint32_t seed);   // kind: índice no cadastro de mapas (engine/MapKit.h)

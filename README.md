@@ -40,10 +40,26 @@ O Favela Stricker é um jogo feito **com** o motor, do mesmo jeito que os jogos 
 | `web/` | as telas do jogo (HTML/JS): `motor.js` (ponte com o motor), `conta.js` (catálogo, conta, salas), `ui.js`, `partida.js` (HUD, controles, editor do HUD, partida ao vivo, voz), `jogo.js` (telas) |
 | `app/` | o app Android (Kotlin): motor + WebView com as telas (`JogoActivity`, `PonteJogo`), sons |
 | `servidor/` | o servidor (Node.js) do Render: entrega o site e faz as partidas ao vivo e a voz |
-| `tools/` | testes do jogo sem celular (`teste_jogo.cpp`), molde e montador de skins, gerador das skins de fuzil e das prévias da loja |
+| `tools/` | testes do jogo sem celular (`teste_jogo.cpp`), molde e montador de skins, gerador das skins de fuzil e das prévias da loja, conversor dos modelos da Meshy (`converter_meshy.cpp`) |
 
 A configuração do Firebase e o endereço do servidor ficam em `app/src/main/assets/config_jogo.json` (APK)
 e `web/config_jogo.js` (site).
+
+## Modelos da Meshy (armas com modelo próprio)
+
+Os modelos que saem da Meshy têm ~1 milhão de triângulos e a textura picada em milhares de pedaços. O
+`tools/converter_meshy.cpp` deixa no tamanho do jogo: reduz para ~20 mil triângulos, refaz o mapa UV e passa
+("assa") a cor, o metal, a rugosidade e o relevo do modelo original para ele. Skin com modelo próprio é um
+`shaders/kit/armas/<arma>_<skin>.glb` + a pintura `shaders/kit/armas/skins/<arma>_<skin>.jpg` (com `_orm`, `_emi` e
+`_efeito.json`); o jogo troca a arma inteira quando a skin está equipada (mesmo dano e mesmo som). Exemplo:
+
+```
+./converter_meshy <pasta_do_zip_da_meshy> shaders/kit/armas/ak47_cosmica.glb 20000 --arma --comprimento 0.95 \
+    --brilho 0.55 --skin shaders/kit/armas/skins/ak47_cosmica
+```
+
+Depois: a entrada em `SKINS_ARMA` (`web/conta.js`), a foto da loja (`SO_PREVIAS` + `tools/recortar_previas.py`) e as
+tiras do lobby (`SO_LOBBY` + `tools/recortar_lobby.py`). Como compilar está no começo do arquivo.
 
 ## Se o jogo fechar sozinho
 

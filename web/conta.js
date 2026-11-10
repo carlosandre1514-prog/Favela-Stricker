@@ -52,8 +52,12 @@ const armaInicial = (time) => {
   return comSkin ? comSkin.key : armaPadrao(time);
 };
 
-// Skins de arma (mercado, com moedas): só mudam a pintura, não o dano
+// Skins de arma (mercado, com moedas): só mudam o visual, não o dano. As com modelo: a arma inteira é outra (modelo
+// próprio feito na Meshy, shaders/kit/armas/<arma>_<skin>.glb), com o mesmo dano e o mesmo som da arma
 const SKINS_ARMA = [
+  { arma: 'ak47', key: 'cosmica', nome: 'AK-47 Energia Cósmica', raridade: 'lendaria', preco: 2200, modelo: true },
+  { arma: 'm4a1', key: 'dragao_raio', nome: 'M4A1 Dragão Relâmpago', raridade: 'lendaria', preco: 2200, modelo: true },
+  { arma: 'm4a1', key: 'mitica', nome: 'M4A1 Mítica', raridade: 'lendaria', preco: 2000, modelo: true },
   { arma: 'ak47', key: 'dragao_azul', nome: 'AK-47 Dragão Azul', raridade: 'lendaria', preco: 1800 },
   { arma: 'm4colt', key: 'carmesim', nome: 'M4 Colt Vermelho Carmesim', raridade: 'lendaria', preco: 1800 },
   { arma: 'ak47', key: 'dourada', nome: 'AK-47 Dourada', raridade: 'lendaria', preco: 1499 },

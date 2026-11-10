@@ -350,6 +350,9 @@ const corTime = (t) => (partida && partida.modo === 1 ? (t === (ultimoHud.time |
 const ABATES_SKIN = {
   'ak47:dragao_azul': { classe: 'dragao', frase: 'devorou', arma: 'AK-47 Dragão Azul' },
   'm4colt:carmesim': { classe: 'carmesim', frase: 'destronou', arma: 'M4 Colt Vermelho Carmesim' },
+  'ak47:cosmica': { classe: 'cosmica', frase: 'desintegrou', arma: 'AK-47 Energia Cósmica' },
+  'm4a1:dragao_raio': { classe: 'dragao', frase: 'eletrocutou', arma: 'M4A1 Dragão Relâmpago' },
+  'm4a1:mitica': { classe: 'carmesim', frase: 'coroou', arma: 'M4A1 Mítica' },
 };
 function atualizarHud(j) {
   const t = partida && partida.hud;
