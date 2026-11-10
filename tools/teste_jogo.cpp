@@ -109,6 +109,71 @@ int main(int argc, char** argv) {
         if (!engine_import_project(e, lerProjeto(projPath).dump().c_str())) { std::printf("  [ERRO] o projeto da partida não abriu: %s\n", engine_last_error(e)); ++g_fail; }
     };
 
+    // Vídeo de gameplay (SO_VIDEO=0 polícia | 1 bandido): o jogador joga sozinho (piloto automático, a mesma
+    // inteligência dos robôs: anda pelo mapa, procura e troca tiro) com a câmera atrás do ombro. Os quadros vão
+    // direto para o ffmpeg (video_<lado>.mp4) e os sons de cada quadro para sons_<lado>.txt (mixados depois por
+    // tools/mixar_sons_video.py). DURACAO=segundos (padrão 75), ARMA, HORA (padrão 10).
+    if (const char* lv = std::getenv("SO_VIDEO")) {
+        eng::Engine* E = reinterpret_cast<eng::Engine*>(e);
+        const int lado = std::atoi(lv) ? 1 : 0;
+        const int fps = 30, quadros = fps * (std::getenv("DURACAO") ? std::atoi(std::getenv("DURACAO")) : 75);
+        const std::string arma = std::getenv("ARMA") ? std::getenv("ARMA") : (lado ? "ak47" : "m4a1");
+        abrirPartida();
+        jogo_escolhas(e, lado, lado ? 0 : 5, arma.c_str(), "tt33");
+        engine_set_first_person(e, 0);
+        engine_set_play(e, 1);
+        engine_set_time_of_day(e, std::getenv("HORA") ? float(std::atof(std::getenv("HORA"))) : 10.f);
+        eng::matchOf(E).piloto = true;
+        const std::string nome = lado ? "bandido" : "policial";
+        char cmd[1024];
+        std::snprintf(cmd, sizeof(cmd), "ffmpeg -loglevel error -y -f rawvideo -pix_fmt rgba -s %dx%d -r %d -i - -vf vflip "
+                      "-c:v libx264 -preset veryfast -crf 21 -pix_fmt yuv420p '%s/video_%s.mp4'", W, H, fps, out.c_str(), nome.c_str());
+        FILE* ff = popen(cmd, "w");
+        FILE* sons = std::fopen((out + "/sons_" + nome + ".txt").c_str(), "w");
+        if (!ff || !sons) { std::printf("  [ERRO] não abri o ffmpeg / o arquivo de sons\n"); return 1; }
+        std::vector<unsigned char> px(size_t(W) * H * 4);
+        float yawCam = E->editorCam.yaw;
+        int abates = 0, mortes = 0;
+        for (int q = 0; q < quadros; ++q) {
+            // câmera atrás do ombro, virando junto com o corpo (suave)
+            const int pf = eng::playerFighter(E);
+            if (pf >= 0)
+                if (eng::GameObject* g = E->scene.get(eng::matchOf(E).f[pf].root)) {
+                    const glm::vec3 fw = g->transform.rotation * glm::vec3(0, 0, 1);
+                    const float alvo = std::atan2(-fw.x, -fw.z);
+                    float d = alvo - yawCam;
+                    while (d > 3.14159f) d -= 6.28318f;
+                    while (d < -3.14159f) d += 6.28318f;
+                    yawCam += d * 0.08f;
+                    E->editorCam.yaw = yawCam;
+                    E->editorCam.pitch = 0.27f;
+                    E->editorCam.distance = 4.3f;
+                }
+            engine_frame(e, 1.f / fps);
+            const char* sl = engine_poll_sounds(e);
+            for (const char* a = sl; *a;) {  // linhas "nome\tvolume\tpan"
+                const char* fim = std::strchr(a, '\n');
+                std::string linha(a, fim ? size_t(fim - a) : std::strlen(a));
+                if (!linha.empty()) std::fprintf(sons, "%d\t%s\n", q, linha.c_str());
+                if (!fim) break;
+                a = fim + 1;
+            }
+            glBindFramebuffer(GL_FRAMEBUFFER, g_fbo);
+            glReadPixels(0, 0, W, H, GL_RGBA, GL_UNSIGNED_BYTE, px.data());
+            std::fwrite(px.data(), 1, px.size(), ff);
+            if (q % (fps * 10) == 0 && pf >= 0) {
+                abates = eng::matchOf(E).f[pf].kills; mortes = eng::matchOf(E).f[pf].deaths;
+                std::printf("  %3d s: abates %d · quedas %d · placar %d x %d\n", q / fps, abates, mortes, eng::matchOf(E).score[0], eng::matchOf(E).score[1]);
+            }
+        }
+        pclose(ff);
+        std::fclose(sons);
+        const int pf = eng::playerFighter(E);
+        std::printf("  vídeo %s: %d quadros · abates %d · quedas %d\n", nome.c_str(), quadros, pf >= 0 ? eng::matchOf(E).f[pf].kills : 0,
+                    pf >= 0 ? eng::matchOf(E).f[pf].deaths : 0);
+        engine_destroy(e);
+        return 0;
+    }
     // Ressurgência online (SO_BR_ONLINE=1): só gente (sem robôs), times e zona iguais em todos os celulares (mesma
     // semente), quem é de outro celular anda pela rede, cai pelo evento e volta quando volta lá; quem sai está fora.
     if (std::getenv("SO_BR_ONLINE")) {

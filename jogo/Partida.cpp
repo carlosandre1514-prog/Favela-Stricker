@@ -1194,6 +1194,7 @@ void teamUpdate(Engine* e, float dt) {
         }
         if (!f.bot) {
             if (G.playerHp <= 0.f) killFighter(e, int(i), M.attacker);
+            else if (M.piloto && G.state == 0) botUpdate(e, int(i), dt);  // piloto automático (vídeo)
             continue;
         }
         if (G.state == 0) botUpdate(e, int(i), dt);

@@ -49,6 +49,7 @@ struct ShopRT { Scene::Handle obj; int kind = 0; int team = 0; };  // kind 0 arm
 struct TeamMatch {
     bool active = false;
     int modo = 0;                         // 0 Polícia x Bandidos (5 x 5), 1 Battle Royale Ressurgência
+    bool piloto = false;                  // vídeos/testes: o jogador anda, procura e atira sozinho (como os robôs)
     // Ressurgência: a zona (círculo que fecha em fases), quantos times e em que lugar cada time ficou (0 = vivo)
     struct Zona { glm::vec2 c{0.f}, de{0.f}, para{0.f}; float r = 0.f, rDe = 0.f, rPara = 0.f, t = 0.f, tick = 0.f;
                   int fase = 0; bool fechando = false; };
