@@ -863,8 +863,14 @@ int main(int argc, char** argv) {
             std::string item = l.substr(a, b - a); a = b + 1;
             size_t c = item.find(':');
             std::string g = item.substr(0, c), sk = c == std::string::npos ? "" : item.substr(c + 1);
-            json spec = {{"tipo", "arma"}, {"arma", g}, {"pos", {0, 1.0, 0}}, {"arquivo", eng::gunModelFile(reinterpret_cast<eng::Engine*>(e), g, sk)}};
-            if (!sk.empty()) spec["textura"] = "kit:armas/skins/" + g + "_" + sk + ".jpg";
+            json spec = {{"tipo", "arma"}, {"arma", g}, {"pos", {0, 1.0, 0}}, {"arquivo", eng::gunModelFile(reinterpret_cast<eng::Engine*>(e), g, sk, std::getenv("ALTA") != nullptr)}};
+            if (const char* arq = std::getenv("ARQUIVO")) spec["arquivo"] = arq;  // outro modelo (ex.: o FBX original, para comparar)
+            {
+                const std::string arq = spec["arquivo"].get<std::string>();  // skin de modelo próprio: a pintura do modelo
+                if (std::getenv("ARQUIVO")) {}
+                else if (arq != "kit:armas/" + g) spec["textura"] = "kit:armas/skins/" + arq.substr(10) + ".jpg";
+                else if (!sk.empty()) spec["textura"] = "kit:armas/skins/" + g + "_" + sk + ".jpg";
+            }
             float metal = -1.f, rough = -1.f;
             eng::gunSkinFinish(g, sk, metal, rough);
             if (!sk.empty() && metal >= 0.f) { spec["metal"] = metal; spec["rugosidade"] = rough; }
