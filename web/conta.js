@@ -241,6 +241,17 @@ class Firebase {
     return { ok: r.ok, code: r.status, dado };
   }
   get(c) { return this.pedir('GET', c); }
+  // escrita condicional (só se ninguém mudou o valor desde a leitura): devolve true se gravou
+  async getComEtag(c) {
+    const r = await fetch(await this.url(c), { headers: { 'X-Firebase-ETag': 'true' } });
+    let dado = null;
+    try { dado = await r.json(); } catch (_) {}
+    return { ok: r.ok, dado, etag: r.headers.get('ETag') || '' };
+  }
+  async putSe(c, v, etag) {
+    const r = await fetch(await this.url(c), { method: 'PUT', headers: { 'Content-Type': 'application/json', 'if-match': etag }, body: JSON.stringify(v) });
+    return r.ok;
+  }
   put(c, v) { return this.pedir('PUT', c, v); }
   patch(c, v) { return this.pedir('PATCH', c, v); }
   post(c, v) { return this.pedir('POST', c, v); }
@@ -376,6 +387,7 @@ class Sala {
       if (dado === null) { this.fechada = true; aoFechar(); return; }
       if (dado !== this.estado) { this.estado = dado; aoEstado(dado); }
     }));
+    this.ouvintes.push(fb.ouvir(`salas/${this.codigo}/host`, (_ev, _sub, dado) => { if (dado && fb && dado === fb.uid && !this.host) { this.host = true; aoMudar(); } }));
     if (this.modo === 'br')  // sala pública: quando começa (contagem de quem criou)
       this.ouvintes.push(fb.ouvir(`salas/${this.codigo}/comeca_em`, (_ev, _sub, dado) => { this.comecaEm = Number(dado) || 0; aoMudar(); }));
   }
@@ -412,6 +424,10 @@ class Sala {
     const tam = Sala.tamanho(this.formato);
     const [times, nt] = Sala.montarTimes(l, tam);
     if (l.length < 2 || nt < 2) return false;
+    // só um celular começa (o de quem criou ou, se ele sumiu, outro da sala): "espera" -> "comecando" só se ninguém
+    // mudou antes; quem perde não sorteia de novo (sortear duas vezes deixava cada celular com times diferentes)
+    const e = await fb.getComEtag(`salas/${this.codigo}/estado`);
+    if (!e.ok || e.dado !== 'espera' || !(await fb.putSe(`salas/${this.codigo}/estado`, 'comecando', e.etag))) return true;
     const semente = 1 + Math.floor(Math.random() * 2e9);
     await fb.del(`salas/${this.codigo}/est`);
     await fb.del(`salas/${this.codigo}/ev`);
@@ -444,6 +460,18 @@ class Sala {
   }
   async sair() {
     this.parar();
+    // Partida rolando ou sala com mais gente: quem criou sai só ele (antes apagava a sala e a partida de todo mundo
+    // acabava junto, por ex. quando o time de quem criou caía na Ressurgência). Na espera, a sala passa para o próximo.
+    const outros = this.lista().filter((p) => p.id !== fb.uid).sort((a, b) => (Number(a.entrou) || 0) - (Number(b.entrou) || 0));
+    if (this.host && (this.estado !== 'espera' || (this.modo === 'br' && outros.length))) {
+      await fb.del(`salas/${this.codigo}/jogadores/${fb.uid}`);
+      const g = await fb.get(`salas/${this.codigo}/jogadores`);
+      const resto = Object.keys((g.ok && g.dado) || {});
+      if (!resto.length) await fb.del('salas/' + this.codigo);  // era o último: limpa
+      else if (this.estado === 'espera' && outros.length) await fb.patch('salas/' + this.codigo, { host: outros[0].id });
+      this.fechada = true;
+      return;
+    }
     if (this.host) {
       await fb.del('salas/' + this.codigo);
       if (this.publica) {
@@ -451,7 +479,13 @@ class Sala {
         const p = await fb.get(ponteiro);
         if (p.ok && p.dado && p.dado.codigo === this.codigo) await fb.del(ponteiro);
       }
-    } else await fb.del(`salas/${this.codigo}/jogadores/${fb.uid}`);
+    } else {
+      await fb.del(`salas/${this.codigo}/jogadores/${fb.uid}`);
+      if (this.estado !== 'espera') {  // fim da partida: o último a sair apaga a sala
+        const g = await fb.get(`salas/${this.codigo}/jogadores`);
+        if (g.ok && !g.dado) await fb.del('salas/' + this.codigo);
+      }
+    }
     this.fechada = true;
   }
   parar() { for (const o of this.ouvintes) o.fechar(); this.ouvintes = []; }

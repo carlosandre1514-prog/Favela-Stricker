@@ -40,6 +40,11 @@ struct Fighter {
     bool netHas = false, netAlive = true, netCrouch = false, netAim = false, netAir = false, netReload = false;
     glm::vec3 netVel{0.f};         // velocidade (prevê a posição entre um pacote e outro)
     float netAge = 0.f;
+    // Ressurgência online: "fora" vem do celular da própria pessoa (cada celular decidia sozinho, e com o atraso da
+    // rede um dava a pessoa como fora enquanto ela renascia no dela); netMorto: há quanto tempo o estado chega "caído"
+    // sem o evento de abate (evento perdido: cai assim mesmo, senão o time dela ficava de pé para sempre)
+    bool netFora = false;
+    float netMorto = 0.f;
     int netShots = 0;
     std::string netWeapon;
     std::map<std::string, std::string> gunSkins;  // online: skins das armas de outra pessoa (arma -> skin)

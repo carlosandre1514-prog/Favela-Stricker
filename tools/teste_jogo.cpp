@@ -247,6 +247,17 @@ int main(int argc, char** argv) {
         frames(e, 10, 1.f / 30.f);
         std::printf("  beto caiu (esperando, não está fora)=%d · voltou=%d\n", caiu, !M.f[bi].dead);
         if (!caiu || M.f[bi].dead) { std::printf("  [ERRO] queda/volta de quem é de outro celular\n"); ++g_fail; }
+        // evento de abate perdido: o estado chega "caído" e, sem o evento, beto cai assim mesmo (1,5 s)
+        st["beto"]["v"] = false;
+        jogo_rede_aplicar(e, st.dump().c_str());
+        frames(e, 30 * 2, 1.f / 30.f);
+        const bool caiuSemEvento = M.f[bi].dead;
+        // o celular dele diz que está fora: fica fora aqui também (mesmo com o time dele de pé neste celular)
+        st["beto"]["f"] = true;
+        jogo_rede_aplicar(e, st.dump().c_str());
+        frames(e, 5, 1.f / 30.f);
+        std::printf("  abate sem evento: caiu=%d · fora pelo celular dele=%d\n", caiuSemEvento, M.f[bi].fora);
+        if (!caiuSemEvento || !M.f[bi].fora) { std::printf("  [ERRO] queda sem evento / fora vindo da rede\n"); ++g_fail; }
         // o time 2 inteiro sai da sala: está fora e o meu time vence
         for (const char* q : {"caio", "duda", "edu"}) jogo_rede_evento(e, json{{"t", "saiu"}, {"id", q}}.dump().c_str());
         frames(e, 5, 1.f / 30.f);
@@ -1044,6 +1055,7 @@ int main(int argc, char** argv) {
                 const float camD = std::getenv("CAM_DIST") ? float(std::atof(std::getenv("CAM_DIST"))) : 2.3f;
                 const char* soClip = std::getenv("CLIP");
                 if (soClip && std::string(c.nome) != soClip) continue;
+                if (const char* rc = std::getenv("RECARGA")) ci.reloadTimer = float(std::atof(rc));  // recarregando (s que faltam)
                 for (int v = 0; v < nVistas && v < 4; ++v) {
                     engine_set_camera(e, 0.f, camY, 0.f, vistas[v], 0.1f, camD);
                     ci.anim->setClip(ci.clipMap[c.clip]);

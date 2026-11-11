@@ -119,7 +119,7 @@ function cartaoConta() {
 // Personagem da tela inicial: o da última partida (lado, roupa e arma com a skin equipada), que gira 360 graus
 // arrastando o dedo. Duas camadas do mesmo tamanho (tools/recortar_lobby.py), cada uma uma tira com os ângulos
 // lado a lado: o personagem na pose de segurar e a arma por cima.
-const LOBBY = { quadros: 24, largura: 358, altura: 480 };
+const LOBBY = { quadros: 24, largura: 390, altura: 480 };
 let anguloBoneco = 0;  // quadro mostrado (fica onde a pessoa deixou enquanto o app está aberto)
 function bonecoInicio() {
   const u = guardado.get('ultimo', null) || { time: guardado.get('lado', 0) };
@@ -793,7 +793,13 @@ function telaSalaBR() {
     if (s.host) {
       if (m >= 2 && !s.comecaEm) { s.comecaEm = Date.now() + 60000; fb.patch('salas/' + s.codigo, { comeca_em: s.comecaEm }); }
       if (m < 2 && s.comecaEm) { s.comecaEm = 0; fb.patch('salas/' + s.codigo, { comeca_em: 0 }); }
-      if (s.estado === 'espera' && (m >= s.max || (s.comecaEm && Date.now() >= s.comecaEm))) { s.estado = 'comecando'; if (!(await s.comecarBR())) s.estado = 'espera'; }
+    }
+    // quem criou começa na hora; se o celular dele sumiu (app fechado, sem internet), qualquer um da sala começa 10 s
+    // depois (a gravação condicional em comecarBR garante que só um começa)
+    const atrasado = !s.host && s.comecaEm && Date.now() >= s.comecaEm + 10000;
+    if (s.estado === 'espera' && (s.host || atrasado) && (m >= s.max || (s.comecaEm && Date.now() >= s.comecaEm))) {
+      s.estado = 'comecando';
+      if (!(await s.comecarBR())) s.estado = 'espera';
     }
     const falta = s.comecaEm ? Math.max(0, Math.ceil((s.comecaEm - Date.now()) / 1000)) : 0;
     info.textContent = m < 2 ? 'Esperando mais gente entrar (precisa de pelo menos 2)…' : `A partida começa em ${falta} s · ou na hora com ${s.max} pessoas`;
@@ -807,7 +813,11 @@ function ligarSala(s) {
   s.ouvir(
     () => { if (telaAtual() === 'sala') telaSala(); else if (telaAtual() === 'salabr') telaSalaBR(); },
     (estado) => { if (sala === s && estado === 'jogo' && !partida) comecarOnline(s); },
-    () => { if (sala !== s) return; sala = null; aviso('A sala fechou (quem criou saiu)'); if (partida) pararPartida(); telaInicio(); },
+    () => {
+      if (sala !== s) return;
+      if (partida) return;  // jogando: a partida continua (o ao vivo é pelo servidor; a sala só serve para a espera)
+      sala = null; aviso('A sala fechou (quem criou saiu)'); telaInicio();
+    },
     (id) => motor.redeEvento(JSON.stringify({ t: 'saiu', id })));
 }
 function sairDaSala() { const s = sala; sala = null; if (s) s.sair().catch(() => {}); }

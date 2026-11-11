@@ -745,6 +745,13 @@ void brUpdate(Engine* e, float dt) {
         Fighter& f = M.f[i];
         if (f.dead) {
             if (f.fora) continue;
+            // de outro celular: só o celular dela sabe se ela volta (o meu pode estar atrasado); saiu da sala: fora
+            if (f.remote) {
+                if (f.netFora || f.left) { f.fora = true; continue; }
+                f.deadTime += dt;
+                remoteUpdate(e, f, dt);
+                continue;
+            }
             // sem ninguém do time de pé (ou zona final): fora da partida
             if ((M.tamanhoTime > 1 && !temVivo(f.team)) || z.fase >= kFaseSemRenascer || f.left) { f.fora = true; continue; }
             f.deadTime += dt;
@@ -1067,7 +1074,15 @@ void remoteUpdate(Engine* e, Fighter& f, float dt) {
         g->transform.setPosition(f.netPos);
         if (g->rigidBody) { e->physics.setEnabled(*g->rigidBody, true); e->physics.setKinematic(*g->rigidBody, true); }
         if (c.anim && c.clipMap[CC_Idle] >= 0) { c.anim->setClip(c.clipMap[CC_Idle]); c.anim->loop = true; c.anim->speed = 1.f; }
-    } else if (!f.netAlive) return;  // caiu lá: espera o evento de abate
+    } else if (!f.netAlive) {  // caiu lá: espera o evento de abate; se ele não chegar em 1,5 s, cai assim mesmo
+        if ((f.netMorto += dt) > 1.5f) {
+            TeamMatch& M = matchOf(e);
+            for (size_t k = 0; k < M.f.size(); ++k)
+                if (&M.f[k] == &f) { killFighter(e, int(k), -1); break; }
+        }
+        return;
+    }
+    f.netMorto = 0.f;
     // onde ele deve estar agora: a última posição + a velocidade desde que ela chegou (até 0,25 s à frente)
     f.netAge += dt;
     glm::vec3 want = f.netPos + f.netVel * std::min(f.netAge, 0.25f);
@@ -1621,7 +1636,7 @@ std::string netCollect(Engine* e) {
         if (g->rigidBody && g->rigidBody->body) { btVector3 lv = g->rigidBody->body->getLinearVelocity(); vel = {lv.x(), lv.y(), lv.z()}; }
         out[f.netId] = {{"p", {r2(p.x), r2(p.y), r2(p.z)}}, {"y", r2(std::atan2(fw.x, fw.z))}, {"pi", r2(c.viewPitch)},
                         {"c", c.crouch}, {"a", c.aimHold || c.aimTimer > 0.f}, {"w", f.weapon}, {"v", !f.dead}, {"n", c.shots},
-                        {"j", c.airborne}, {"r", c.reloadTimer > 0.f}, {"vel", {r2(vel.x), r2(vel.y), r2(vel.z)}}};
+                        {"j", c.airborne}, {"r", c.reloadTimer > 0.f}, {"f", f.fora}, {"vel", {r2(vel.x), r2(vel.y), r2(vel.z)}}};
     }
     return out.dump();
 }
@@ -1646,6 +1661,7 @@ void netApply(Engine* e, const std::string& states) {
         f.netWeapon = st.value("w", f.netWeapon);
         f.netAir = st.value("j", false);
         f.netReload = st.value("r", false);
+        f.netFora = f.netFora || st.value("f", false);  // fora é para sempre
         if (auto v = st.find("vel"); v != st.end() && v->is_array() && v->size() == 3)
             f.netVel = {(*v)[0].get<float>(), (*v)[1].get<float>(), (*v)[2].get<float>()};
         f.netAge = 0.f;

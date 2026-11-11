@@ -982,7 +982,11 @@ void updateSupportHands(Engine* e, float dt) {
             for (int k : {CC_Rifle + AP_Idle, CC_Rifle + AP_Walk, CC_Rifle + AP_Run, CC_Rifle + AP_Aim, CC_Rifle + AP_AimWalk, int(CC_RifleBack),
                           int(CC_RifleLeft), int(CC_RifleRight), int(CC_RifleFire), int(CC_Jump), int(CC_CrouchWalk)})
                 armed |= c.clipMap[k] >= 0 && a->clipIndex == c.clipMap[k] && !a->posing && !a->preview;
-        bool want = armed && !c.dying && c.reloadTimer <= 0.f;
+        // recarregando correndo: a animação continua a de correr (não a de recarregar); as mãos ficam na arma (antes
+        // soltavam e os braços balançavam atravessando a arma) e a esquerda vai ao pente e volta
+        const bool correndo = c.clipMap[CC_Rifle + AP_Run] >= 0 && a->clipIndex == c.clipMap[CC_Rifle + AP_Run];
+        const bool recarregaCorrendo = c.reloadTimer > 0.f && correndo && !pistol;
+        bool want = armed && !c.dying && (c.reloadTimer <= 0.f || recarregaCorrendo);
         c.supportW = want ? std::min(1.f, c.supportW + dt * 6.f) : std::max(0.f, c.supportW - dt * 6.f);
         // mirando com arma longa: a arma sobe até o olho (bochecha na coronha, coronha no ombro)
         // primeira pessoa: atirar sem mirar só aponta a arma (no ombro); mirar leva a alça de mira ao olho
@@ -1150,6 +1154,11 @@ void updateSupportHands(Engine* e, float dt) {
         {
             glm::vec3 h = onGun(c.guardPt);
             glm::vec3 wristL = h - wu * (0.06f * scale) + wl * (0.03f * scale) - wf * (0.05f * scale);
+            if (recarregaCorrendo) {  // troca o pente: a mão desce até o pente e volta (no último 1,2 s da recarga)
+                const float k = c.reloadTimer >= 1.2f ? 0.f : std::sin(c.reloadTimer / 1.2f * 3.14159265f);
+                const glm::vec3 pente = onGun(glm::mix(c.gripPt, c.guardPt, 0.45f)) - wu * (0.09f * scale);
+                wristL = glm::mix(wristL, pente - wu * (0.04f * scale) - wf * (0.03f * scale), k);
+            }
             glm::vec3 nowL = glm::vec3(a->global[ha][3]);
             glm::vec3 poleL = glm::vec3(toSkel * glm::vec4(-upW + left * 0.35f, 0.f));  // cotovelo esquerdo por baixo da arma
             twoBoneIK(*a, up, fo, ha, glm::mix(nowL, wristL, c.supportW), poleL);
