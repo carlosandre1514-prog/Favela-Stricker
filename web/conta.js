@@ -15,6 +15,10 @@ const RARIDADES = { comum: 'Comum', rara: 'Rara', epica: 'Épica', lendaria: 'Le
 // gratuitas. Polícia só usa farda; bandido só roupa de bandido.
 const ROUPAS = [
   { key: 'soldado', nome: 'Soldado', time: 0, i: 0, preco: 0, raridade: 'comum' },
+  { key: 'pm', nome: 'PM', time: 0, i: 1, preco: 0, raridade: 'comum' },
+  { key: 'bope', nome: 'BOPE', time: 0, i: 2, preco: 0, raridade: 'comum' },
+  { key: 'exercito', nome: 'Selva', time: 0, i: 3, preco: 0, raridade: 'comum' },
+  { key: 'choque', nome: 'Choque', time: 0, i: 4, preco: 0, raridade: 'comum' },
   { key: 'criminoso1', nome: 'Malandro', time: 1, i: 0, preco: 0, raridade: 'comum' },
   { key: 'criminoso2', nome: 'Vapor', time: 1, i: 1, preco: 0, raridade: 'comum' },
   { key: 'criminoso3', nome: 'Olheiro', time: 1, i: 2, preco: 0, raridade: 'comum' },

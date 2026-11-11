@@ -21,12 +21,12 @@ namespace {
 bool sameHandle(Scene::Handle a, Scene::Handle b) { return a.index == b.index && a.gen == b.gen; }
 // ================= Polícia x Bandidos (partida de times) =================
 // Roupas da partida: os personagens da Meshy (shaders/kit/personagens/meshy, tools/preparar_personagem.py), com o
-// esqueleto e as animações do jogo. Polícia: o soldado; bandidos: 4. Todas gratuitas.
+// esqueleto e as animações do jogo. Polícia: 5 (soldado, PM, BOPE, selva, choque); bandidos: 4. Todas gratuitas.
 struct SkinDef { const char* name; int price; const char* modelo; };
-const SkinDef kSkins[2][4] = {{{"Soldado", 0, "soldado"}, {"", 0, ""}, {"", 0, ""}, {"", 0, ""}},
-                              {{"Malandro", 0, "criminoso1"}, {"Vapor", 0, "criminoso2"}, {"Olheiro", 0, "criminoso3"}, {"Frente", 0, "criminoso4"}}};
+const SkinDef kSkins[2][5] = {{{"Soldado", 0, "soldado"}, {"PM", 0, "pm"}, {"BOPE", 0, "bope"}, {"Selva", 0, "exercito"}, {"Choque", 0, "choque"}},
+                              {{"Malandro", 0, "criminoso1"}, {"Vapor", 0, "criminoso2"}, {"Olheiro", 0, "criminoso3"}, {"Frente", 0, "criminoso4"}, {"", 0, ""}}};
 // quantas roupas cada lado tem
-const int kSkinCount[2] = {1, 4};
+const int kSkinCount[2] = {5, 4};
 int clampSkin(int team, int skin) { return std::clamp(skin, 0, kSkinCount[std::clamp(team, 0, 1)] - 1); }
 
 // Aparência de um lutador: o modelo da roupa do lado, na altura do esqueleto dos modelos

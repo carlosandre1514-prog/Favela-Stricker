@@ -742,7 +742,7 @@ int main(int argc, char** argv) {
     if (std::getenv("SO_LOBBY")) {
         using nlohmann::json;
         eng::Engine* E = reinterpret_cast<eng::Engine*>(e);
-        static const char* keys[2][6] = {{"soldado", "", "", "", "", ""}, {"criminoso1", "criminoso2", "criminoso3", "criminoso4", "", ""}};
+        static const char* keys[2][6] = {{"soldado", "pm", "bope", "exercito", "choque", ""}, {"criminoso1", "criminoso2", "criminoso3", "criminoso4", "", ""}};
         const float cam[6] = {0.f, 1.0f, 0.f, std::getenv("CAM_YAW") ? float(std::atof(std::getenv("CAM_YAW"))) : -0.62f, 0.05f,
                               std::getenv("CAM_DIST") ? float(std::atof(std::getenv("CAM_DIST"))) : 2.4f};
         auto camera = [&] { engine_set_camera(e, cam[0], cam[1], cam[2], cam[3], cam[4], cam[5]); };
@@ -816,7 +816,7 @@ int main(int argc, char** argv) {
     }
     if (std::getenv("SO_RETRATOS_BLOCO")) {
         using nlohmann::json;
-        static const char* keys[2][6] = {{"soldado", "", "", "", "", ""}, {"criminoso1", "criminoso2", "criminoso3", "criminoso4", "", ""}};
+        static const char* keys[2][6] = {{"soldado", "pm", "bope", "exercito", "choque", ""}, {"criminoso1", "criminoso2", "criminoso3", "criminoso4", "", ""}};
         engine_new_scene(e);
         engine_set_time_of_day(e, 13.f);
         engine_set_quality(e, 0);  // sem sombra no chão (o recorte pega só o boneco)
@@ -996,7 +996,7 @@ int main(int argc, char** argv) {
         struct C { const char* nome; int clip; } clips[] = {{"parado", eng::CC_Idle}, {"andando", eng::CC_Walk}, {"correndo", eng::CC_Run},
             {"fuzil_mirando", eng::CC_Rifle + eng::AP_Aim}, {"fuzil_correndo", eng::CC_Rifle + eng::AP_Run}, {"agachado", eng::CC_CrouchWalk},
             {"recarregando", eng::CC_Reload}, {"pulando", eng::CC_Jump}, {"morte", eng::CC_Death}, {"acenando", eng::CC_Wave}};
-        const int roupas[][2] = {{0, 0}, {1, 0}, {1, 1}, {1, 2}, {1, 3}};
+        const int roupas[][2] = {{0, 0}, {0, 1}, {0, 2}, {0, 3}, {0, 4}, {1, 0}, {1, 1}, {1, 2}, {1, 3}};
         const char* so = std::getenv("ROUPA");
         for (auto& rp : roupas) {
             json look = json::parse(jogo_aparencia_roupa(rp[0], rp[1]));
