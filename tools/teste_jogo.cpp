@@ -1271,6 +1271,85 @@ int main(int argc, char** argv) {
         return g_fail ? 1 : 0;
     }
     // Offline: inimigo abatido derruba munição; a vida volta fora do combate (SO_DROP=1)
+    // Partidas em sequência no mesmo mapa (como no app): Ressurgência contra robôs, depois Polícia x Bandidos
+    // (SO_SEQUENCIA=1): o jogador tem que existir, andar e atirar em todas; mede o tempo do quadro
+    if (std::getenv("SO_SEQUENCIA")) {
+        using nlohmann::json;
+        eng::Engine* E = reinterpret_cast<eng::Engine*>(e);
+        abrirPartida();
+        const int ordem[] = {1, 0, 1, 0};
+        for (int k = 0; k < 4; ++k) {
+            const int modo = ordem[k];
+            jogo_modo(e, modo);
+            jogo_escolhas(e, k % 2, 0, "ak47", "tt33");
+            jogo_aquecimento(e, 20.f);
+            engine_set_first_person(e, 1);
+            engine_set_play(e, 1);
+            frames(e, 60);  // aquecendo (o primeiro quadro cria os bonecos)
+            double jogo = 0, envio = 0, desenho = 0;
+            const auto t0 = std::chrono::steady_clock::now();
+            for (int q = 0; q < 60; ++q) { engine_frame(e, 1.f / 60.f); glFinish(); jogo += E->profGame; envio += E->profSubmit; desenho += E->profRender; }
+            const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count() / 60.0;
+            std::printf("    por quadro: jogo/física/animação %.1f ms · envio %.1f ms · desenho %.1f ms\n", jogo / 60, envio / 60, desenho / 60);
+            {
+                const auto& st = E->renderer.stats();
+                std::printf("    triângulos %u · chamadas de desenho %u · objetos visíveis %u\n", st.triangles, st.drawCalls, st.visibleObjects);
+                if (std::getenv("TRIS")) {
+                    std::map<std::string, long> por;
+                    E->renderer.trisPorNome = &por;
+                    frames(e, 1);
+                    E->renderer.trisPorNome = nullptr;
+                    std::vector<std::pair<long, std::string>> v;
+                    for (auto& [n, q] : por) v.push_back({q, n});
+                    std::sort(v.rbegin(), v.rend());
+                    for (size_t i = 0; i < v.size() && i < 12; ++i) std::printf("      %7ld  %s\n", v[i].first, v[i].second.c_str());
+                }
+            }
+            eng::TeamMatch& M = eng::matchOf(E);
+            const int pf = eng::playerFighter(E);
+            json h = json::parse(std::string(jogo_hud(e)));
+            float p[3], r[3], sc[3];
+            engine_get_transform(e, engine_player_id(e), p, r, sc);
+            std::printf("  partida %d (%s): lutadores %zu · jogador %d · player %d · pos (%.1f, %.1f, %.1f) · armas %zu · aquecimento %d · %.1f ms/quadro\n",
+                        k + 1, modo ? "Ressurgência" : "PvB", M.f.size(), pf, E->player, p[0], p[1], p[2], h.value("armas", json::array()).size(), h.value("aquecimento", 0), ms);
+            if (pf < 0 || h.value("armas", json::array()).empty()) { std::printf("  [ERRO] sem jogador na partida\n"); ++g_fail; }
+            engine_set_play(e, 0);
+            frames(e, 2);
+        }
+        // Ressurgência em cada gráfico: o detalhe dos personagens cai do Avançado ao Leve; todos nascem no chão
+        long trisAntes = -1;
+        for (int nivel = 3; nivel >= 0; --nivel) {
+            engine_set_quality(e, nivel);
+            jogo_modo(e, 1);
+            jogo_escolhas(e, 0, 0, "ak47", "tt33");
+            jogo_aquecimento(e, 20.f);
+            engine_set_play(e, 1);
+            frames(e, 3);
+            eng::TeamMatch& M = eng::matchOf(E);
+            int noAr = 0;
+            for (const auto& f : M.f)
+                if (eng::GameObject* g = E->scene.get(f.root)) {
+                    const glm::vec3 p = g->transform.position;
+                    if (p.y > eng::mapHeight(E, p.x, p.z) + 6.f) ++noAr;  // (laje: até ~6 m acima do chão do mapa)
+                }
+            std::map<std::string, long> por;
+            E->renderer.trisPorNome = &por;
+            frames(e, 1);
+            E->renderer.trisPorNome = nullptr;
+            long corpo = por["Corpo"], armas = por["Peça de Fuzil"] + por["Peça de Pistola"];
+            double d = 0;
+            for (int q = 0; q < 30; ++q) { engine_frame(e, 1.f / 60.f); glFinish(); d += E->profRender; }
+            std::printf("  gráfico %d: corpos %ld · armas %ld triângulos visíveis · desenho %.1f ms · no alto %d\n", nivel, corpo, armas, d / 30, noAr);
+            if (noAr > 2) { std::printf("  [ERRO] gente nascendo no ar\n"); ++g_fail; }
+            if (trisAntes >= 0 && corpo + armas > trisAntes) { std::printf("  [ERRO] o gráfico mais fraco não ficou mais leve\n"); ++g_fail; }
+            trisAntes = corpo + armas;
+            engine_set_play(e, 0);
+            frames(e, 2);
+        }
+        engine_destroy(e);
+        std::printf(g_fail ? "FALHOU\n" : "OK\n");
+        return g_fail ? 1 : 0;
+    }
     // Aquecimento (SO_AQUECIMENTO=1): abate não conta, troca de arma funciona, no fim zera e começa a valer
     if (std::getenv("SO_AQUECIMENTO")) {
         using nlohmann::json;

@@ -139,6 +139,7 @@ void engine_frame(Engine* e, float dt) {
     auto tw = std::chrono::steady_clock::now();
     auto ms = [](auto a, auto b) { return std::chrono::duration<float, std::milli>(b - a).count(); };
     e->profWorld = ms(tw, std::chrono::steady_clock::now());
+    e->profGame = ms(t0, tw);
     eng::updateEffects(e, dt);
 
     // Câmera: near/far e distância de sombra acompanham o zoom e o tamanho do mapa

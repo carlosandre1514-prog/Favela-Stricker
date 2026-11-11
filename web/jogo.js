@@ -265,7 +265,7 @@ function telaModo(categoria) {
       <div class="linha" style="justify-content:space-between;align-items:center"><span class="rodape">${rodape}</span><span class="entrar">${botao}</span></div></button>`;
   const online = cat === 'online';
   const cartoes = online ? [
-    cartao('br', '#DC2626', ICONE.grupo, 'RESSURGÊNCIA', 'BATTLE ROYALE ONLINE', 'Até 40 pessoas em times de 1 a 4 caem do céu na favela. Caiu? Volta em 10 s perto do time. A zona fecha: o último time de pé vence.',
+    cartao('br', '#DC2626', ICONE.grupo, 'RESSURGÊNCIA', 'BATTLE ROYALE ONLINE', 'Até 40 pessoas em times de 1 a 4: cada time nasce junto, longe dos outros. Caiu? Volta em 10 s perto do time. A zona fecha: o último time de pé vence.',
       ['solo · duo · trio · squad', 'voz do time', 'com amigos'], '~8 min · só gente de verdade', 'JOGAR'),
     cartao('pvb', '#3B82F6', ICONE.escudo, 'POLÍCIA x BANDIDOS', '5 CONTRA 5 ONLINE', 'Sala com código para jogar com os amigos: cada um escolhe o lado. Até 50 abates ou 20 min, loja de armas na base.',
       ['até 10 pessoas', 'voz do time'], 'crie a sala e mande o código', 'JOGAR'),
@@ -274,7 +274,7 @@ function telaModo(categoria) {
   ] : [
     cartao('off-pvb', '#3B82F6', ICONE.escudo, 'POLÍCIA x BANDIDOS', 'CONTRA ROBÔS', 'Você e 4 robôs contra 5 robôs. Treine as armas, a mira e o mapa sem internet.',
       ['sem internet', 'loja na base'], 'até 50 abates ou 20 min', 'JOGAR'),
-    cartao('off-br', '#DC2626', ICONE.grupo, 'RESSURGÊNCIA', 'TREINO CONTRA ROBÔS', '10 times de 4 robôs (o seu time com você) caem na favela, com a zona fechando. Treine o battle royale.',
+    cartao('off-br', '#DC2626', ICONE.grupo, 'RESSURGÊNCIA', 'TREINO CONTRA ROBÔS', '10 times de 4 robôs (o seu time com você) nascem espalhados pela favela, com a zona fechando. Treine o battle royale.',
       ['sem internet', '40 na partida'], '~8 min', 'JOGAR'),
   ];
   const t = mostrar(html(`<div class="tela" style="gap:12px">

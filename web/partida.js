@@ -140,7 +140,7 @@ async function iniciarPartida(time, roupa, sala, armaPrincipal, modo = 0) {
     while (!motor.mapaPronto()) await dorme(150);
   }
   iniciandoPartida = false;
-  carga.status(modo === 1 ? 'Caindo na favela com o seu time…' : 'Entrando na partida…');
+  carga.status(modo === 1 ? 'Entrando na favela com o seu time…' : 'Entrando na partida…');
   setTimeout(() => carga.el.remove(), 12000);  // nunca fica presa
   motor.girarMenu(false);
   ctxAudio();

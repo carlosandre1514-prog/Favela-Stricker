@@ -315,7 +315,7 @@ struct Engine {
     // Estatísticas
     float statTime = 0.f, fps = 0.f, frameMs = 0.f, cpuMs = 0.f, cpuAccum = 0.f;
     // perfil do último quadro (ms): mundo (carregar pedaços), montar a lista de desenho, render (CPU do GL)
-    float profWorld = 0.f, profSubmit = 0.f, profRender = 0.f;
+    float profWorld = 0.f, profSubmit = 0.f, profRender = 0.f, profGame = 0.f;  // profGame: jogo, física e animações
     int quality = 2;  // 0 desempenho (sem sombra, vê menos longe), 1 equilibrado, 2 alta
     int nivel = 2;    // nível gráfico do jogo: 0 Leve, 1 Padrão, 2 Intermediária, 3 Ultra (applyQualityLevel)
     bool lowTextures = false;  // celular fraco (qualidade.txt = 0 ao abrir): texturas na metade e terreno simples

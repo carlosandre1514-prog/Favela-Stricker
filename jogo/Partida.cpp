@@ -80,6 +80,13 @@ int teamOf(const json& r) {
     return t.rfind("pol", 0) == 0 ? 0 : t.rfind("band", 0) == 0 ? 1 : -1;
 }
 
+// "kit:armas/x" -> "kit:armas/x_leve" se existir (tools/simplificar_arma.py); a pintura das skins usa o nome sem _leve
+std::string armaLeve(Engine* e, const std::string& arquivo) {
+    if (arquivo.rfind("kit:", 0) != 0) return arquivo;
+    if (FILE* t = std::fopen(kitPath(e, arquivo.substr(4) + "_leve").c_str(), "rb")) { std::fclose(t); return arquivo + "_leve"; }
+    return arquivo;
+}
+
 void equipGun(Engine* e, Fighter& f) {
     int ci = charIndexOfRoot(e, f.root);
     if (ci < 0) return;
@@ -93,8 +100,12 @@ void equipGun(Engine* e, Fighter& f) {
         return it == skins->end() ? std::string() : it->second;
     };
     WeaponLook look;
-    // skin com modelo próprio: a arma inteira troca; na mão do jogador deste aparelho, a versão detalhada
-    look.file = gunModelFile(e, gunOf(k).key, skinDe(gunOf(k).key), !f.remote && !f.bot && e->nivel >= 1);
+    // skin com modelo próprio: a arma inteira troca; na mão do jogador deste aparelho, a versão detalhada (só no
+    // gráfico Avançado: a da AK Energia Cósmica tem 1 milhão de triângulos)
+    const bool meu = !f.remote && !f.bot;
+    const std::string arqMao = gunModelFile(e, gunOf(k).key, skinDe(gunOf(k).key), meu && e->nivel >= 3);
+    // Ressurgência: a arma dos outros fica leve (~3 a 8 mil triângulos) no Padrão e no Leve
+    look.file = matchOf(e).modo == 1 && !meu && e->nivel <= 1 ? armaLeve(e, arqMao) : arqMao;
     int w = createWeapon(e, kind, ci, look);
     // pintura da skin; a de modelo próprio tem a dela (o UV de cada modelo é outro): armas/skins/<modelo>.jpg
     auto pintar = [&](GameObject& wg, const std::string& gun, const std::string& arquivo) {
@@ -107,15 +118,17 @@ void equipGun(Engine* e, Fighter& f) {
     };
     if (GameObject* wg = objectById(e, w)) {
         e->game.spawned.push_back(Scene::handleOf(*wg));
-        pintar(*wg, gunOf(k).key, look.file);
+        pintar(*wg, gunOf(k).key, arqMao);
     }
     // a outra arma fica guardada no corpo: fuzil nas costas, pistola na coxa
     const std::string outra = k == f.primary ? f.secondary : f.primary;
     if (!outra.empty() && outra != k && knownGun(outra)) {
         WeaponLook guardada;
-        guardada.file = gunModelFile(e, gunOf(outra).key, skinDe(gunOf(outra).key));
+        const std::string arqGuardada = gunModelFile(e, gunOf(outra).key, skinDe(gunOf(outra).key));
+        // guardada no corpo (fuzil nas costas, pistola na coxa): leve na Ressurgência, menos no Avançado
+        guardada.file = matchOf(e).modo == 1 && e->nivel <= 2 ? armaLeve(e, arqGuardada) : arqGuardada;
         int hw = holsterWeapon(e, ci, outra == "tt33" ? WK_Pistol : WK_Rifle, guardada);
-        if (GameObject* hg = objectById(e, hw)) pintar(*hg, gunOf(outra).key, guardada.file);
+        if (GameObject* hg = objectById(e, hw)) pintar(*hg, gunOf(outra).key, arqGuardada);
     } else {
         holsterWeapon(e, ci, -1, {});
     }
@@ -139,10 +152,22 @@ void fillAmmo(Fighter& f) {
     f.grenades = 2;
 }
 std::string g_killWeapon;  // arma do abate em andamento ("" = a arma de quem atirou)
+Scene::Handle g_projPlayer;  // o personagem do projeto que é o jogador (guardado no começo de cada partida)
 
 // Cria (ou recria, ao trocar de roupa) o personagem em jogo do lutador, em pos/yaw
 void spawnFighterBody(Engine* e, Fighter& f, glm::vec3 pos, float yaw) {
     json spec = {{"tipo", "personagem"}, {"aparencia", fighterLook(f.lado, f.skin, f.name)}, {"semente", 7}};
+    // Ressurgência (40 na partida): o detalhe do corpo segue o gráfico. Avançado = o modelo completo (30 a 38 mil
+    // triângulos); Intermediário ~18 mil; Padrão ~9 a 12 mil; Leve o mínimo. A cabeça fica sempre inteira
+    // (tools/simplificar_personagem.py). Sem a versão pedida, a próxima mais detalhada.
+    if (matchOf(e).modo == 1 && spec["aparencia"].contains("modelo")) {
+        static const char* kSufixo[4] = {"_minimo", "_leve", "_medio", ""};
+        const std::string base = spec["aparencia"]["modelo"].get<std::string>();
+        for (int n = std::clamp(e->nivel, 0, 3); n < 3; ++n) {
+            const std::string nome = base + kSufixo[n];
+            if (FILE* t = std::fopen(kitPath(e, "personagens/meshy/" + nome + ".bin").c_str(), "rb")) { std::fclose(t); spec["aparencia"]["modelo"] = nome; break; }
+        }
+    }
     spec["pos"] = {pos.x, pos.y, pos.z};
     spec["rot_y"] = glm::degrees(yaw);
     spec["nome"] = f.name;
@@ -474,7 +499,7 @@ bool visible(Engine* e, Fighter& a, Fighter& b) {
 }
 
 // ======================= Battle Royale Ressurgência =======================
-// 10 times de 4 caem do céu espalhados pela favela. Quem cai renasce em 10 s perto de um companheiro vivo; o time
+// 10 times de 4 nascem no chão, cada time junto num ponto da favela longe dos outros. Quem cai renasce em 10 s perto de um companheiro vivo; o time
 // que fica todo no chão ao mesmo tempo está fora. A zona fecha em 6 fases (fora dela a vida vai embora) e nas duas
 // últimas ninguém renasce mais. Vence o último time de pé.
 struct FaseZona { float espera, fecha, raio, dano; };
@@ -483,7 +508,7 @@ const FaseZona kFases[] = {{60.f, 45.f, 75.f, 2.f}, {50.f, 40.f, 50.f, 4.f}, {45
 constexpr int kFasesN = 6;
 constexpr int kFaseSemRenascer = 4;  // da 5ª fase em diante, quem cai está fora
 constexpr int kTimesBR = 10, kPorTimeBR = 4, kMaxTimesBR = 40;  // offline (testes): 10 x 4; online: até 40 times (solo)
-constexpr float kRenasceBR = 10.f, kZonaInicial = 110.f, kAlturaQueda = 22.f;
+constexpr float kRenasceBR = 10.f, kZonaInicial = 110.f;
 const char* kNomesBR[] = {"Biel", "Dedé", "Neguin", "Tico", "Juninho", "Kaká", "Lipe", "Nando", "Rafa", "Tuta", "Vini", "Zé",
                           "Bruninho", "Caio", "Davi", "Edu", "Fael", "Guto", "Hugo", "Igor", "Jow", "Kauã", "Léo", "Márcio",
                           "Nico", "Pedrinho", "Quinho", "Rodrigo", "Sid", "Teteu", "Uri", "Valdo", "Wesley", "Xandi", "Yuri",
@@ -590,8 +615,7 @@ void brStart(Engine* e) {
             f.netWeapon = f.weapon;
             const int k = noTime[f.team]++;
             const float a = 6.2831853f * k / std::max(1, M.tamanhoTime) + 0.3f;
-            glm::vec3 p = groundAt(e, pousos[f.team] + glm::vec3(std::cos(a), 0.f, std::sin(a)) * 1.8f);
-            p.y += kAlturaQueda;
+            glm::vec3 p = groundAt(e, pousos[f.team] + glm::vec3(std::cos(a), 0.f, std::sin(a)) * 1.8f);  // no chão, com o time
             M.f.push_back(f);
             spawnFighterBody(e, M.f.back(), p, a);
             M.f.back().lastPos = p;
@@ -620,8 +644,7 @@ void brStart(Engine* e) {
                 fillAmmo(f);
             }
             const float a = 6.2831853f * k / kPorTimeBR + e->fxRng.range(0.f, 0.6f);
-            glm::vec3 p = groundAt(e, pousos[t] + glm::vec3(std::cos(a), 0.f, std::sin(a)) * 1.8f);
-            p.y += kAlturaQueda;  // cai do céu
+            glm::vec3 p = groundAt(e, pousos[t] + glm::vec3(std::cos(a), 0.f, std::sin(a)) * 1.8f);  // no chão, com o time
             M.f.push_back(f);
             spawnFighterBody(e, M.f.back(), p, e->fxRng.range(0.f, 6.2831853f));
             M.f.back().lastPos = p;
@@ -637,7 +660,7 @@ void brStart(Engine* e) {
     G.message = "Ressurgência: " + std::to_string(M.times) + " times. Fique dentro da zona!";
 }
 
-// Volta perto de um companheiro vivo (dentro da zona, sem inimigo colado), caindo do céu
+// Volta perto de um companheiro vivo (dentro da zona, sem inimigo colado), no chão
 void brRenascer(Engine* e, Fighter& f) {
     TeamMatch& M = matchOf(e);
     glm::vec3 alvo(1e9f);
@@ -651,8 +674,7 @@ void brRenascer(Engine* e, Fighter& f) {
         if (spots.empty()) for (const glm::vec3& n : M.nav) if (distZona(M.zona, n) < M.zona.r) spots.push_back(n);
         if (spots.empty()) return;
         glm::vec3 p = groundAt(e, spots[e->fxRng.irange(0, int(spots.size()) - 1)]);
-        p.y += kAlturaQueda;
-        reviveAt(e, f, p, "De volta! Caiu de novo na zona");
+        reviveAt(e, f, p, "De volta! Você voltou dentro da zona");
         return;
     }
     for (const glm::vec3& n : M.nav) {
@@ -663,8 +685,7 @@ void brRenascer(Engine* e, Fighter& f) {
     glm::vec3 p = spots.empty() ? alvo + glm::vec3(e->fxRng.range(-3.f, 3.f), 0.f, e->fxRng.range(-3.f, 3.f))
                                 : spots[e->fxRng.irange(0, int(spots.size()) - 1)];
     p = groundAt(e, p);
-    p.y += kAlturaQueda;
-    reviveAt(e, f, p, "De volta! Caiu perto do seu time");
+    reviveAt(e, f, p, "De volta! Você voltou perto do seu time");
 }
 
 void brUpdate(Engine* e, float dt) {
@@ -697,7 +718,7 @@ void brUpdate(Engine* e, float dt) {
             }
         }
     }
-    // queda do céu (começo e renascer): cai devagar, como de paraquedas (rápido demais atravessava o chão);
+    // queda (pulo de laje etc.): no máximo 6 m/s (rápido demais atravessava o chão);
     // se mesmo assim alguém passar para baixo do mapa, volta para o chão ali em cima
     for (Fighter& f : M.f) {
         if (f.dead || f.remote) continue;
@@ -824,7 +845,7 @@ void brUpdate(Engine* e, float dt) {
 }
 
 // Fim do aquecimento: zera abates, quedas, placar e dinheiro; todos voltam vivos para o começo (base na Polícia x
-// Bandidos, caindo do céu no ponto do time na Ressurgência) e o relógio da partida começa a contar
+// Bandidos; na Ressurgência, cada time no seu ponto, longe dos outros) e o relógio da partida começa a contar
 void fimAquecimento(Engine* e) {
     TeamMatch& M = matchOf(e);
     M.aquecimento = 0.f;
@@ -841,8 +862,7 @@ void fimAquecimento(Engine* e) {
             const int k = noTime[std::clamp(f.team, 0, 63)]++;
             const float a = 6.2831853f * k / std::max(1, M.tamanhoTime) + 0.3f;
             glm::vec3 p = groundAt(e, M.pousos[std::clamp(f.team, 0, int(M.pousos.size()) - 1)] + glm::vec3(std::cos(a), 0.f, std::sin(a)) * 1.8f);
-            p.y += kAlturaQueda;
-            reviveAt(e, f, p, "VALENDO! Caindo na favela");
+            reviveAt(e, f, p, "VALENDO! O seu time está junto, longe dos outros");
         } else {
             respawn(e, f);
         }
@@ -967,6 +987,8 @@ void teamStart(Engine* e) {
     struct Slot { Scene::Handle h; int team; bool player; };
     std::vector<Slot> slots;
     Scene::Handle playerRoot = e->player >= 0 && e->player < int(e->characters.size()) ? e->characters[e->player].root : Scene::Handle{};
+    if (e->scene.get(playerRoot)) g_projPlayer = playerRoot;
+    else if (e->scene.get(g_projPlayer)) playerRoot = g_projPlayer;  // o jogador sumiu (partida anterior): volta o do projeto
     for (GameObject* go : [&] { std::vector<GameObject*> v; e->scene.forEach([&](GameObject& g, Scene::Handle) { if (g.id >= 0 && !g.transform.parent && g.recipe >= 0 && g.active) v.push_back(&g); }); return v; }()) {
         json r = recipeOf(e, *go);
         std::string tipo = r.value("tipo", "");
@@ -1868,6 +1890,7 @@ void Partida::onPlayStart(Engine* e) { teamStart(e); }  // Polícia x Bandidos (
 void Partida::onPlayStop(Engine* e) {
     g_origPlayer = {};
     for (const Fighter& f : M.f) if (!f.bot) g_origPlayer = f.original;
+    if (!e->scene.get(g_origPlayer)) g_origPlayer = g_projPlayer;  // Ressurgência: o jogador foi criado na partida
     g_hadMatch = M.active;
     teamStop(e);
 }
