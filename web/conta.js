@@ -281,7 +281,8 @@ let salvando = null;
 function salvarConta() {
   if (!fb || !fb.token) return;
   clearTimeout(salvando);
-  salvando = setTimeout(() => fb.put('usuarios/' + fb.uid, contaJson()).catch(() => {}), 400);
+  // PATCH: troca só estes campos (o histórico de partidas e o ID ficam no mesmo lugar e não podem sumir)
+  salvando = setTimeout(() => fb.patch('usuarios/' + fb.uid, contaJson()).catch(() => {}), 400);
 }
 // 1º login: a conta recebe o que já está no aparelho; depois o aparelho segue a conta
 async function carregarConta() {

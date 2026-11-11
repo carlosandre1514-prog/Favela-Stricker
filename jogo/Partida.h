@@ -18,6 +18,9 @@ struct Fighter {
     bool bot = true, dead = false;
     float hp = 100.f, deadTime = 0.f;
     int kills = 0, deaths = 0, money = 800;
+    float danoCausado = 0.f;        // histórico: dano que este lutador causou na partida
+    int cabecas = 0;               // histórico: abates com o último tiro na cabeça
+    bool ultimoCabeca = false;     // o último tiro que levou foi na cabeça?
     int skin = 0;                  // roupa (índice na lista do time)
     std::string weapon = "pistola";
     std::vector<int> owned;        // armas/roupas compradas (ids da loja)

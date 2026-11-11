@@ -503,3 +503,44 @@ body.menu-fundo canvas#tela { visibility: hidden; }
 .filtro-armas button { flex: none; white-space: nowrap; padding: 5px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; color: #D1D5DB; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.1); }
 .filtro-armas button.sel { background: #FBBF24; color: #111827; border-color: #FBBF24; }
 .abas .aba { white-space: nowrap; }
+
+/* histórico de partidas */
+.hist-resumo { width: 236px; flex: none; gap: 8px; display: flex; flex-direction: column; padding: 10px; overflow-y: auto; min-height: 0; }
+.hist-titulo { font-size: 11px; font-weight: 800; letter-spacing: 2px; color: #FCD34D; }
+.hist-grade { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.hist-est { display: flex; flex-direction: column; gap: 1px; padding: 5px 9px; border-radius: 10px; background: rgba(255,255,255,.05); }
+.hist-est b { font-family: 'Bebas Neue', Impact, sans-serif; font-size: 21px; line-height: 1; color: #F9FAFB; letter-spacing: .5px; }
+.hist-est b small { font-family: Inter, system-ui, sans-serif; font-size: 11px; color: #86EFAC; letter-spacing: 0; }
+.hist-est span { font-size: 9px; font-weight: 800; letter-spacing: 1.5px; color: #9CA3AF; }
+.hist-lista { display: flex; flex-direction: column; gap: 6px; overflow-y: auto; min-height: 0; padding-right: 2px; }
+.hist-linha { --res: #6B7280; display: grid; grid-template-columns: 76px minmax(0, 1fr) repeat(4, 44px) 66px; align-items: center; gap: 6px; text-align: left;
+  padding: 7px 12px 7px 0; border-radius: 12px; color: #F3F4F6; flex: none;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--res) 26%, transparent), rgba(255,255,255,.035) 40%); border: 1px solid rgba(255,255,255,.08); border-left: 4px solid var(--res); }
+.hist-linha:hover, .hist-linha:focus-visible { border-color: color-mix(in srgb, var(--res) 60%, transparent); border-left-color: var(--res); outline: none; }
+.res-v { --res: #FBBF24; } .res-t { --res: #22C55E; } .res-d { --res: #EF4444; } .res-s { --res: #6B7280; }
+.hist-res { display: flex; flex-direction: column; align-items: center; line-height: 1; }
+.hist-res .bebas { font-size: 23px; color: color-mix(in srgb, var(--res) 70%, #fff); }
+.hist-res small { font-size: 10px; color: #D1D5DB; margin-top: 2px; }
+.hist-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.hist-info b { font-size: 13px; letter-spacing: .5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hist-info span { font-size: 11px; color: #9CA3AF; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hist-info .ponto-on { display: inline-block; vertical-align: middle; }
+.hist-num { display: flex; flex-direction: column; align-items: center; line-height: 1.05; }
+.hist-num b { font-size: 16px; }
+.hist-num small { font-size: 9px; color: #9CA3AF; text-transform: uppercase; letter-spacing: .5px; }
+.hist-xp { font-size: 11px; font-weight: 800; color: #FCD34D; text-align: right; }
+.hist-vazio { margin: auto; display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; }
+.hist-vazio .bebas { font-size: 30px; }
+.hist-detalhe { width: min(640px, calc(100vw - 32px)); max-height: calc(100vh - 16px); overflow-y: auto; gap: 7px; padding-top: 10px; padding-bottom: 10px; border-top: 4px solid var(--res); }
+.hist-detalhe .hist-grade { grid-template-columns: repeat(5, 1fr); display: grid; }
+.hist-grande { font-size: 32px; line-height: .95; color: color-mix(in srgb, var(--res) 70%, #fff); }
+.hist-retrato { width: 50px; height: 64px; object-fit: contain; border-radius: 10px; background: rgba(255,255,255,.05); }
+.hist-arma { width: 130px; height: 56px; object-fit: contain; }
+.hist-tab { display: flex; flex-direction: column; gap: 0; padding: 5px 8px; border-radius: 10px; background: rgba(255,255,255,.04); }
+.hist-jog { font-size: 12px; padding: 2px 6px; border-radius: 6px; gap: 6px; }
+.hist-jog > b, .hist-jog > span:not(.cresce) { width: 52px; text-align: right; }
+.hist-jog.cab { font-size: 10px; font-weight: 800; letter-spacing: 1px; }
+.hist-jog.eu { background: rgba(255,255,255,.12); font-weight: 800; }
+@media (max-width: 720px) { .hist-linha { grid-template-columns: 80px minmax(0, 1fr) repeat(2, 46px) 64px; } .hist-linha .hist-num:nth-of-type(n+5) { display: none; } }
+.hist-detalhe .hist-est b { font-size: 19px; }
+.hist-detalhe .hist-grade { gap: 6px; }

@@ -145,7 +145,8 @@ async function iniciarPartida(time, roupa, sala, armaPrincipal, modo = 0) {
   motor.girarMenu(false);
   ctxAudio();
   const br = modo === 1;  // Ressurgência: online (sala da Ressurgência)
-  partida = { time, sala, fim: false, agachado: false, mirando: false, danoAntes: false, modo: br ? 1 : 0 };
+  partida = { time, sala, fim: false, agachado: false, mirando: false, danoAntes: false, modo: br ? 1 : 0,
+    inicio: Date.now(), roupa: roupa.key, arma: armaPrincipal || armaInicial(time) };  // (o histórico guarda com que jogou)
   ultimoHud = {};
   montarHud(!!sala, br);
   const rosterBR = br && sala ? sala.rosterBRpronto : null;
@@ -636,7 +637,8 @@ function pausar() {
   $('#p-voltar', c).onclick = () => { c.remove(); if (!TOQUE) travarMouse(); };
   $('#p-sair', c).onclick = async () => {
     c.remove();
-    if (await confirmar('Sair da partida?', partida.sala ? 'Você sai da sala também.' : 'O progresso desta partida não conta.', 'Sair')) {
+    if (await confirmar('Sair da partida?', partida.sala ? 'Você sai da sala também.' : 'O progresso desta partida não conta (vai para o histórico como "saiu").', 'Sair')) {
+      registrarPartida(ultimoHud, { saiu: true });
       pararPartida(); sairDaSala(); telaInicio();
     }
   };

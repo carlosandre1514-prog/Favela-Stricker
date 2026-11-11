@@ -8,7 +8,7 @@ function topo(titulo, voltar, extra = '', direita = chipMoedas(false)) {
   return h;
 }
 function ligarAtalhos(t) {
-  for (const b of $$('[data-ir]', t)) b.onclick = () => ({ moedas: telaMoedas, mercado: () => telaMercado('todas'), armas: () => telaArmas(), config: () => telaConfig('sens'), multi: () => telaModo('online'), amigos: () => telaAmigos('amigos'), chat: telaChatGlobal })[b.dataset.ir]();
+  for (const b of $$('[data-ir]', t)) b.onclick = () => ({ moedas: telaMoedas, mercado: () => telaMercado('todas'), armas: () => telaArmas(), config: () => telaConfig('sens'), multi: () => telaModo('online'), amigos: () => telaAmigos('amigos'), chat: telaChatGlobal, historico: () => telaHistorico() })[b.dataset.ir]();
 }
 const nomeNivel = () => NIVEIS[motor.nivel()]?.nome || 'Leve';
 
@@ -223,6 +223,7 @@ function telaInicio() {
       <div class="grade">
         <button class="btn btn-fraco" data-ir="mercado">${ICONE.skins} Skins</button>
         <button class="btn btn-fraco" data-ir="armas">${ICONE.armas} Arsenal</button>
+        <button class="btn btn-fraco" data-ir="historico" style="grid-column:1 / -1">${ICONE.relogio} Histórico de partidas</button>
       </div>
     </div>
     <div class="direita-topo">
@@ -1041,10 +1042,11 @@ function fimRessurgencia(j) {
   const br = j.br || {};
   const lugar = br.colocacao | 0 || 10;
   const online = !!(partida && partida.sala);
-  pararPartida();
-  if (online) sairDaSala();
   const xpAbates = (j.abates | 0) * XP_ABATE, xpResultado = lugar === 1 ? XP_VITORIA : lugar <= 3 ? XP_EMPATE : XP_DERROTA;
   const xp = conta.ganharXp(xpAbates + xpResultado);
+  registrarPartida(j, { xp: xpAbates + xpResultado, online });
+  pararPartida();
+  if (online) sairDaSala();
   const subiu = xp.depois.nivel > xp.antes.nivel;
   const pctXp = xp.depois.precisa ? Math.round(100 * xp.depois.noNivel / xp.depois.precisa) : 100;
   const meus = (j.jogadores || []).filter((p) => p.time === j.time).sort((a, b) => b.abates - a.abates);
@@ -1087,8 +1089,9 @@ function fimDePartida(j) {
   const venceu = sc[0] > sc[1] ? 0 : sc[1] > sc[0] ? 1 : -1;
   const time = partida ? partida.time : 0;
   const s = partida && partida.sala;
-  pararPartida();
   const xpAbates = (j.abates | 0) * XP_ABATE, xpResultado = venceu === time ? XP_VITORIA : venceu < 0 ? XP_EMPATE : XP_DERROTA;
+  registrarPartida(j, { xp: xpAbates + xpResultado, online: !!s });
+  pararPartida();
   const xp = conta.ganharXp(xpAbates + xpResultado);
   const subiu = xp.depois.nivel > xp.antes.nivel;
   const pctXp = xp.depois.precisa ? Math.round(100 * xp.depois.noNivel / xp.depois.precisa) : 100;
@@ -1127,6 +1130,163 @@ function fimDePartida(j) {
   </div>`), 'fim');
   if (s) { $('#f-sair', t).onclick = () => { sairDaSala(); telaInicio(); }; $('#f-volta', t).onclick = () => { s.voltar(); telaSala(); }; }
   else { $('#f-menu', t).onclick = telaInicio; $('#f-novo', t).onclick = () => telaRoupa(time); }
+}
+
+// ---------------- histórico de partidas ----------------
+// Cada partida que termina (ou de que a pessoa sai) vira uma linha: modo, resultado, abates, quedas, dano, abates
+// na cabeça, tempo, XP, personagem e arma, e o placar de quem jogou. Fica no aparelho (as 50 últimas) e na conta
+// (usuarios/<uid>/historico), então aparece em qualquer aparelho em que a pessoa entrar.
+const HIST_MAX = 50;
+const historicoLocal = () => guardado.get('historico', []);
+function registrarPartida(j, { xp = 0, online = false, saiu = false } = {}) {
+  if (!partida || !j || !j.ativo) return;
+  const dur = Math.round((Date.now() - (partida.inicio || Date.now())) / 1000);
+  if (saiu && dur < 20) return;  // abriu e saiu na hora: não conta
+  const br = partida.modo === 1;
+  const time = j.time ?? partida.time;
+  const p = {
+    id: 'p' + Date.now(), em: Date.now(), modo: br ? 'br' : 'pvb', online: !!(online || partida.sala), dur,
+    abates: j.abates | 0, mortes: j.mortes | 0, dano: j.danoCausado | 0, cabecas: j.cabecas | 0, xp: Math.round(xp),
+    roupa: partida.roupa || '', arma: partida.arma || '', skin: partida.arma ? conta.skinArma(partida.arma) : '', lado: partida.time | 0,
+    tabela: (j.jogadores || []).filter((x) => !br || x.time === time).slice(0, 10)
+      .map((x) => ({ n: String(x.nome || '').slice(0, 16), t: x.time | 0, a: x.abates | 0, m: x.mortes | 0, v: !!x.voce })),
+  };
+  if (br) {
+    const b = j.br || {};
+    p.lugar = saiu ? 0 : (b.colocacao | 0) || (b.totalTimes || 10);
+    p.times = b.totalTimes || 10;
+    p.res = saiu ? 's' : p.lugar === 1 ? 'v' : 'd';
+  } else {
+    const sc = j.placar || [0, 0];
+    p.placar = [sc[0] | 0, sc[1] | 0];
+    p.res = saiu ? 's' : sc[0] === sc[1] ? 'e' : (sc[0] > sc[1] ? 0 : 1) === (partida.time | 0) ? 'v' : 'd';
+  }
+  guardado.set('historico', [p, ...historicoLocal()].slice(0, HIST_MAX));
+  if (fb && fb.token) {
+    fb.put(`usuarios/${fb.uid}/historico/${p.id}`, p).then(() => podarHistorico()).catch(() => {});
+  }
+}
+// na conta ficam só as 50 últimas
+async function podarHistorico() {
+  const u = await fb.url(`usuarios/${fb.uid}/historico`);
+  const r = await fetch(u + (u.includes('?') ? '&' : '?') + 'shallow=true');
+  if (!r.ok) return;
+  const chaves = Object.keys((await r.json()) || {}).sort();
+  if (chaves.length <= HIST_MAX) return;
+  const apagar = {};
+  for (const k of chaves.slice(0, chaves.length - HIST_MAX)) apagar[k] = null;
+  await fb.patch(`usuarios/${fb.uid}/historico`, apagar);
+}
+// junta o que está na conta com o que está no aparelho (partidas de outro aparelho aparecem aqui)
+async function sincronizarHistorico() {
+  if (!fb || !fb.token) return false;
+  try {
+    const u = await fb.url(`usuarios/${fb.uid}/historico`);
+    const r = await fetch(u + (u.includes('?') ? '&' : '?') + 'orderBy=%22%24key%22&limitToLast=' + HIST_MAX);
+    if (!r.ok) return false;
+    const remoto = Object.values((await r.json()) || {}).filter((p) => p && p.id && p.em);
+    const porId = new Map(historicoLocal().map((p) => [p.id, p]));
+    const antes = porId.size;
+    for (const p of remoto) {
+      p.tabela = Array.isArray(p.tabela) ? p.tabela : Object.values(p.tabela || {});
+      porId.set(p.id, p);
+    }
+    const lista = [...porId.values()].sort((a, b) => b.em - a.em).slice(0, HIST_MAX);
+    guardado.set('historico', lista);
+    return porId.size !== antes;
+  } catch (_) { return false; }
+}
+function quandoFoi(ms) {
+  const d = new Date(ms), hoje = new Date();
+  const hm = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  const dias = Math.round((new Date(hoje.toDateString()) - new Date(d.toDateString())) / 86400000);
+  return dias === 0 ? 'hoje ' + hm : dias === 1 ? 'ontem ' + hm : d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) + ' ' + hm;
+}
+const duracao = (s) => (s >= 60 ? Math.floor(s / 60) + ' min' + (s % 60 >= 10 ? ' ' + (s % 60) + ' s' : '') : s + ' s');
+function resultadoHist(p) {
+  if (p.res === 's') return { txt: 'SAIU', sub: 'saiu antes do fim', cls: 'res-s' };
+  if (p.modo === 'br') return p.lugar === 1 ? { txt: 'VITÓRIA', sub: `#1 de ${p.times}`, cls: 'res-v' }
+    : { txt: '#' + p.lugar, sub: `de ${p.times} times`, cls: p.lugar <= 3 ? 'res-t' : 'res-d' };
+  const pl = p.placar || [0, 0];
+  return { txt: p.res === 'v' ? 'VITÓRIA' : p.res === 'e' ? 'EMPATE' : 'DERROTA', sub: `${pl[0]} x ${pl[1]}`, cls: p.res === 'v' ? 'res-v' : p.res === 'e' ? 'res-t' : 'res-d' };
+}
+function telaHistorico(filtro = 'todas') {
+  motor.girarMenu(true);
+  const desenhar = () => {
+    const todas = historicoLocal();
+    const l = todas.filter((p) => filtro === 'todas' || p.modo === filtro);
+    const soma = (k) => l.reduce((s, p) => s + (p[k] | 0), 0);
+    const vit = l.filter((p) => p.res === 'v').length;
+    const abates = soma('abates'), mortes = soma('mortes');
+    const pct = (a, b) => (b ? Math.round(100 * a / b) + '%' : '—');
+    const melhor = l.reduce((m, p) => Math.max(m, p.abates | 0), 0);
+    const est = [
+      ['PARTIDAS', fmt(l.length)],
+      ['VITÓRIAS', `${fmt(vit)} <small>${pct(vit, l.length)}</small>`],
+      ...(filtro === 'br' ? [['TOP 3', fmt(l.filter((p) => p.modo === 'br' && p.lugar >= 1 && p.lugar <= 3).length)]] : []),
+      ['ABATES', fmt(abates)],
+      ['A/Q', mortes ? (abates / mortes).toFixed(2).replace('.', ',') : abates ? fmt(abates) : '—'],
+      ['DANO MÉDIO', l.length ? fmt(Math.round(soma('dano') / l.length)) : '—'],
+      ['NA CABEÇA', pct(soma('cabecas'), abates)],
+      ['MAIS ABATES', fmt(melhor)],
+    ];
+    $('#h-est', t).innerHTML = est.map(([n, v]) => `<div class="hist-est"><b>${v}</b><span>${n}</span></div>`).join('');
+    $('#h-lista', t).innerHTML = l.length ? l.map((p, i) => {
+      const r = resultadoHist(p);
+      return `<button class="hist-linha ${r.cls}" data-i="${i}">
+        <div class="hist-res"><span class="bebas">${r.txt}</span><small>${esc(r.sub)}</small></div>
+        <div class="hist-info"><b>${p.modo === 'br' ? 'RESSURGÊNCIA' : 'POLÍCIA x BANDIDOS'}</b>
+          <span>${p.online ? '<i class="ponto-on on"></i> online' : 'contra robôs'} · ${quandoFoi(p.em)} · ${duracao(p.dur | 0)}</span></div>
+        <div class="hist-num"><b>${p.abates | 0}</b><small>abates</small></div>
+        <div class="hist-num"><b>${p.mortes | 0}</b><small>quedas</small></div>
+        <div class="hist-num"><b>${fmt(p.dano | 0)}</b><small>dano</small></div>
+        <div class="hist-num"><b>${p.cabecas | 0}</b><small>cabeça</small></div>
+        <div class="hist-xp">+${fmt(p.xp | 0)} XP</div></button>`;
+    }).join('') : `<div class="hist-vazio"><span class="bebas">NENHUMA PARTIDA AINDA</span><span class="dica">Jogue uma partida: ela aparece aqui com os seus números.</span>
+        <button class="btn btn-ouro" id="h-jogar">${ICONE.play} JOGAR</button></div>`;
+    for (const b of $$('.hist-linha', t)) b.onclick = () => detalheHistorico(l[Number(b.dataset.i)]);
+    const jg = $('#h-jogar', t);
+    if (jg) jg.onclick = () => telaModo();
+  };
+  const t = mostrar(html(`<div class="tela" style="gap:10px">
+    <div class="segmento" role="tablist">${[['todas', 'TODAS'], ['br', 'RESSURGÊNCIA'], ['pvb', 'POLÍCIA x BANDIDOS']].map(([k, n]) =>
+      `<button role="tab" class="${k === filtro ? 'sel' : ''}" data-f="${k}" aria-selected="${k === filtro}">${n}</button>`).join('')}</div>
+    <div class="linha cresce" style="align-items:stretch;gap:12px;min-height:0">
+      <div class="cartao hist-resumo"><span class="hist-titulo">SUAS ESTATÍSTICAS</span><div class="hist-grade" id="h-est"></div></div>
+      <div class="hist-lista cresce" id="h-lista"></div>
+    </div></div>`), 'historico');
+  t.prepend(topo('HISTÓRICO DE PARTIDAS', telaInicio, '', '<span class="dica">as 50 últimas · na sua conta</span>'));
+  for (const b of $$('[data-f]', t)) b.onclick = () => telaHistorico(b.dataset.f);
+  desenhar();
+  sincronizarHistorico().then((mudou) => { if (mudou && telaAtual() === 'historico') desenhar(); });
+}
+function detalheHistorico(p) {
+  const r = resultadoHist(p);
+  const roupa = ROUPAS.find((x) => x.key === p.roupa);
+  const arma = ARMAS.find((a) => a.key === p.arma);
+  const linhaJ = (x) => `<div class="linha hist-jog ${x.v ? 'eu' : ''}"><span class="cresce">${x.v ? 'Você' : esc(x.n)}</span><b>${x.a}</b><span class="apagado">${x.m}</span></div>`;
+  const cab = (nome, cor) => `<div class="linha hist-jog cab" style="color:${cor}"><span class="cresce">${nome}</span><span>ABATES</span><span>QUEDAS</span></div>`;
+  const tab = p.tabela || [];
+  const placar = p.modo === 'br'
+    ? `<div class="hist-tab">${cab('SEU TIME', '#86EFAC')}${tab.sort((a, b) => b.a - a.a).map(linhaJ).join('')}</div>`
+    : `<div class="linha" style="gap:10px;align-items:flex-start">${[0, 1].map((tm) => `<div class="hist-tab cresce">${cab(tm ? 'BANDIDOS' : 'POLÍCIA', tm ? '#FCD34D' : '#93C5FD')}
+        ${tab.filter((x) => x.t === tm).sort((a, b) => b.a - a.a).map(linhaJ).join('')}</div>`).join('')}</div>`;
+  const c = html(`<div class="camada fixo"><div class="janela hist-detalhe ${r.cls}">
+    <div class="linha" style="gap:14px;align-items:center">
+      ${roupa ? `<img class="hist-retrato" src="retratos/${roupa.key}.png" alt="${esc(roupa.nome)}">` : ''}
+      <div class="coluna cresce" style="gap:2px"><span class="dica" style="font-size:11px;font-weight:800;letter-spacing:2px">${p.modo === 'br' ? 'RESSURGÊNCIA' : 'POLÍCIA x BANDIDOS'} · ${p.online ? 'ONLINE' : 'CONTRA ROBÔS'}</span>
+        <span class="bebas hist-grande">${r.txt}</span><span class="dica">${esc(r.sub)} · ${quandoFoi(p.em)} · ${duracao(p.dur | 0)}</span>
+        ${roupa ? `<span class="dica">${esc(roupa.nome)}${arma ? ' · ' + esc(arma.nome) : ''}</span>` : ''}</div>
+      ${arma ? `<img class="hist-arma" src="armas/${arma.key}${p.skin ? '_' + p.skin : ''}.png" alt="" onerror="this.src='armas/${arma.key}.png'">` : ''}
+    </div>
+    <div class="hist-grade linha">${[['ABATES', p.abates | 0], ['QUEDAS', p.mortes | 0], ['DANO', fmt(p.dano | 0)], ['NA CABEÇA', p.cabecas | 0], ['XP', '+' + fmt(p.xp | 0)]]
+      .map(([n, v]) => `<div class="hist-est"><b>${v}</b><span>${n}</span></div>`).join('')}</div>
+    ${tab.length ? placar : ''}
+    <div class="linha" style="justify-content:flex-end"><button class="btn btn-ouro" id="hd-ok">Fechar</button></div>
+  </div></div>`);
+  palco.appendChild(c);
+  $('#hd-ok', c).onclick = () => c.remove();
+  c.onclick = (e) => { if (e.target === c) c.remove(); };
 }
 
 // ---------------- início ----------------

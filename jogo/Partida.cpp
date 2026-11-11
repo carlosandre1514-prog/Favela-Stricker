@@ -341,6 +341,7 @@ void killFighter(Engine* e, int vi, int ai) {
     if (ai >= 0 && ai != vi && M.f[ai].team != v.team) {
         Fighter& a = M.f[ai];
         ++a.kills;
+        if (v.ultimoCabeca) ++a.cabecas;
         if (M.modo == 0) { ++M.score[a.team]; a.money += 300; }
         msg = std::string(kTeamIcon[a.lado]) + " " + a.name + " abateu " + kTeamIcon[v.lado] + " " + v.name;
         if (!a.bot && M.modo == 0) msg += "  (+$300)";
@@ -1237,6 +1238,10 @@ bool teamDamage(Engine* e, GameObject* root, float dmg) {
         if (e->scene.get(f.root) != root) continue;
         if (f.dead) return true;
         if (att >= 0 && att < int(M.f.size()) && M.f[att].team == f.team) return true;  // sem fogo amigo
+        // histórico: dano de verdade (o que tirou da vida) e se o golpe foi na cabeça (tiro marcado agora)
+        f.ultimoCabeca = g_killWeapon.empty() && e->hitMarker >= 0.249f && e->hitHead;
+        if (att >= 0 && att < int(M.f.size()))
+            M.f[att].danoCausado += std::min(dmg, f.remote ? 100.f : f.bot ? std::max(0.f, f.hp) : std::max(0.f, e->game.playerHp));
         if (f.remote) {  // online: o dano vai para o celular de quem levou o tiro (lá ele perde vida e cai)
             if (M.online && att >= 0 && att < int(M.f.size()) && !M.f[att].remote)
                 M.netOut.push_back(json{{"t", "dano"}, {"alvo", f.netId}, {"dano", std::round(dmg * 10.f) / 10.f}, {"de", M.f[att].netId},
@@ -1528,6 +1533,8 @@ std::string hudJson(Engine* e) {
         j["time"] = f.team;
         j["abates"] = f.kills;
         j["mortes"] = f.deaths;
+        j["danoCausado"] = int(std::round(f.danoCausado));
+        j["cabecas"] = f.cabecas;
         j["morto"] = f.dead;
         j["renasce"] = f.dead ? (f.fora ? -1 : std::max(0, int(std::ceil((M.modo == 1 ? 10.f : 5.f) - f.deadTime)))) : 0;
         j["granadas"] = f.grenades;
