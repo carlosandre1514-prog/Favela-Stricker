@@ -12,7 +12,8 @@ os braços descem da pose A para a de repouso do jogo GIRANDO OS OSSOS DO RIG (a
 Meshy pesou, sem esticar); depois a palma vira de frente (torção espalhada no antebraço) e a mão ganha os ossos
 dos dedos (o rig do Meshy não tem dedos).
 
-Uso: python3 tools/preparar_personagem_rig.py <modelo.glb> <rig.glb> <pasta_saida> <nome>
+Uso: python3 tools/preparar_personagem_rig.py <modelo.glb> <rig.glb> <pasta_saida> <nome> [--colete colete.glb]
+  --colete: veste o colete (o .glb do converter_meshy) no tronco; usado nos bandidos
 """
 import json
 import os
@@ -20,6 +21,7 @@ import struct
 import sys
 
 import numpy as np
+from PIL import Image
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from preparar_personagem import ALTURA, ler_glb, dist_segmento  # noqa: E402
@@ -77,6 +79,7 @@ def arc(a, b):
 
 def main():
     entrada, rig, saida, nome = sys.argv[1:5]
+    colete = sys.argv[sys.argv.index('--colete') + 1] if '--colete' in sys.argv else None
     P, N, U, T, I, imgs = ler_glb(entrada)
     y0 = P[:, 1].min()
     H0 = P[:, 1].max() - y0
@@ -238,6 +241,54 @@ def main():
         ids = np.array([o for o, _, _ in segs])
         for c_ in range(2):
             np.add.at(W, (sel, ids[ordem[:, c_]]), wm * wv[:, c_])
+
+    # ---- colete (opcional): vestido no tronco, preso aos ossos do tronco do vértice do corpo mais perto; a malha e a
+    # pintura entram no mesmo personagem (textura lado a lado: corpo à esquerda, colete à direita)
+    if colete:
+        CP, CN, CU, CT, CI, cimgs = ler_glb(colete)
+        CP, CN, CT = CP.astype(np.float64), CN.astype(np.float64), CT.astype(np.float64)
+        braco_cols = [LUP, LFO, LHA, RUP, RFO, RHA] + list(range(17, 37))
+        perna_cols = [LTH, LSH, LFT, RTH, RSH, RFT]
+        tronco = (W[:, braco_cols].sum(1) < 0.3) & (W[:, perna_cols].sum(1) < 0.5) & (y > J['hips'][1] - 0.02) & (y < J['neck'][1])
+        topo = J['lsh'][1] + 0.035 * H       # as alças passam por cima do ombro
+        base = J['hips'][1] + 0.01 * H       # termina na cintura
+        faixa = tronco & (np.abs(y - (J['chest'][1] + 0.05 * H)) < 0.06 * H)
+        x0, x1 = np.percentile(P[faixa, 0], 1), np.percentile(P[faixa, 0], 99)
+        z0, z1 = np.percentile(P[faixa, 2], 1), np.percentile(P[faixa, 2], 99)
+        cx, cz = (x0 + x1) / 2, (z0 + z1) / 2
+        lx, lz = (x1 - x0) * 1.04, (z1 - z0) * 1.18
+        mn, mx = CP.min(0), CP.max(0)
+        CP = (CP - (mn + mx) / 2) / (mx - mn)
+        CP = CP * np.array([lx, topo - base, lz]) + np.array([cx, (topo + base) / 2, cz])
+        # empurra para fora do corpo o que ficou dentro (1,2 cm de folga), pela normal do vértice do corpo mais perto
+        ti = np.where(tronco)[0]
+        perto = np.zeros(len(CP), int)
+        for s in range(0, len(CP), 256):
+            q = CP[s:s + 256]
+            perto[s:s + 256] = ti[((q[:, None, :] - P[None, ti, :]) ** 2).sum(-1).argmin(1)]
+        folga = 0.012 * H / 1.78
+        for _ in range(2):
+            d = ((CP - P[perto]) * N[perto]).sum(1)
+            CP += np.where(d < folga, folga - d, 0)[:, None] * N[perto]
+        Wc = W[perto].copy()
+        Wc[:, braco_cols] = 0                  # o colete segue o tronco, não os braços
+        Wc /= np.maximum(Wc.sum(1, keepdims=True), 1e-9)
+        nb = len(P)
+        P = np.vstack([P, CP])
+        N = np.vstack([N, CN])
+        T = np.vstack([T, CT])
+        U = np.vstack([U * np.array([0.5, 1.0]), CU * np.array([0.5, 1.0]) + np.array([0.5, 0.0])]).astype(np.float32)
+        I = np.concatenate([I, CI.astype(np.uint32) + nb])
+        W = np.vstack([W, Wc])
+        lado_a_lado = []
+        for a_, b_ in zip(imgs[:3], cimgs[:3]):
+            b_ = b_.resize(a_.size)
+            im = Image.new('RGB', (a_.width * 2, a_.height))
+            im.paste(a_, (0, 0))
+            im.paste(b_, (a_.width, 0))
+            lado_a_lado.append(im)
+        imgs = lado_a_lado
+        print(f'  colete: {len(CP)} vértices, {len(CI) // 3} triângulos, {lx:.2f} x {topo - base:.2f} x {lz:.2f} m')
 
     # ---- 4 ossos por vértice
     jo = np.argsort(-W, axis=1)[:, :4]
