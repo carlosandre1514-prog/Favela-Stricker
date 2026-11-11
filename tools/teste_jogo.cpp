@@ -910,6 +910,22 @@ int main(int argc, char** argv) {
         engine_test_shot(e, id);
         engine_frame(e, 1.f / 30.f); engine_frame(e, 1.f / 30.f);
         save(out, "energia_tiro.png");
+        if (std::getenv("RAJADA")) {  // rajada de 10 tiros (calor nas veias) e o impacto da bala
+            eng::Engine* E = reinterpret_cast<eng::Engine*>(e);
+            for (int k = 0; k < 10; ++k) {
+                engine_test_shot(e, id);
+                for (int f = 0; f < 3; ++f) engine_frame(e, 1.f / 30.f);
+            }
+            save(out, "energia_rajada.png");
+            for (int f = 0; f < 45; ++f) engine_frame(e, 1.f / 30.f);
+            save(out, "energia_esfriando.png");
+            if (eng::GameObject* w = eng::objectById(E, id)) {
+                const glm::vec3 alvo = glm::vec3(w->transform.world()[3]) + glm::vec3(0.f, 0.f, -0.25f);
+                eng::impactFx(E, eng::Scene::handleOf(*w), alvo, glm::vec3(0.f, 0.f, -1.f));
+                engine_frame(e, 1.f / 30.f); engine_frame(e, 1.f / 30.f);
+                save(out, "energia_impacto.png");
+            }
+        }
         engine_destroy(e);
         std::printf(g_fail ? "FALHOU\n" : "OK\n");
         return g_fail ? 1 : 0;
@@ -997,12 +1013,22 @@ int main(int argc, char** argv) {
                 ci.anim->setClip(ci.clipMap[c.clip]);
                 ci.anim->time = 0.f;
                 for (int k = 0; k < 18; ++k) { ci.anim->setClip(ci.clipMap[c.clip]); engine_frame(e, 1.f / 30.f); }
-                const float vistas[2] = {0.6f, 1.5708f};
-                for (int v = 0; v < 2; ++v) {
-                    engine_set_camera(e, 0.f, 1.05f, 0.f, vistas[v], 0.1f, 2.3f);
+                if (std::getenv("JUNTAS"))  // posição de cada junta: pose de bind -> animada (espaço do esqueleto)
+                    for (int j = 0; j < 17 && j < ci.anim->skeleton->jointCount; ++j) {
+                        glm::vec3 bp = glm::vec3(glm::inverse(ci.anim->skeleton->inverseBind[j])[3]), ap = glm::vec3(ci.anim->global[j][3]);
+                        std::printf("  junta %2d bind (%.3f %.3f %.3f) anim (%.3f %.3f %.3f)\n", j, bp.x, bp.y, bp.z, ap.x, ap.y, ap.z);
+                    }
+                const float vistas[4] = {0.6f, 1.5708f, 3.1416f, -0.9f};
+                const int nVistas = std::getenv("VISTAS") ? std::atoi(std::getenv("VISTAS")) : 2;  // 4 = também de costas e do outro lado
+                const float camY = std::getenv("CAM_Y") ? float(std::atof(std::getenv("CAM_Y"))) : 1.05f;
+                const float camD = std::getenv("CAM_DIST") ? float(std::atof(std::getenv("CAM_DIST"))) : 2.3f;
+                const char* soClip = std::getenv("CLIP");
+                if (soClip && std::string(c.nome) != soClip) continue;
+                for (int v = 0; v < nVistas && v < 4; ++v) {
+                    engine_set_camera(e, 0.f, camY, 0.f, vistas[v], 0.1f, camD);
                     ci.anim->setClip(ci.clipMap[c.clip]);
                     engine_frame(e, 1e-4f);
-                    save(out, ("anim_" + nomeR + "_" + c.nome + (v ? "_lado" : "_frente") + ".png").c_str());
+                    save(out, ("anim_" + nomeR + "_" + c.nome + (v == 0 ? "_frente" : v == 1 ? "_lado" : v == 2 ? "_costas" : "_outro") + ".png").c_str());
                 }
             }
         }

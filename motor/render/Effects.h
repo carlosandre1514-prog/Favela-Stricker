@@ -55,6 +55,8 @@ struct Emitter {
     float ativT = -1.f, nivel = 0.35f, ondaT = -1.f, accEnergia = 0.f, accArcos = 0.f, luzEnergia = 0.f;
     float parado = 0.f, volta = 0.f, fragVolta = 0.f, flareVolta = 0.f;
     bool atirou = false;
+    // calor da rajada: sobe a cada tiro e esfria sozinho (as veias correm e brilham mais, o núcleo pulsa)
+    float calor = 0.f;
     glm::vec3 posParado{0.f};
     glm::vec3 nucleo{0.f};   // x = quanto o disco sai para os lados, y e z = centro (espaço do modelo)
     glm::vec3 luzPos{0.f}, corEnergia{0.66f, 0.33f, 1.f};

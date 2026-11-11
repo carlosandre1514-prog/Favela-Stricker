@@ -444,6 +444,8 @@ void atualizarAncoras(Engine* e, float dt);
 void atualizarEnergia(Engine* e, float dt);  // skin de energia (depois da arma posicionada: núcleo e cristais colados nela)
 bool tiroNasPortas(Engine* e, glm::vec3 de, glm::vec3 ate);  // bala que passa por uma porta: ela abre para o lado do tiro  // depois de posicionar as armas, antes de desenhar
 void bulletFx(Engine* e, Scene::Handle weapon, glm::vec3 from, glm::vec3 to);
+// impacto da bala onde acertou (o de sempre; skin de energia: estouro roxo com anel e faíscas)
+void impactFx(Engine* e, Scene::Handle weapon, glm::vec3 hit, glm::vec3 dir);
 void applyKitTexture(Engine* e, GameObject& g, const std::string& kitName, float metal = -1.f, float rough = -1.f);  // textura de cor do kit no objeto
 std::string kitPath(Engine* e, const std::string& name);  // caminho de um arquivo do kit ("armas/ak47" -> .../kit/armas/ak47.glb)
 

@@ -385,7 +385,7 @@ int createCharacter(Engine* e, const CharacterParams& p, glm::vec3 pos, float ya
     auto model = std::make_unique<LoadedModel>();
     MeshBuilder mb;
     CharacterParams pm = p;  // com as juntas do modelo, se tiver
-    struct ModeloLido { std::vector<Vertex> v; std::vector<uint32_t> idx; bool juntas = false; glm::vec3 j[17]; };
+    struct ModeloLido { std::vector<Vertex> v; std::vector<uint32_t> idx; int juntas = 0; glm::vec3 j[CJ_Total]; };
     const ModeloLido* lido = nullptr;
     if (!p.modelo.empty()) {  // personagem de modelo (Meshy): a malha com os pesos dos ossos, lida uma vez por modelo
         static std::map<std::string, ModeloLido> cache;
@@ -394,13 +394,15 @@ int createCharacter(Engine* e, const CharacterParams& p, glm::vec3 pos, float ya
             ModeloLido m;
             if (FILE* f = std::fopen(kitPath(e, "personagens/meshy/" + p.modelo + ".bin").c_str(), "rb")) {
                 char mg[4]; uint32_t nv = 0, ni = 0;
-                const bool v2 = std::fread(mg, 1, 4, f) == 4 && std::memcmp(mg, "FSP2", 4) == 0;
-                const bool v1 = !v2 && std::memcmp(mg, "FSP1", 4) == 0;
-                if ((v1 || v2) && std::fread(&nv, 4, 1, f) == 1 && std::fread(&ni, 4, 1, f) == 1 && nv < 2000000 && ni < 6000000) {
-                    float jf[17 * 3];
-                    if (v2 && std::fread(jf, sizeof(jf), 1, f) == 1) {
-                        m.juntas = true;
-                        for (int k = 0; k < 17; ++k) m.j[k] = glm::vec3(jf[k * 3], jf[k * 3 + 1], jf[k * 3 + 2]);
+                const bool lido4 = std::fread(mg, 1, 4, f) == 4;
+                // FSP1: sem juntas; FSP2: as 17 juntas do corpo; FSP3: também os dedos (CJ_Total)
+                const int nj = !lido4 ? -1 : std::memcmp(mg, "FSP3", 4) == 0 ? int(CJ_Total) : std::memcmp(mg, "FSP2", 4) == 0 ? 17
+                             : std::memcmp(mg, "FSP1", 4) == 0 ? 0 : -1;
+                if (nj >= 0 && std::fread(&nv, 4, 1, f) == 1 && std::fread(&ni, 4, 1, f) == 1 && nv < 2000000 && ni < 6000000) {
+                    float jf[CJ_Total * 3];
+                    if (nj > 0 && std::fread(jf, sizeof(float) * 3 * nj, 1, f) == 1) {
+                        m.juntas = nj;
+                        for (int k = 0; k < nj; ++k) m.j[k] = glm::vec3(jf[k * 3], jf[k * 3 + 1], jf[k * 3 + 2]);
                     }
                     struct Reg { float p[3], n[3], u[2], t[4]; uint16_t j[4]; float w[4]; };
                     static_assert(sizeof(Reg) == 72, "registro do .bin");
@@ -427,7 +429,11 @@ int createCharacter(Engine* e, const CharacterParams& p, glm::vec3 pos, float ya
         }
         if (!it->second.v.empty()) {
             lido = &it->second;
-            if (lido->juntas) { pm.temJuntas = true; for (int k = 0; k < 17; ++k) pm.juntas[k] = lido->j[k]; }
+            if (lido->juntas) {
+                pm.temJuntas = true;
+                pm.temDedos = lido->juntas == int(CJ_Total);
+                for (int k = 0; k < lido->juntas; ++k) pm.juntas[k] = lido->j[k];
+            }
         } else std::printf("personagem: modelo %s não abriu, ficou o boneco\n", p.modelo.c_str());
     }
     buildCharacter(pm, *model, mb);
@@ -1302,7 +1308,7 @@ static void fireGun(Engine* e, CharacterInfo& c, GameObject& root, btRigidBody* 
         glm::vec3 end = any ? hit : from + dir * 300.f;
         bulletFx(e, c.weapon, muzzle, end);
         if (!any) continue;
-        fxImpact(e->particles, e->fxRng, hit, dir);
+        impactFx(e, c.weapon, hit, dir);
         if (k == 0) playSound(e, "impacto", end, 0.5f);
         if (!obj) continue;
         float dist = glm::length(hit - from);
@@ -1366,9 +1372,9 @@ static void fire(Engine* e, CharacterInfo& c, GameObject& root, btRigidBody* sel
             glm::vec3 jitter = k ? glm::vec3(e->fxRng.range(-1.f, 1.f), e->fxRng.range(-1.f, 1.f), e->fxRng.range(-1.f, 1.f)) * 0.04f * glm::length(end - muzzle) : glm::vec3(0.f);
             bulletFx(e, c.weapon, muzzle, end + jitter);
         }
-        if (any) fxImpact(e->particles, e->fxRng, hit, dir);
+        if (any) impactFx(e, c.weapon, hit, dir);
     } else if (any) {
-        fxImpact(e->particles, e->fxRng, hit, dir);
+        impactFx(e, c.weapon, hit, dir);
     }
     if (any && obj) {  // dano em inimigos / objetos com vida
         static const float dmg[] = {25.f, 20.f, 60.f, 100.f, 35.f, 30.f};
@@ -2025,27 +2031,46 @@ void tracoRaio(ParticleSystem& ps, glm::vec3 p0, glm::vec3 p1, float largura, fl
 
 static void tiroEnergia(Engine* e, Emitter& em, glm::vec3 boca, glm::vec3 dir) {
     em.atirou = true;  // conta como "fez alguma coisa": a arma parada volta e o relógio dos 2 minutos zera
-    // clarão na boca (estrela laranja com o centro branco) + fagulhas roxas e douradas + luz roxa
+    em.pulso = 1.f;    // veias e núcleo acendem forte e apagam
+    em.calor = std::min(1.f, em.calor + 0.14f);
+    const glm::vec3 roxo = srgbLin(em.corEnergia), lilas = srgbLin(glm::vec3(0.86f, 0.74f, 1.f));
+    const float k = 1.f + 0.35f * em.calor;  // rajada longa: o clarão cresce um pouco
+    // clarão de energia: estrela roxa, miolo branco-lilás e um anel que abre na boca do cano
     ParticleSpawn c;
-    c.pos = boca; c.life = 0.07f; c.size0 = 0.152f; c.size1 = 0.06f;
-    c.color0 = glm::vec4(srgbLin(glm::vec3(1.f, 0.70f, 0.28f)) * 2.2f, 1.f); c.color1 = glm::vec4(c.color0.r, c.color0.g, c.color0.b, 0.f);
+    c.pos = boca + dir * (0.01f / kEsc); c.life = 0.075f; c.size0 = 0.16f * k; c.size1 = 0.07f;
+    c.color0 = glm::vec4(roxo * 3.2f, 1.f); c.color1 = glm::vec4(roxo, 0.f);
     c.shape = PS_Star; c.presa = true;
     e->particles.emit(c);
     ParticleSpawn w = c;
-    w.size0 = 0.05f; w.size1 = 0.02f; w.color0 = glm::vec4(3.f, 2.8f, 2.5f, 1.f); w.color1 = glm::vec4(1.f, 1.f, 1.f, 0.f); w.shape = PS_Glow;
+    w.size0 = 0.06f * k; w.size1 = 0.025f; w.color0 = glm::vec4(lilas * 3.5f, 1.f); w.color1 = glm::vec4(lilas, 0.f); w.shape = PS_Glow;
     e->particles.emit(w);
-    for (int i = 0; i < 14; ++i) {
+    ParticleSpawn h = c;  // halo largo e fraco (a energia "vaza" em volta)
+    h.size0 = 0.12f * k; h.size1 = 0.26f * k; h.life = 0.12f; h.color0 = glm::vec4(roxo * 0.9f, 0.55f); h.color1 = glm::vec4(roxo * 0.4f, 0.f);
+    h.shape = PS_Glow;
+    e->particles.emit(h);
+    ParticleSpawn a = c;
+    a.pos = boca + dir * (0.03f / kEsc); a.life = 0.14f; a.size0 = 0.02f; a.size1 = 0.13f * k;
+    a.color0 = glm::vec4(lilas * 2.2f, 0.9f); a.color1 = glm::vec4(roxo, 0.f); a.shape = PS_Ring;
+    e->particles.emit(a);
+    // faíscas: a maioria roxa, algumas lilás quase brancas, saindo em cone para a frente
+    for (int i = 0; i < 16; ++i) {
         ParticleSpawn s;
         s.pos = boca;
-        s.vel = (dir * e->fxRng.range(1.f, 4.f) + glm::vec3(e->fxRng.range(-0.8f, 0.8f), e->fxRng.range(-0.8f, 0.8f), e->fxRng.range(-0.8f, 0.8f))) / kEsc;
-        s.life = e->fxRng.range(0.25f, 0.5f);
-        const glm::vec3 cor = srgbLin(i % 3 ? glm::vec3(0.77f, 0.55f, 1.f) : glm::vec3(1.f, 0.82f, 0.54f));
-        s.size0 = e->fxRng.range(8.f, 18.f) * 0.000478f; s.size1 = s.size0 * 0.3f;
-        s.color0 = glm::vec4(cor * 2.f, 1.f); s.color1 = glm::vec4(cor, 0.f);
-        s.shape = PS_Star; s.drag = 1.6f;
+        s.vel = (dir * e->fxRng.range(1.5f, 5.f) + glm::vec3(e->fxRng.range(-0.9f, 0.9f), e->fxRng.range(-0.9f, 0.9f), e->fxRng.range(-0.9f, 0.9f))) / kEsc;
+        s.life = e->fxRng.range(0.18f, 0.42f);
+        const glm::vec3 cor = i % 4 ? roxo : lilas;
+        s.size0 = e->fxRng.range(8.f, 16.f) * 0.000478f; s.size1 = s.size0 * 0.25f;
+        s.color0 = glm::vec4(cor * 2.4f, 1.f); s.color1 = glm::vec4(cor, 0.f);
+        s.shape = PS_Star; s.drag = 2.f;
         e->particles.emit(s);
     }
-    addFlash(e, {boca, srgbLin(glm::vec3(0.75f, 0.56f, 1.f)), 12.f, 2.6f}, 0.16f);
+    // a energia sai do núcleo e corre pela arma até a boca do cano (um raio curto a cada tiro)
+    if (em.luzPos != glm::vec3(0.f) && glm::distance(em.luzPos, boca) < 1.2f) {
+        std::vector<glm::vec3> pts;
+        zigue(e->fxRng, em.luzPos, boca, 0.02f / kEsc, 3, pts);
+        for (size_t i = 0; i + 1 < pts.size(); ++i) tracoRaio(e->particles, pts[i], pts[i + 1], 0.012f / kEsc, 0.9f, roxo, 0.06f);
+    }
+    addFlash(e, {boca, srgbLin(glm::vec3(0.72f, 0.5f, 1.f)), 13.f + 4.f * em.calor, 2.8f}, 0.16f);
 }
 // feixe roxo do tiro: um traço largo da boca para a frente (3,9 m, o do artefato) com 3 filamentos elétricos
 static void feixeEnergia(Engine* e, glm::vec3 from, glm::vec3 to) {
@@ -2056,12 +2081,37 @@ static void feixeEnergia(Engine* e, glm::vec3 from, glm::vec3 to) {
     const glm::vec3 fim = from + u * std::min(dist, 9.f / kEsc);
     const glm::vec3 cor = srgbLin(glm::vec3(0.70f, 0.40f, 1.f));
     tracoRaio(e->particles, from, fim, 0.05f / kEsc * 2.f, 1.f, cor, 0.16f);
+    tracoRaio(e->particles, from, fim, 0.014f / kEsc * 2.f, 1.4f, srgbLin(glm::vec3(0.9f, 0.82f, 1.f)), 0.1f);  // fio claro no meio
     std::vector<glm::vec3> pts;
     for (int j = 0; j < 3; ++j) {
         pts.clear();
         zigue(e->fxRng, from, fim, 0.12f / kEsc * 2.f, 4, pts);
         for (size_t i = 0; i + 1 < pts.size(); ++i) tracoRaio(e->particles, pts[i], pts[i + 1], 0.016f / kEsc * 2.f, 0.55f, cor, 0.16f);
     }
+}
+// estouro roxo onde a bala da skin de energia acerta
+static void impactoEnergia(Engine* e, Emitter& em, glm::vec3 hit, glm::vec3 dir) {
+    const glm::vec3 roxo = srgbLin(em.corEnergia), lilas = srgbLin(glm::vec3(0.86f, 0.74f, 1.f));
+    const glm::vec3 p = hit - dir * (0.02f / kEsc);
+    ParticleSpawn g;
+    g.pos = p; g.life = 0.12f; g.size0 = 0.08f; g.size1 = 0.18f;
+    g.color0 = glm::vec4(roxo * 2.4f, 1.f); g.color1 = glm::vec4(roxo, 0.f); g.shape = PS_Glow;
+    e->particles.emit(g);
+    ParticleSpawn r = g;
+    r.life = 0.2f; r.size0 = 0.03f; r.size1 = 0.32f; r.color0 = glm::vec4(lilas * 1.8f, 0.8f); r.color1 = glm::vec4(roxo, 0.f); r.shape = PS_Ring;
+    e->particles.emit(r);
+    for (int i = 0; i < 10; ++i) {
+        ParticleSpawn s;
+        s.pos = p;
+        s.vel = (-dir * e->fxRng.range(0.5f, 2.f) + glm::vec3(e->fxRng.range(-1.5f, 1.5f), e->fxRng.range(-0.5f, 2.f), e->fxRng.range(-1.5f, 1.5f))) / kEsc;
+        s.life = e->fxRng.range(0.25f, 0.5f);
+        s.size0 = e->fxRng.range(7.f, 13.f) * 0.000478f; s.size1 = s.size0 * 0.3f;
+        const glm::vec3 cor = i % 3 ? roxo : lilas;
+        s.color0 = glm::vec4(cor * 2.2f, 1.f); s.color1 = glm::vec4(cor, 0.f);
+        s.shape = PS_Star; s.drag = 1.8f; s.gravity = 2.5f / kEsc;  // caem
+        e->particles.emit(s);
+    }
+    addFlash(e, {p, roxo, 6.f, 1.6f}, 0.1f);
 }
 
 void atualizarEnergia(Engine* e, float dt) {
@@ -2129,7 +2179,10 @@ void atualizarEnergia(Engine* e, float dt) {
         } else {
             em.nivel += ((em.ativo ? 1.f : 0.35f) - em.nivel) * std::min(1.f, dt * 2.f);
         }
-        const float veia = em.nivel * (0.85f + 0.15f * std::sin(t * 2.3f));
+        // tiro: as veias acendem (pulso) e, com a rajada, correm mais quentes (calor); os dois apagam sozinhos
+        em.pulso = std::max(0.f, em.pulso - dt * 9.f);
+        em.calor = std::max(0.f, em.calor - dt * 0.45f);
+        const float veia = em.nivel * (0.85f + 0.15f * std::sin(t * (2.3f + 6.f * em.calor))) + 0.5f * em.pulso + 0.45f * em.calor;
         Scene::forEachInSubtree(*o, [&](GameObject& p) {
             if (!p.meshRenderer) return;
             e->renderer.setEnergia(p.meshRenderer->material, glm::vec4(veia, frag, 1.f, 0.f));
@@ -2145,8 +2198,8 @@ void atualizarEnergia(Engine* e, float dt) {
         const float vida1 = dt * 1.05f;  // partículas de um quadro (núcleo, cristais): redesenhadas a cada quadro
 
         // núcleo, dos dois lados do disco (como um adesivo virado para fora: some quando visto de lado)
-        const float tamNuc = (0.55f + 0.45f * em.nivel + 0.9f * flare) * (1.f + 0.05f * std::sin(t * 5.f));
-        const float forcaNuc = 0.45f + 0.45f * em.nivel + 0.6f * flare;
+        const float tamNuc = (0.55f + 0.45f * em.nivel + 0.9f * flare + 0.35f * em.pulso + 0.2f * em.calor) * (1.f + 0.05f * std::sin(t * 5.f));
+        const float forcaNuc = 0.45f + 0.45f * em.nivel + 0.6f * flare + 0.4f * em.pulso;
         for (int lado = -1; lado <= 1; lado += 2) {
             const glm::vec3 pos = glm::vec3(M * glm::vec4(lado * (em.nucleo.x + 0.004f), em.nucleo.y, em.nucleo.z, 1.f));
             const glm::vec3 nrm = glm::normalize(glm::vec3(M * glm::vec4(float(lado), 0.f, 0.f, 0.f)));
@@ -2160,7 +2213,7 @@ void atualizarEnergia(Engine* e, float dt) {
             ps.emit(s);
         }
         em.luzPos = centroArma;
-        em.luzEnergia = (0.8f + 1.6f * em.nivel + 5.f * flare) * (0.85f + 0.15f * std::sin(t * 7.f));
+        em.luzEnergia = (0.8f + 1.6f * em.nivel + 5.f * flare + 2.5f * em.pulso + 1.2f * em.calor) * (0.85f + 0.15f * std::sin(t * 7.f));
 
         // onda de choque saindo do núcleo
         if (em.ondaT >= 0.f) {
@@ -2315,6 +2368,10 @@ void muzzleFx(Engine* e, Scene::Handle weapon, glm::vec3 muzzle, glm::vec3 dir) 
         addFlash(e, fxMuzzleFlash(e->particles, e->fxRng, muzzle, dir), 0.06f);
     }
     e->particles.ancoraAtual = -1;
+}
+void impactFx(Engine* e, Scene::Handle weapon, glm::vec3 hit, glm::vec3 dir) {
+    fxImpact(e->particles, e->fxRng, hit, dir);
+    if (Emitter* em = skinShot(e, weapon); em && em->energia) impactoEnergia(e, *em, hit, dir);
 }
 void bulletFx(Engine* e, Scene::Handle weapon, glm::vec3 from, glm::vec3 to) {
     tiroNasPortas(e, from, to);  // todo tiro (meu, dos robôs e de quem joga online) passa por aqui

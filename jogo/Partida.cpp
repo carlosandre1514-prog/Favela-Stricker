@@ -436,7 +436,7 @@ void botShoot(Engine* e, int fi, int ti) {
         if (p == 0) muzzleFx(e, c.weapon, muzzle, glm::normalize(end - muzzle));
         bulletFx(e, c.weapon, muzzle, end);
         if (any) {
-            fxImpact(e->particles, e->fxRng, hit, dir);
+            impactFx(e, c.weapon, hit, dir);
             M.attacker = fi;
             const float far = dist > gun.falloff ? std::max(0.3f, 1.f - 0.7f * (dist - gun.falloff) / (1.5f * gun.falloff)) : 1.f;
             damageAt(e, obj, gun.dmg * far, from);
@@ -1044,7 +1044,7 @@ void remoteShotFx(Engine* e, Fighter& f, CharacterInfo& c, GameObject& g) {
     glm::vec3 end = any ? hit : from + dir * 200.f;
     muzzleFx(e, c.weapon, muzzle, glm::normalize(end - muzzle));
     bulletFx(e, c.weapon, muzzle, end);
-    if (any) fxImpact(e->particles, e->fxRng, hit, dir);
+    if (any) impactFx(e, c.weapon, hit, dir);
     playSound(e, c.shotSound.empty() ? "tiro_m4" : c.shotSound.c_str(), muzzle, 1.f);
     c.fireAnim = 0.3f;
     c.aimTimer = 1.f;

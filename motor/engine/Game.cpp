@@ -187,7 +187,7 @@ void enemyAttack(Engine* e, CharacterInfo& c, GameObject& go, Behavior& b, Chara
     muzzleFx(e, c.weapon, muzzle, glm::normalize(end - muzzle));
     playSound(e, c.shotSound.empty() ? "tiro_pistola" : c.shotSound.c_str(), muzzle, 1.f);
     bulletFx(e, c.weapon, muzzle, end);
-    if (any) fxImpact(e->particles, e->fxRng, hit, dir);
+    if (any) impactFx(e, c.weapon, hit, dir);
     if (any && rootOf(e, obj) == &pg) hurtPlayer(e, b.dano);
 }
 

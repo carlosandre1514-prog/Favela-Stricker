@@ -85,6 +85,9 @@ glm::quat arc(glm::vec3 a, glm::vec3 b) {
 
 struct ArmPose { glm::quat upper, fore, hand; };
 
+// braço relaxado: a palma (de frente na pose de bind) vira para a coxa, girando o braço e principalmente o antebraço
+constexpr float kTorcaoBraco = 0.3f, kTorcaoAntebraco = 1.05f;
+
 // IK de 2 ossos: leva o pulso até `wrist` (espaço do modelo), cotovelo para o lado de `pole`, mão na rotação `handRot`.
 // chest = rotação do peito (pai do braço) no espaço do modelo; as rotações devolvidas são locais (bind sem rotação).
 ArmPose solveArm(const Joints& J, int up, int fo, int ha, glm::quat chest, glm::vec3 wrist, glm::vec3 pole, glm::quat handRot) {
@@ -160,10 +163,10 @@ void locomotion(ClipWriter& w, const Joints& J, float legAmp, float knee, float 
     legs(w, J, legAmp, knee, bob);
     w.rot(CJ_Spine, [=](float) { return rx(lean); });
     w.rot(CJ_Chest, [=](float ph) { return ry(-0.12f * armAmp * std::sin(ph)) * rx(lean * 0.5f); });
-    w.rot(CJ_LUpper, [=](float ph) { return rz(0.07f) * rx(armAmp * std::sin(ph)); });
-    w.rot(CJ_RUpper, [=](float ph) { return rz(-0.07f) * rx(-armAmp * std::sin(ph)); });
-    w.rot(CJ_LFore, [=](float ph) { return rx(-elbow - 0.15f * armAmp * std::max(0.f, std::sin(ph))); });
-    w.rot(CJ_RFore, [=](float ph) { return rx(-elbow - 0.15f * armAmp * std::max(0.f, -std::sin(ph))); });
+    w.rot(CJ_LUpper, [=](float ph) { return rz(0.07f) * rx(armAmp * std::sin(ph)) * ry(-kTorcaoBraco); });
+    w.rot(CJ_RUpper, [=](float ph) { return rz(-0.07f) * rx(-armAmp * std::sin(ph)) * ry(kTorcaoBraco); });
+    w.rot(CJ_LFore, [=](float ph) { return rx(-elbow - 0.15f * armAmp * std::max(0.f, std::sin(ph))) * ry(-kTorcaoAntebraco); });
+    w.rot(CJ_RFore, [=](float ph) { return rx(-elbow - 0.15f * armAmp * std::max(0.f, -std::sin(ph))) * ry(kTorcaoAntebraco); });
 }
 
 // Dedos: curl > 0 fecha a mão (polegar junto); trigger: indicador meio esticado (no gatilho)
@@ -277,10 +280,10 @@ void idle(ClipWriter& w, const Joints& J) {
     w.rot(CJ_Chest, [=](float ph) { return rx(0.025f * std::sin(ph)); });
     w.rot(CJ_Neck, [=](float ph) { return ry(0.08f * std::sin(ph)); });
     w.rot(CJ_Head, [=](float ph) { return ry(0.1f * std::sin(ph)) * rx(0.03f * std::sin(2 * ph)); });
-    w.rot(CJ_LUpper, [=](float ph) { return rz(0.1f + 0.02f * std::sin(ph)); });
-    w.rot(CJ_RUpper, [=](float ph) { return rz(-0.1f - 0.02f * std::sin(ph)); });
-    w.rot(CJ_LFore, [=](float) { return rx(-0.12f); });
-    w.rot(CJ_RFore, [=](float) { return rx(-0.12f); });
+    w.rot(CJ_LUpper, [=](float ph) { return rz(0.1f + 0.02f * std::sin(ph)) * ry(-kTorcaoBraco); });
+    w.rot(CJ_RUpper, [=](float ph) { return rz(-0.1f - 0.02f * std::sin(ph)) * ry(kTorcaoBraco); });
+    w.rot(CJ_LFore, [=](float) { return rx(-0.12f) * ry(-kTorcaoAntebraco); });
+    w.rot(CJ_RFore, [=](float) { return rx(-0.12f) * ry(kTorcaoAntebraco); });
     fingers(w, false, 0.25f, false);
     fingers(w, true, 0.25f, false);
 }
@@ -307,7 +310,8 @@ void wave(ClipWriter& w, const Joints& J) {
     w.pos(CJ_Hips, [=](float ph) { return glm::vec3(0, hipsY - 0.004f + 0.004f * std::sin(ph), 0); });
     w.rot(CJ_RUpper, [=](float) { return rz(-2.65f); });
     w.rot(CJ_RFore, [=](float ph) { return rz(-0.25f + 0.55f * std::sin(2 * ph)); });
-    w.rot(CJ_LUpper, [=](float) { return rz(0.1f); });
+    w.rot(CJ_LUpper, [=](float) { return rz(0.1f) * ry(-kTorcaoBraco); });
+    w.rot(CJ_LFore, [=](float) { return rx(-0.12f) * ry(-kTorcaoAntebraco); });
     w.rot(CJ_Head, [=](float ph) { return rz(-0.08f + 0.04f * std::sin(ph)); });
     w.rot(CJ_Chest, [=](float ph) { return rz(-0.04f * std::sin(ph)); });
 }
@@ -913,6 +917,8 @@ void buildCharacter(const CharacterParams& p, LoadedModel& out, MeshBuilder& b) 
             parent[j] = hand; parent[j + 1] = j;
         }
     }
+    if (p.temJuntas && p.temDedos)  // os dedos medidos no modelo (no tamanho da mão dele)
+        for (int i = CJ_Neck + 1; i < CJ_Total; ++i) pos[i] = p.juntas[i];
     for (int i = 0; i < CJ_Total; ++i) { J.pos[i] = pos[i]; J.parent[i] = parent[i]; }
     J.H = H;
 

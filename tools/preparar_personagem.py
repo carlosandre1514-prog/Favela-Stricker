@@ -8,8 +8,8 @@ Saída (shaders/kit/personagens/meshy/):
                        retos ao lado do corpo, motor/procgen/Character.cpp), altura ALTURA, e cada vértice preso a até
                        4 ossos (pesos pela distância até cada osso, só os ossos da região certa: braço, perna ou tronco)
   <nome>.jpg, <nome>_normal.jpg, <nome>_orm.jpg   as texturas
-Formato do .bin: "FSP2", nv, ni (uint32); as 17 juntas do esqueleto medidas NESTE modelo (17 x 3 floats, na ordem de
-CharJoint + pescoço): o jogo monta o esqueleto e as animações nelas, então cada osso dobra onde o corpo do modelo
+Formato do .bin: "FSP3", nv, ni (uint32); as 37 juntas do esqueleto medidas NESTE modelo (37 x 3 floats, na ordem de
+CharJoint + pescoço + dedos, CJ_Total): o jogo monta o esqueleto e as animações nelas, então cada osso dobra onde o corpo do modelo
 dobra; por vértice pos(3f) normal(3f) uv(2f) tangente(4f) ossos(4 uint16) pesos(4f); depois os índices (uint32).
 
 Uso: python3 tools/preparar_personagem.py <entrada.glb> <pasta_saida> <nome>
@@ -124,6 +124,66 @@ def main():
             V[:, 1] = np.where(braco, vx * sn + vy * c, vy)
         print(f'  braço {"esquerdo" if lado > 0 else "direito"}: {np.degrees(ang):.0f}° da vertical, {int(braco.sum())} vértices')
 
+    # ---- cotovelo e pulso medidos no braço já abaixado (o pulso é a parte mais fina acima da mão); a mão gira em
+    # volta do antebraço até a palma ficar de frente (+Z), como no esqueleto do jogo (as animações e a pegada da arma
+    # contam com isso); a torção se espalha do cotovelo ao pulso, como a do antebraço de verdade
+    y = P[:, 1]
+    medido = {}
+    for lado in (1, -1):
+        A = eh_braco[lado]
+        ponta_y = float(y[A].min())
+        melhor = None
+        for yy in np.linspace(ponta_y + 0.085 * H, ponta_y + 0.135 * H, 21):
+            m = A & (np.abs(y - yy) < 0.006 * H)
+            if m.sum() < 10:
+                continue
+            q = P[m][:, [0, 2]]
+            r = float(np.percentile(np.linalg.norm(q - q.mean(0), axis=1), 90))
+            if melhor is None or r < melhor[0]:
+                melhor = (r, yy, q.mean(0))
+        wy, wc = melhor[1], melhor[2]
+        ey = piv_y - (piv_y - wy) * 0.56                     # ombro-cotovelo 0,186 H, cotovelo-pulso 0,146 H
+        me = A & (np.abs(y - ey) < 0.01 * H)
+        ec = P[me][:, [0, 2]].mean(0)
+        mao = A & (y < wy)
+        q = P[mao] - P[mao].mean(0)
+        n = np.linalg.svd(q, full_matrices=False)[2][2].copy()  # menor espessura da mão = normal da palma
+        n[1] = 0
+        n /= np.linalg.norm(n)
+        m_ax = np.array([n[2], 0, -n[0]])                   # de lado na mão (polegar de um lado, mínimo do outro)
+        alto = mao & (y > wy - 0.6 * (wy - ponta_y)) & (y < wy - 0.12 * (wy - ponta_y))
+        pr = (P[alto] - P[mao].mean(0)) @ m_ax
+        lado_polegar = 1.0 if np.percentile(pr, 98) > -np.percentile(pr, 2) else -1.0
+        if lado_polegar != lado:                            # polegar = lado * m_ax com a palma em +n
+            n = -n
+        medido[lado] = dict(wy=wy, wc=wc, ey=ey, ec=ec, ponta=ponta_y, mao=mao, n=n,
+                            certeza=abs(np.percentile(pr, 98) + np.percentile(pr, 2)))
+    # as duas mãos são espelho uma da outra: se o polegar enganou numa (luva, mão fechada), vale a mais certa
+    ne, nd = medido[1]['n'], medido[-1]['n']
+    if ne @ np.array([-nd[0], 0, nd[2]]) < 0:
+        fraca = 1 if medido[1]['certeza'] < medido[-1]['certeza'] else -1
+        medido[fraca]['n'] = -medido[fraca]['n']
+    for lado in (1, -1):
+        md = medido[lado]
+        A, wy, wc, ey, ponta_y, mao, n = eh_braco[lado], md['wy'], md['wc'], md['ey'], md['ponta'], md['mao'], md['n']
+        phi = np.arctan2(n[0], n[2])
+        teta = -phi
+        f = np.where(y < wy, 1.0, np.clip((y - ey) / max(1e-6, wy - ey), 0, 1))
+        f = np.where(A & (y < ey), f * f * (3 - 2 * f), 0.0)
+        a = teta * f
+        c, sn = np.cos(a), np.sin(a)
+        rx_, rz_ = P[:, 0] - wc[0], P[:, 2] - wc[1]
+        P[:, 0] = np.where(f > 0, wc[0] + rx_ * c + rz_ * sn, P[:, 0])
+        P[:, 2] = np.where(f > 0, wc[1] - rx_ * sn + rz_ * c, P[:, 2])
+        for V in (N, T):
+            vx, vz = V[:, 0].copy(), V[:, 2].copy()
+            V[:, 0] = np.where(f > 0, vx * c + vz * sn, vx)
+            V[:, 2] = np.where(f > 0, -vx * sn + vz * c, vz)
+        mao_q = P[mao]
+        md.update(centro=mao_q.mean(0), largura=float(np.percentile(mao_q[:, 0], 97) - np.percentile(mao_q[:, 0], 3)))
+        print(f'  mão {"esquerda" if lado > 0 else "direita"}: palma girada {np.degrees(teta):.0f}°, pulso a {wy:.3f} m, '
+              f'mão de {wy - ponta_y:.3f} m')
+
     # ---- juntas medidas neste modelo: ombro no pivô; cotovelo e pulso pelas proporções do braço (ombro-cotovelo
     # 0,186 H, cotovelo-pulso 0,146 H e pulso-ponta dos dedos 0,108 H numa pessoa), em escala com o braço medido;
     # pernas no centro de cada perna na altura do quadril, do joelho e do tornozelo; coluna no meio do tronco
@@ -136,8 +196,9 @@ def main():
         L = ponta[lado] / 0.44
         bz = float(centro(eh_braco[lado])[2])
         J[k + 'sh'] = np.array([lado * piv_x, piv_y, bz])
-        J[k + 'el'] = np.array([lado * piv_x, piv_y - 0.186 * L, bz])
-        J[k + 'wr'] = np.array([lado * piv_x, piv_y - 0.332 * L, bz])
+        md = medido[lado]
+        J[k + 'el'] = np.array([md['ec'][0], md['ey'], md['ec'][1]])
+        J[k + 'wr'] = np.array([md['wc'][0], md['wy'], md['wc'][1]])
         for jn, yy in (('hi', 0.52 * H), ('kn', 0.285 * H), ('an', 0.06 * H)):
             faixa = (np.abs(y - yy) < 0.02 * H) & (x * lado > 0.005 * H) & ~eh_braco[1] & ~eh_braco[-1]
             c = centro(faixa)
@@ -147,6 +208,17 @@ def main():
         J[jn] = np.array([0.0, yy * H, float(centro(faixa)[2])])
     for k in ('lhi', 'rhi'):  # quadril um pouco para dentro do centro da coxa (a junta fica dentro da bacia)
         J[k][0] *= 0.85
+    # dedos: o desenho do esqueleto do jogo (palma de frente, polegar do lado de fora) no tamanho desta mão
+    for lado, k in ((1, 'l'), (-1, 'r')):
+        md = medido[lado]
+        wr = np.array([md['centro'][0], md['wy'], md['centro'][2]])
+        esc = (md['wy'] - md['ponta']) / (0.1095 * H)
+        lx = np.clip(md['largura'] / (0.05 * H), 0.7, 1.4)
+        J[k + 'polegar1'] = wr + np.array([lado * 0.022 * H * lx, -0.015 * H * esc, 0.012 * H])
+        J[k + 'polegar2'] = wr + np.array([lado * 0.03 * H * lx, -0.036 * H * esc, 0.02 * H])
+        for nome_d, fx in (('indicador', 0.018), ('medio', 0.006), ('anelar', -0.006), ('minimo', -0.018)):
+            J[k + nome_d + '1'] = wr + np.array([lado * fx * H * lx, -0.0575 * H * esc, 0.0])
+            J[k + nome_d + '2'] = J[k + nome_d + '1'] + np.array([0, -(0.02 if nome_d == 'minimo' else 0.026) * H * esc, 0])
     print('  juntas: ombro x %.3f, cotovelo y %.3f, pulso y %.3f, quadril x %.3f, joelho x %.3f' %
           (J['lsh'][0], J['lel'][1], J['lwr'][1], J['lhi'][0], J['lkn'][0]))
 
@@ -157,11 +229,22 @@ def main():
         (CHEST, (J['spine'] + J['chest']) * 0.5, J['neck'] - np.array([0, 0.035 * H, 0])),
         (NECK, J['neck'] - np.array([0, 0.035 * H, 0]), J['head']),
         (HEAD, J['head'], J['head'] + np.array([0, 0.135 * H, 0])),
-        (LUP, J['lsh'], J['lel']), (LFO, J['lel'], J['lwr']), (LHA, J['lwr'], J['lwr'] - np.array([0, 0.1 * H, 0])),
-        (RUP, J['rsh'], J['rel']), (RFO, J['rel'], J['rwr']), (RHA, J['rwr'], J['rwr'] - np.array([0, 0.1 * H, 0])),
+        (LUP, J['lsh'], J['lel']), (LFO, J['lel'], J['lwr']), (LHA, J['lwr'], (J['lindicador1'] + J['lminimo1']) * 0.5),
+        (RUP, J['rsh'], J['rel']), (RFO, J['rel'], J['rwr']), (RHA, J['rwr'], (J['rindicador1'] + J['rminimo1']) * 0.5),
         (LTH, J['lhi'], J['lkn']), (LSH, J['lkn'], J['lan']), (LFT, J['lan'], J['lan'] + np.array([0, -0.03 * H, 0.08 * H])),
         (RTH, J['rhi'], J['rkn']), (RSH, J['rkn'], J['ran']), (RFT, J['ran'], J['ran'] + np.array([0, -0.03 * H, 0.08 * H])),
     ]
+    # dedos (CJ_LThumb1.. em Character.h): cada dedo 2 ossos, o segundo até a ponta
+    dedo_id = {}
+    for lado, k in ((1, 'l'), (-1, 'r')):
+        base = 17 if lado > 0 else 27
+        for i, nome_d in enumerate(('polegar', 'indicador', 'medio', 'anelar', 'minimo')):
+            j1, j2 = J[k + nome_d + '1'], J[k + nome_d + '2']
+            d = (j2 - j1) / max(1e-6, np.linalg.norm(j2 - j1))
+            comp = (0.022 if nome_d == 'polegar' else 0.018 if nome_d == 'minimo' else 0.024) * H * (medido[lado]['wy'] - medido[lado]['ponta']) / (0.1095 * H)
+            ossos.append((base + 2 * i, j1, j2))
+            ossos.append((base + 2 * i + 1, j2, j2 + d * comp))
+            dedo_id[base + 2 * i] = dedo_id[base + 2 * i + 1] = lado
     D = np.stack([dist_segmento(P, a, b) for _, a, b in ossos], axis=1)
     idx = np.array([o for o, _, _ in ossos])
     braco_e, braco_d = eh_braco[1], eh_braco[-1]
@@ -178,13 +261,18 @@ def main():
     for k in (col[HIPS], col[SPINE], col[HEAD]): pode[:, k] = ~qualquer_braco
     # tronco na altura do ombro (alça da camisa, deltoide): pode pegar um pouco do braço do lado
     # (só a capa do ombro, por cima e por fora do pivô: o peito e as costas ficam no tronco)
-    capa_e = ~qualquer_braco & (y > 0.77 * H) & (x > piv_x * 0.82)
-    capa_d = ~qualquer_braco & (y > 0.77 * H) & (x < -piv_x * 0.82)
+    capa_e = ~qualquer_braco & (y > 0.78 * H) & (x > piv_x * 0.88) & (np.abs(P[:, 2] - J['lsh'][2]) < 0.045 * H)
+    capa_d = ~qualquer_braco & (y > 0.78 * H) & (x < -piv_x * 0.88) & (np.abs(P[:, 2] - J['rsh'][2]) < 0.045 * H)
     pode[:, col[LUP]] |= capa_e
     pode[:, col[RUP]] |= capa_d
     # pernas: só o que não é braço, do lado certo (um pouco dos dois no meio, entre as pernas)
     for k in (col[LTH], col[LSH], col[LFT]): pode[:, k] = perna & (x > -0.01 * H)
     for k in (col[RTH], col[RSH], col[RFT]): pode[:, k] = perna & (x < 0.01 * H)
+    # dedos: só a mão do lado, da base dos dedos para baixo (a palma fica no osso da mão)
+    for o, lado in dedo_id.items():
+        md = medido[lado]
+        k = 'l' if lado > 0 else 'r'
+        pode[:, col[o]] = md['mao'] & (y < J[k + 'medio1'][1] + 0.012 * H) | (md['mao'] & (o in (17, 18, 27, 28)))
     D = np.where(pode, D, 1e9)
     ordem = np.argsort(D, axis=1)[:, :3]
     dd = np.take_along_axis(D, ordem, axis=1)
@@ -197,7 +285,7 @@ def main():
     # média dos vizinhos na malha. Tira as "costuras" duras de peso (onde a malha estica ou afina ao dobrar).
     # Vizinhança pela posição (os vértices repetidos na costura da UV contam como um só, senão a malha abre).
     nv0 = len(P)
-    W = np.zeros((nv0, 17), np.float64)
+    W = np.zeros((nv0, 37), np.float64)
     np.add.at(W, (np.repeat(np.arange(nv0), 3), jo.ravel()), wv.ravel())
     _, sold = np.unique(np.round(P / 1e-5).astype(np.int64), axis=0, return_inverse=True)
     sold = sold.ravel()
@@ -207,10 +295,10 @@ def main():
     b = np.concatenate([tri[:, 1], tri[:, 2], tri[:, 0], tri[:, 0], tri[:, 1], tri[:, 2]])
     par = np.unique(np.stack([a, b], 1)[a != b], axis=0)
     grau = np.bincount(par[:, 0], minlength=ns).astype(np.float64)
-    Ws = np.zeros((ns, 17)); np.add.at(Ws, sold, W)
+    Ws = np.zeros((ns, 37)); np.add.at(Ws, sold, W)
     Ws /= np.maximum(Ws.sum(1, keepdims=True), 1e-9)
-    pode_s = np.zeros((ns, 17), bool)
-    pode_full = np.zeros((nv0, 17), bool); pode_full[:, idx] = pode
+    pode_s = np.zeros((ns, 37), bool)
+    pode_full = np.zeros((nv0, 37), bool); pode_full[:, idx] = pode
     np.logical_or.at(pode_s, sold, pode_full)
     for _ in range(3):
         viz = np.zeros_like(Ws); np.add.at(viz, par[:, 0], Ws[par[:, 1]])
@@ -229,9 +317,10 @@ def main():
     os.makedirs(saida, exist_ok=True)
     nv, ni = len(P), len(I)
     with open(os.path.join(saida, nome + '.bin'), 'wb') as f:
-        f.write(b'FSP2')
+        f.write(b'FSP3')
         f.write(struct.pack('<II', nv, ni))
         ordem_juntas = ['hips', 'spine', 'chest', 'head', 'lsh', 'lel', 'lwr', 'rsh', 'rel', 'rwr', 'lhi', 'lkn', 'lan', 'rhi', 'rkn', 'ran', 'neck']
+        ordem_juntas += [k + d + n for k in 'lr' for d in ('polegar', 'indicador', 'medio', 'anelar', 'minimo') for n in '12']
         f.write(np.array([J[k] for k in ordem_juntas], dtype='<f4').tobytes())
         reg = np.zeros(nv, dtype=[('p', '<f4', 3), ('n', '<f4', 3), ('u', '<f4', 2), ('t', '<f4', 4), ('j', '<u2', 4), ('w', '<f4', 4)])
         reg['p'], reg['n'], reg['u'], reg['t'] = P, N, U, T

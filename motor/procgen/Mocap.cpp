@@ -261,6 +261,40 @@ std::deque<MocapClip>& mocapLibrary() {
     return lib;
 }
 
+// Postura com arma: as capturas de tiro (Mixamo) curvam o peito ~40° para a frente e a cabeça desce ~30° para olhar
+// pela mira. Com a arma posta no ombro pelo IK (Engine.cpp updateSupportHands) isso só deixava o personagem corcunda
+// e cabisbaixo. Aqui o peito fica até ~10° (+25% do que passar) e a cabeça quase reta (~5°), quadro a quadro; o resto
+// do movimento (pernas, giro do tronco, balanço) fica igual.
+static void endireitarPostura(MocapClip& c) {
+    auto q = [&](int j, int f) { return &c.rot[(size_t(j) * c.frames + f) * 4]; };
+    auto pitch = [&](const float* v) {  // giro em volta de X (para a frente > 0)
+        const float s = v[3] < 0.f ? -1.f : 1.f;
+        return 2.f * std::atan2(v[0] * s, v[3] * s);
+    };
+    auto girar = [&](float* v, float d) {
+        glm::quat r = glm::angleAxis(d, glm::vec3(1, 0, 0)) * glm::quat(v[3], v[0], v[1], v[2]);
+        r = glm::normalize(r);
+        v[0] = r.x; v[1] = r.y; v[2] = r.z; v[3] = r.w;
+    };
+    for (int f = 0; f < c.frames; ++f) {
+        const float hips = pitch(q(CJ_Hips, f)), sp = pitch(q(CJ_Spine, f)), ch = pitch(q(CJ_Chest, f));
+        const float ne = pitch(q(CJ_Neck, f)), he = pitch(q(CJ_Head, f));
+        const float peito = hips + sp + ch, cabeca = peito + ne + he;
+        const float lim = 0.17f, limCab = 0.09f;
+        const float peitoNovo = peito > lim ? lim + (peito - lim) * 0.25f : peito;
+        const float cabNova = cabeca > limCab ? limCab + (cabeca - limCab) * 0.2f : cabeca;
+        float tira = peito - peitoNovo;  // tira do peito e da coluna, na proporção de quanto cada um dobra
+        const float pc = std::max(0.f, ch), ps = std::max(0.f, sp);
+        if (tira > 0.f && pc + ps > 1e-4f) {
+            girar(q(CJ_Chest, f), -tira * pc / (pc + ps));
+            girar(q(CJ_Spine, f), -tira * ps / (pc + ps));
+        } else tira = 0.f;
+        // pescoço: a cabeça fica onde deve em relação ao peito novo
+        const float rel = ne + he, relNovo = cabNova - (peito - tira);
+        girar(q(CJ_Neck, f), relNovo - rel);
+    }
+}
+
 void loadMocapLibrary(const std::string& dir) {
     static bool loaded = false;
     if (loaded) return;
@@ -279,6 +313,9 @@ void loadMocapLibrary(const std::string& dir) {
         c.name = f[2];
         if (!loadMocap((dir + "/" + f[0]).c_str(), c)) { std::fprintf(stderr, "animação %s não abriu\n", f[0].c_str()); continue; }
         if (f.size() >= 4) c.loop = f[3] == "1";
+        if ((c.name.find("(fuzil)") != std::string::npos || c.name.find("(pistola)") != std::string::npos) &&
+            c.name.find("Recarregando") == std::string::npos && c.name.find("Agach") == std::string::npos)
+            endireitarPostura(c);
         mocapLibrary().push_back(std::move(c));
     }
 }
