@@ -62,6 +62,7 @@ EMSCRIPTEN_KEEPALIVE void web_escolhas(int team, int skin, const char* primary, 
 EMSCRIPTEN_KEEPALIVE void web_skin_arma(const char* gun, const char* skin) { if (g) jogo_skin_arma(g, gun, skin); }
 EMSCRIPTEN_KEEPALIVE const char* web_hud() { return g ? jogo_hud(g) : "{}"; }
 EMSCRIPTEN_KEEPALIVE const char* web_sons() { return g ? engine_poll_sounds(g) : ""; }
+EMSCRIPTEN_KEEPALIVE float web_chuva() { float t[3] = {0, 0, 0}; if (g) engine_get_weather(g, t); return t[0]; }  // 0..1
 EMSCRIPTEN_KEEPALIVE void web_andar(float x, float y, int run) { if (g) engine_player_input(g, x, y, run); }
 EMSCRIPTEN_KEEPALIVE void web_pular() { if (g) engine_player_jump(g); }
 EMSCRIPTEN_KEEPALIVE void web_agachar(int on) { if (g) engine_player_crouch(g, on); }

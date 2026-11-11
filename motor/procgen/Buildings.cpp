@@ -512,7 +512,9 @@ void railing(Geo& g, float x0, float z0, float x1, float z1, float y, float h) {
 }
 
 // Guarda-corpo ao longo de um lance (na lateral x), acompanhando os degraus, com colisão em cada degrau
-static void stairsSideRail(Geo& g, float x, float zs, float dir, float run, float rise) {
+// y0: altura do começo do lance; chao: até onde a colisão desce (lance no chão: até o chão, sem vão embaixo onde o
+// boneco encostava e era jogado para cima; lance no alto: até um pouco abaixo dos degraus)
+static void stairsSideRail(Geo& g, float x, float zs, float dir, float run, float rise, float y0 = 0.f, float chao = 1e9f) {
     DetailScope ds(g);  // a grade só aparece de perto (a colisão vale sempre)
     MeshBuilder& m = g[Mat::GunMetal];
     m.color = glm::vec4(1.f); m.uvTile = {0.f, 0.f};
@@ -520,12 +522,13 @@ static void stairsSideRail(Geo& g, float x, float zs, float dir, float run, floa
     const float H = 0.95f;
     for (int i = 0; i < n; ++i) {
         float za = zs + dir * run * i / n, zb = zs + dir * run * (i + 1) / n;
-        float y = rise * (i + 1) / n, lo = std::min(za, zb), hi = std::max(za, zb);
-        g.collider({x - 0.04f, y, lo}, {0.08f, H + 0.1f, hi - lo + 0.002f});
+        float y = y0 + rise * (i + 1) / n, lo = std::min(za, zb), hi = std::max(za, zb);
+        const float base = chao < 1e8f ? chao : y - 0.45f;
+        g.collider({x - 0.04f, base, lo}, {0.08f, y + H + 0.1f - base, hi - lo + 0.002f});
         if (i % 3 == 0 || i == n - 1) m.box({x - 0.025f, y, (lo + hi) * 0.5f - 0.025f}, {0.05f, H, 0.05f});
     }
     // barra de cima inclinada
-    glm::vec3 a(x, rise / n + H, zs + dir * run * 0.5f / n), b(x, rise + H, zs + dir * run * (n - 0.5f) / n);
+    glm::vec3 a(x, y0 + rise / n + H, zs + dir * run * 0.5f / n), b(x, y0 + rise + H, zs + dir * run * (n - 0.5f) / n);
     glm::vec3 c = (a + b) * 0.5f, dv = b - a;
     glm::mat4 keep = m.xf;
     m.xf = keep * glm::translate(glm::mat4(1.f), c) * glm::rotate(glm::mat4(1.f), std::atan2(-dv.y, dv.z), glm::vec3(1, 0, 0));
@@ -544,12 +547,22 @@ void outsideStairs(Geo& g, const ModuleSpec& s, float w, float d, float rise) {
     const float L = s.stairsZigzag ? 0.9f : 0.f;               // patamar no fim de cada lance
     const float startOff = raised && s.stairsZigzag ? L : 0.f;  // começa no patamar do lance de baixo
     const float zs = z0 + dir * startOff, run = d - startOff - L, zEnd = zs + dir * run;
-    // térreo maciço até o chão; andares de cima só com os degraus (passa gente embaixo)
-    stairsRun(g, Mat::Concrete, x0, sw, 0.f, zs, run, rise, 1e9f, dir, raised);
+    // térreo maciço até o chão (começando no chão de verdade, que pode estar abaixo do piso da casa); andares de
+    // cima só com os degraus (passa gente embaixo)
+    const float drop = raised ? 0.f : std::max(0.f, s.stairsDrop);
+    const float y0 = -drop, subida = rise + drop, chao = raised ? 1e9f : y0 - 0.3f;
+    stairsRun(g, Mat::Concrete, x0, sw, y0, zs, run, subida, raised ? 1e9f : chao, dir, raised);
+    if (!raised)  // lateral maciça com colisão (só a rampa por cima deixava o boneco subir de lado e ser jogado)
+        for (int i = 0, n = std::max(4, int(subida / 0.18f + 0.5f)); i < n; ++i) {
+            const int i1 = i + 1;
+            float za = zs + dir * run * i / n, zb = zs + dir * run * i1 / n;
+            const float topo = y0 + subida * i / n - 0.04f;  // logo abaixo da rampa (não faz degrau nela)
+            g.collider({x0, chao, std::min(za, zb)}, {sw, topo - chao, std::abs(zb - za)});
+        }
     // guarda-corpo dos lados do lance: o de fora sempre (no corredor de dentro, é o lado do outro corredor); no
     // corredor de fora, também o de dentro (o outro corredor está em outra altura). O lado da parede não precisa.
-    stairsSideRail(g, x0, zs, dir, run, rise);
-    if (s.stairsZigzag && s.stairsLane == 1) stairsSideRail(g, x0 + sw, zs, dir, run, rise);
+    stairsSideRail(g, x0, zs, dir, run, subida, y0, chao);
+    if (s.stairsZigzag && s.stairsLane == 1) stairsSideRail(g, x0 + sw, zs, dir, run, subida, y0, chao);
     const float H = 0.95f, edge = z0 + dir * d;  // borda da casa onde o lance termina
     if (s.stairsZigzag) {
         // patamar: dos dois corredores, do fim do lance até a borda, na altura de cima (laje fina, livre por baixo)

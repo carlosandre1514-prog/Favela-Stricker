@@ -1112,6 +1112,28 @@ void updateSupportHands(Engine* e, float dt) {
         glm::vec3 wu = glm::normalize(glm::vec3(toSkel * glm::vec4(w->transform.rotation * glm::vec3(0, 1, 0), 0.f)));
         glm::vec3 wl = glm::normalize(glm::cross(wu, wf));
         auto onGun = [&](glm::vec3 local) { return glm::vec3(toSkel * w->transform.world() * glm::vec4(local, 1.f)); };
+        if (fpView) {
+            // primeira pessoa: a arma fica parada em relação ao olho, mas os ombros seguem a animação (correndo o
+            // tronco balança e inclina): as mãos não alcançavam a arma e ficavam balançando soltas. Os ombros vão para
+            // um ponto fixo em relação ao olho (o braço de cima não aparece na primeira pessoa) e o IK sempre fecha.
+            const glm::vec3 sideW = glm::normalize(glm::cross(view, viewUp));  // direita da tela
+            for (int lado = 0; lado < 2; ++lado) {
+                const int j = lado ? up : rup;
+                if (j < 0) continue;
+                const glm::vec3 alvo = e->fpEye + (-viewUp * 0.2f + sideW * (lado ? -0.17f : 0.17f) - view * 0.06f) * scale;
+                const glm::vec3 agora = glm::vec3(a->global[j][3]);
+                const glm::vec3 delta = glm::mix(glm::vec3(0.f), glm::vec3(toSkel * glm::vec4(alvo, 1.f)) - agora, c.supportW);
+                const Skeleton& S = *a->skeleton;
+                bool in[kMaxJoints] = {};
+                for (int k = 0; k < S.jointCount; ++k) {
+                    const int i = S.order[k];
+                    in[i] = i == j || (S.parent[i] >= 0 && in[S.parent[i]]);
+                    if (!in[i]) continue;
+                    a->global[i][3] += glm::vec4(delta, 0.f);
+                    a->palette[i] = a->global[i] * S.inverseBind[i];
+                }
+            }
+        }
         if (rup >= 0) {  // mão direita no cabo: palma do lado direito do cabo, dedos dando a volta pela frente
             glm::vec3 g = onGun(c.gripPt);
             glm::vec3 wristR = g - wf * (0.06f * scale) - wl * (0.035f * scale) + wu * (0.03f * scale);

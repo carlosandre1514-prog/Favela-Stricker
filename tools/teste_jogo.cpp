@@ -109,6 +109,26 @@ int main(int argc, char** argv) {
         if (!engine_import_project(e, lerProjeto(projPath).dump().c_str())) { std::printf("  [ERRO] o projeto da partida não abriu: %s\n", engine_last_error(e)); ++g_fail; }
     };
 
+    // Fotos livres do mapa (SO_VISTA="x,y,z,yaw,pitch,dist;..."): uma foto por ponto (vista_N.png), sem jogar
+    if (const char* lv = std::getenv("SO_VISTA")) {
+        abrirPartida();
+        engine_set_time_of_day(e, 11.f);
+        engine_set_quality(e, 2);
+        std::string l = lv;
+        int k = 0;
+        for (size_t a = 0; a < l.size();) {
+            size_t b = l.find(';', a); if (b == std::string::npos) b = l.size();
+            float v[6] = {0, 0, 0, 0, 0.3f, 8.f};
+            std::sscanf(l.substr(a, b - a).c_str(), "%f,%f,%f,%f,%f,%f", &v[0], &v[1], &v[2], &v[3], &v[4], &v[5]);
+            a = b + 1;
+            engine_set_camera(e, v[0], v[1], v[2], v[3], v[4], v[5]);
+            frames(e, 3);
+            save(out, ("vista_" + std::to_string(k++) + ".png").c_str());
+        }
+        engine_destroy(e);
+        std::printf("OK\n");
+        return 0;
+    }
     // Vídeo de gameplay (SO_VIDEO=0 polícia | 1 bandido): o jogador joga sozinho (piloto automático, a mesma
     // inteligência dos robôs: anda pelo mapa, procura e troca tiro) com a câmera atrás do ombro. Os quadros vão
     // direto para o ffmpeg (video_<lado>.mp4) e os sons de cada quadro para sons_<lado>.txt (mixados depois por

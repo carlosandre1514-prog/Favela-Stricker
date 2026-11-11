@@ -147,7 +147,9 @@ float favelaHeight(float x, float z, uint32_t seed) {
     return h;
 }
 
-void favelaHouse(Geo& g, Rng& r, float w, float d, int floors, float footLow, bool frontOpen) {
+// chao(x, z): o chão naquele ponto (coordenadas da casa) em relação ao piso do térreo (negativo: mais baixo)
+void favelaHouse(Geo& g, Rng& r, float w, float d, int floors, float footLow, bool frontOpen,
+                 const std::function<float(float, float)>& chao) {
     glm::vec4 paint = favelaPaint(r);
     const bool brickBase = r.chance(0.3f), graffitiBase = !brickBase && r.chance(0.18f);
     const bool rawUpper = r.chance(0.45f);
@@ -197,6 +199,12 @@ void favelaHouse(Geo& g, Rng& r, float w, float d, int floors, float footLow, bo
             ms.stairsLane = zigzag ? fromTop % 2 : 0;
             ms.stairsToFront = zigzag && f % 2 == 1;         // lances alternam o sentido
             ms.stairsZigzag = zigzag;
+            if (f == 0 && chao) {  // o primeiro lance começa no chão de verdade (no lado de baixo do morro)
+                const float sx = bx - bw / 2 - lane * float(ms.stairsLane + 1) + lane * 0.5f;
+                const float sz = bz + (ms.stairsToFront ? -bd / 2 : bd / 2);
+                ms.stairsDrop = std::clamp(-chao(sx, sz), 0.f, 4.f);
+                if (std::getenv("MAPA_ESCADAS")) std::printf("  escada externa: começa %.2f m abaixo do piso\n", ms.stairsDrop);
+            }
         } else if (outsideStairs) {
         } else if (bd >= 4.4f && bw >= 3.4f) ms.stairs = SK_Straight;
         ms.porch = f == 0 ? porchGround : (frontOpen && r.chance(0.3f));
@@ -220,7 +228,10 @@ void favelaHouse(Geo& g, Rng& r, float w, float d, int floors, float footLow, bo
     const float top = y;
     MeshBuilder& p = g[Mat::Painted];
     p.uvTile = {0.f, 0.f};
-    float tx = r.chance(0.5f) ? bx + bw / 2 - 0.8f : bx - bw / 2 + 0.8f, tz = bz - bd / 2 + 0.8f;
+    // caixa d'água: com escada externa (lado -X), sempre do outro lado (antes às vezes ficava bem onde a escada chega
+    // na laje e tapava a subida)
+    const bool txMais = r.chance(0.5f) || outsideStairs;
+    float tx = txMais ? bx + bw / 2 - 0.8f : bx - bw / 2 + 0.8f, tz = bz - bd / 2 + 0.8f;
     if (r.chance(0.85f)) {
         MeshBuilder& c = g[Mat::Concrete];
         c.color = glm::vec4(1.f); c.uvTile = {1.f, 1.f};
@@ -385,12 +396,18 @@ void genFavela(Engine* e, Rng& r, glm::vec3& spawn, float& spawnYaw) {
                 const auto& rt = routes[ri];
                 glm::vec2 a = rt[i], b = rt[i + 1], dir = glm::normalize(b - a);
                 float L = glm::length(b - a), yaw = std::atan2(dir.x, dir.y);
-                for (float s = 0.f; s < L; s += 0.45f) {
-                    glm::vec2 q = a + dir * (s + 0.225f);
+                // degrau seguindo o morro (sem o fundo): onde é íngreme o degrau fica mais curto, para o espelho não
+                // passar de ~20 cm (com 45 cm fixos, o morro íngreme dava degraus de 30 cm)
+                for (float s = 0.f; s < L;) {
+                    const glm::vec2 q0 = a + dir * s, q1 = a + dir * std::min(L, s + 0.45f);
+                    const float incl = std::abs(H(q1.x, q1.y) - H(q0.x, q0.y)) / std::max(0.05f, glm::length(q1 - q0));
+                    const float passo = std::clamp(0.19f / std::max(incl, 1e-3f), 0.26f, 0.45f);
+                    glm::vec2 q = a + dir * (s + passo * 0.5f);
                     const glm::vec3 p(q.x, H(q.x, q.y) - 0.35f, q.y);
                     Geo& gs = stepGeo(p);
                     DetailScope ds(gs);
-                    yawBox(stepMesh(gs), p, {2.8f, 0.42f, 0.47f}, yaw, 4);  // degrau seguindo o morro (sem o fundo)
+                    yawBox(stepMesh(gs), p, {2.8f, 0.42f, passo + 0.02f}, yaw, 4);
+                    s += passo;
                 }
                 for (float s = 0.f; s < L; s += 1.8f) {  // de longe
                     const float len = std::min(1.8f, L - s);
@@ -521,14 +538,20 @@ void genFavela(Engine* e, Rng& r, glm::vec3& spawn, float& spawnYaw) {
             if (!keep) {
                 Geo descarte;
                 descarte.place(pos, yaw);
-                favelaHouse(descarte, r, w, d, floors, mx - mn + 0.05f, frontOpen);
+                favelaHouse(descarte, r, w, d, floors, mx - mn + 0.05f, frontOpen, nullptr);
                 lots.push_back({c, hs});
                 continue;
             }
             ++houseKept;
             Geo& g = cells.at(pos);
             g.place(pos, yaw);
-            favelaHouse(g, r, w, d, floors, mx - mn + 0.05f, frontOpen);
+            const auto chao = [&](float lx, float lz) {  // ponto da casa -> altura do terreno ali, em relação ao piso
+                const float cy = std::cos(yaw), sy = std::sin(yaw);
+                const float wx = pos.x + lx * cy + lz * sy, wz = pos.z - lx * sy + lz * cy;
+                return H(wx, wz) - pos.y;
+            };
+            if (std::getenv("MAPA_ESCADAS")) std::printf("casa em %.1f %.1f %.1f yaw %.2f\n", pos.x, pos.y, pos.z, yaw);
+            favelaHouse(g, r, w, d, floors, mx - mn + 0.05f, frontOpen, chao);
             lots.push_back({c, hs});
         }
     if (std::getenv("MAPA_DEBUG")) std::printf("  casas: %d de %d\n", houseKept, houseTotal);

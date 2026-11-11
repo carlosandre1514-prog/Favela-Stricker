@@ -166,9 +166,31 @@ function tocarSom(nome, vol, pan) {
   else if (nome !== base && buffers[base]) usar(buffers[base]);
 }
 
+// chuva em loop (sons/chuva.ogg, tools/gerar_chuva.py): volume acompanha quanto está chovendo, num canal só dela
+let chuva = null, chuvaQuadro = 0;
+function atualizarChuva() {
+  const a = audio;
+  if (!a) return;
+  if (!chuva) {
+    chuva = { ganho: a.createGain(), fonte: null, carregando: true };
+    chuva.ganho.gain.value = 0;
+    chuva.ganho.connect(a.destination);
+    fetch('sons/chuva.ogg').then((r) => (r.ok ? r.arrayBuffer() : Promise.reject())).then((d) => a.decodeAudioData(d))
+      .then((buf) => {
+        const src = a.createBufferSource();
+        src.buffer = buf; src.loop = true;
+        src.connect(chuva.ganho); src.start();
+        chuva.fonte = src;
+      }).catch(() => {}).finally(() => { chuva.carregando = false; });
+  }
+  const nivel = Math.max(0, Math.min(1, wasm('web_chuva', 'number', [], []) || 0));
+  chuva.ganho.gain.setTargetAtTime(nivel * 0.85 * volumeSons, a.currentTime, 0.4);
+}
+
 // laço do site: chamado pelo motor depois de desenhar cada quadro
 const aposQuadroExtra = [];
 function aposQuadroSite() {
+  if (audio && ++chuvaQuadro % 15 === 0) atualizarChuva();
   if (entrada.dx || entrada.dy) { wasm('web_olhar', null, ['number', 'number'], [entrada.dx, entrada.dy]); entrada.dx = entrada.dy = 0; }
   if (entrada.girando) wasm('web_olhar', null, ['number', 'number'], [-0.35, 0]);
   if (entrada.atirando) wasm('web_atirar', null, [], []);

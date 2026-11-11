@@ -2,11 +2,15 @@ package com.mobile3d
 
 import android.content.Context
 import android.media.AudioAttributes
+import android.media.MediaPlayer
 import android.media.SoundPool
 import kotlin.random.Random
 
-// Sons do jogo (assets/sons/*.wav, gerados por tools/gerar_sons.py): tiros de cada arma, recarga, impacto, golpes,
-// trovão e a chuva em loop. O motor pede os sons (nativePollSounds) e diz quanto está chovendo (nativeGetWeather).
+// Sons do jogo (assets/sons/*.wav): tiros de cada arma, recarga, impacto, golpes e trovão; a chuva em loop
+// (assets/sons/chuva.ogg, tools/gerar_chuva.py). O motor pede os sons (nativePollSounds) e diz quanto está chovendo
+// (nativeGetWeather).
+// A chuva toca num player só dela (MediaPlayer): no SoundPool ela dividia os 16 canais com os tiros e, numa rajada,
+// o Android tirava o canal dela (prioridade mais baixa) — a chuva cortava e voltava falhando junto com os tiros.
 class SoundManager(context: Context) {
     private val pool = SoundPool.Builder()
         .setMaxStreams(16)
@@ -15,8 +19,21 @@ class SoundManager(context: Context) {
         .build()
     private val ids = HashMap<String, Int>()
     private val ready = HashSet<Int>()
-    private var rainStream = 0
+    private val rain: MediaPlayer? = try {
+        context.assets.openFd("sons/chuva.ogg").use { fd ->
+            MediaPlayer().apply {
+                setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_GAME)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build())
+                setDataSource(fd.fileDescriptor, fd.startOffset, fd.length)
+                isLooping = true
+                setVolume(0f, 0f)
+                prepare()
+            }
+        }
+    } catch (_: Exception) { null }
+    private var rainOn = false
     private var rainVolume = 0f
+    private var paused = false
     var enabled = true
     var volume = 1f  // configurações do jogo (efeitos)
 
@@ -50,20 +67,28 @@ class SoundManager(context: Context) {
         }
     }
 
-    // Chuva em loop: volume acompanha a intensidade (0..1)
+    // Chuva em loop: volume acompanha a intensidade (0..1), subindo e descendo aos poucos
     fun setRain(level: Float) {
-        val v = if (enabled) (level * 0.85f * volume).coerceIn(0f, 1f) else 0f
-        if (v < 0.01f) {
-            if (rainStream != 0) { pool.stop(rainStream); rainStream = 0 }
+        val p = rain ?: return
+        val alvo = if (enabled) (level * 0.85f * volume).coerceIn(0f, 1f) else 0f
+        if (alvo < 0.01f && rainVolume < 0.01f) {
+            if (rainOn) { try { p.pause() } catch (_: Exception) {}; rainOn = false }
             rainVolume = 0f
             return
         }
-        val id = ids["chuva"] ?: return
-        if (rainStream == 0 && isReady(id)) rainStream = pool.play(id, v, v, 0, -1, 1f)
-        if (rainStream != 0 && kotlin.math.abs(v - rainVolume) > 0.02f) { pool.setVolume(rainStream, v, v); rainVolume = v }
+        val v = rainVolume + (alvo - rainVolume) * 0.15f
+        if (kotlin.math.abs(v - rainVolume) > 0.003f || !rainOn) {
+            try { p.setVolume(v, v) } catch (_: Exception) {}
+            rainVolume = v
+        }
+        if (!rainOn && !paused) { try { p.start() } catch (_: Exception) {}; rainOn = true }
     }
 
-    fun pause() { pool.autoPause() }
-    fun resume() { pool.autoResume() }
-    fun release() { pool.release() }
+    fun pause() {
+        paused = true
+        pool.autoPause()
+        if (rainOn) { try { rain?.pause() } catch (_: Exception) {}; rainOn = false }
+    }
+    fun resume() { paused = false; pool.autoResume() }
+    fun release() { pool.release(); try { rain?.release() } catch (_: Exception) {} }
 }
