@@ -972,6 +972,44 @@ int main(int argc, char** argv) {
         std::printf(g_fail ? "FALHOU\n" : "OK\n");
         return g_fail ? 1 : 0;
     }
+    // Deformação dos personagens nas animações (SO_ANIM=1): cada roupa em cada animação, de três quartos e de lado,
+    // de perto (ombro, axila, cotovelo, quadril e joelho): anim_<roupa>_<animação>_<vista>.png
+    if (std::getenv("SO_ANIM")) {
+        using nlohmann::json;
+        eng::Engine* E = reinterpret_cast<eng::Engine*>(e);
+        struct C { const char* nome; int clip; } clips[] = {{"parado", eng::CC_Idle}, {"andando", eng::CC_Walk}, {"correndo", eng::CC_Run},
+            {"fuzil_mirando", eng::CC_Rifle + eng::AP_Aim}, {"fuzil_correndo", eng::CC_Rifle + eng::AP_Run}, {"agachado", eng::CC_CrouchWalk},
+            {"recarregando", eng::CC_Reload}, {"pulando", eng::CC_Jump}, {"morte", eng::CC_Death}, {"acenando", eng::CC_Wave}};
+        const int roupas[][2] = {{0, 0}, {1, 0}, {1, 1}, {1, 2}, {1, 3}};
+        const char* so = std::getenv("ROUPA");
+        for (auto& rp : roupas) {
+            json look = json::parse(jogo_aparencia_roupa(rp[0], rp[1]));
+            const std::string nomeR = look.value("modelo", std::string("boneco"));
+            if (so && nomeR != so) continue;
+            for (const C& c : clips) {
+                engine_new_scene(e);
+                engine_set_time_of_day(e, 13.f);
+                engine_set_quality(e, 3);
+                json sp = {{"tipo", "personagem"}, {"aparencia", look}, {"semente", 7}, {"pos", {0, 0, 0}}};
+                if (c.clip >= eng::CC_Rifle) sp["arma"] = "ak47";
+                if (engine_add_spec(e, sp.dump().c_str()) < 0) { std::printf("  [ERRO] %s\n", engine_last_error(e)); ++g_fail; continue; }
+                eng::CharacterInfo& ci = E->characters.back();
+                ci.anim->setClip(ci.clipMap[c.clip]);
+                ci.anim->time = 0.f;
+                for (int k = 0; k < 18; ++k) { ci.anim->setClip(ci.clipMap[c.clip]); engine_frame(e, 1.f / 30.f); }
+                const float vistas[2] = {0.6f, 1.5708f};
+                for (int v = 0; v < 2; ++v) {
+                    engine_set_camera(e, 0.f, 1.05f, 0.f, vistas[v], 0.1f, 2.3f);
+                    ci.anim->setClip(ci.clipMap[c.clip]);
+                    engine_frame(e, 1e-4f);
+                    save(out, ("anim_" + nomeR + "_" + c.nome + (v ? "_lado" : "_frente") + ".png").c_str());
+                }
+            }
+        }
+        engine_destroy(e);
+        std::printf(g_fail ? "FALHOU\n" : "OK\n");
+        return g_fail ? 1 : 0;
+    }
     // Prévias das armas com as skins do mercado (fundo puro: o recorte é feito depois por tools/recortar_previas.py)
     // SO_PREVIAS = "arma:skin,arma:skin,..." (skin vazia = padrão)
     if (const char* lista = std::getenv("SO_PREVIAS")) {

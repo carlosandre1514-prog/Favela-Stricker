@@ -87,6 +87,11 @@ def main():
     # ---- braços: da pose A da Meshy para a pose de repouso do jogo (retos para baixo, no ombro do esqueleto)
     piv_x = 0.125 * H                      # centro do ombro de uma pessoa (o esqueleto do jogo fica em 0,153 H)
     piv_y = 0.81 * H
+    # o que é braço sai da pose A (lá o braço está longe do corpo): só esses vértices pegam os ossos do braço.
+    # (com os braços já abaixados, a mão fica ao lado do quadril e o quadril pegava o osso do antebraço: a malha
+    # esticava entre a mão e a perna nas animações)
+    eh_braco = {}
+    ao_longo = {}
     for lado in (1, -1):
         s = P[:, 0] * lado
         mao = np.argmax(s)                                     # na pose A, a ponta da mão é o ponto mais de fora
@@ -99,6 +104,8 @@ def main():
         t = rel[:, :2] @ d[:2]
         r = np.linalg.norm(rel[:, :2] - t[:, None] * d[:2][None, :], axis=1)
         braco = (s > piv_x * 0.55) & (t > -0.02 * H) & (r < 0.085 * H) & (P[:, 1] > 0.38 * H)
+        eh_braco[lado] = braco.copy()
+        ao_longo[lado] = t.copy()
         w = np.clip(t / (0.1 * H), 0, 1)
         w = w * w * (3 - 2 * w) * braco
         a = -ang * w                                           # gira em volta do eixo Z (de frente)
@@ -129,21 +136,26 @@ def main():
     D = np.stack([dist_segmento(P, a, b) for _, a, b in ossos], axis=1)
     idx = np.array([o for o, _, _ in ossos])
     x, y = P[:, 0], P[:, 1]
-    braco_e = (x > sx - 0.06 * H) & (y < 0.84 * H) & (y > 0.4 * H)
-    braco_d = (x < -(sx - 0.06 * H)) & (y < 0.84 * H) & (y > 0.4 * H)
-    perna = y < 0.5 * H
-    pode = np.ones_like(D, dtype=bool)
+    braco_e, braco_d = eh_braco[1], eh_braco[-1]
+    qualquer_braco = braco_e | braco_d
+    t_e, t_d = ao_longo[1], ao_longo[-1]
+    perna = (y < 0.56 * H) & ~qualquer_braco
+    pode = np.zeros_like(D, dtype=bool)
     col = {o: k for k, o in enumerate(idx)}
-    bracos_e, bracos_d = [col[LUP], col[LFO], col[LHA]], [col[RUP], col[RFO], col[RHA]]
-    pernas_e, pernas_d = [col[LTH], col[LSH], col[LFT]], [col[RTH], col[RSH], col[RFT]]
-    tronco = [col[HIPS], col[SPINE], col[CHEST], col[NECK], col[HEAD]]
-    for k in bracos_e: pode[:, k] = braco_e
-    for k in bracos_d: pode[:, k] = braco_d
-    for k in pernas_e: pode[:, k] = perna & (x > -0.01 * H)
-    for k in pernas_d: pode[:, k] = perna & (x < 0.01 * H)
-    # braço solto do tronco: só ossos do braço (e um pouco do peito perto do ombro)
-    for k in tronco:
-        pode[:, k] &= ~((braco_e | braco_d) & (y < 0.76 * H))
+    # braço: os 3 ossos do lado; perto do ombro (até 0,1 H do pivô) também o peito, para a malha passar suave
+    for k in (col[LUP], col[LFO], col[LHA]): pode[:, k] = braco_e
+    for k in (col[RUP], col[RFO], col[RHA]): pode[:, k] = braco_d
+    ombro = (braco_e & (t_e < 0.1 * H)) | (braco_d & (t_d < 0.1 * H))
+    for k in (col[CHEST], col[NECK]): pode[:, k] = ~qualquer_braco | ombro
+    for k in (col[HIPS], col[SPINE], col[HEAD]): pode[:, k] = ~qualquer_braco
+    # tronco na altura do ombro (alça da camisa, deltoide): pode pegar um pouco do braço do lado
+    capa_e = ~qualquer_braco & (y > 0.72 * H) & (x > 0.08 * H)
+    capa_d = ~qualquer_braco & (y > 0.72 * H) & (x < -0.08 * H)
+    pode[:, col[LUP]] |= capa_e
+    pode[:, col[RUP]] |= capa_d
+    # pernas: só o que não é braço, do lado certo (um pouco dos dois no meio, entre as pernas)
+    for k in (col[LTH], col[LSH], col[LFT]): pode[:, k] = perna & (x > -0.01 * H)
+    for k in (col[RTH], col[RSH], col[RFT]): pode[:, k] = perna & (x < 0.01 * H)
     D = np.where(pode, D, 1e9)
     ordem = np.argsort(D, axis=1)[:, :3]
     dd = np.take_along_axis(D, ordem, axis=1)
