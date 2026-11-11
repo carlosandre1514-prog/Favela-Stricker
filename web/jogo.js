@@ -119,7 +119,7 @@ function cartaoConta() {
 // Personagem da tela inicial: o da última partida (lado, roupa e arma com a skin equipada), que gira 360 graus
 // arrastando o dedo. Duas camadas do mesmo tamanho (tools/recortar_lobby.py), cada uma uma tira com os ângulos
 // lado a lado: o personagem na pose de segurar e a arma por cima.
-const LOBBY = { quadros: 24, largura: 351, altura: 480 };
+const LOBBY = { quadros: 24, largura: 340, altura: 480 };
 let anguloBoneco = 0;  // quadro mostrado (fica onde a pessoa deixou enquanto o app está aberto)
 function bonecoInicio() {
   const u = guardado.get('ultimo', null) || { time: guardado.get('lado', 0) };
