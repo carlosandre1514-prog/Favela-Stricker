@@ -253,7 +253,7 @@ function telaLado() {
         <span class="texto" style="color:#DBEAFE">Nasce fora da favela, na rua dos prédios. Sobe as escadarias para tomar o morro.</span>
         <span class="cresce"></span>
         <div class="linha" style="gap:6px;flex-wrap:wrap"><span class="tag" style="background:rgba(59,130,246,.22);color:#DBEAFE">M4A1 · M4 Colt com luneta</span>
-          <span class="tag" style="background:rgba(59,130,246,.22);color:#DBEAFE">5 fardas grátis: PM, Civil, Exército, Choque, BOPE</span></div>
+          <span class="tag" style="background:rgba(59,130,246,.22);color:#DBEAFE">5 fardas grátis: Soldado, PM, BOPE, Selva, Choque</span></div>
         <div class="linha" style="justify-content:space-between"><span style="font-size:12px;color:#BFDBFE">4 robôs + você</span><span class="entrar" style="background:#3B82F6">ENTRAR</span></div>
       </button>
       <button class="lado ban" data-time="1">
@@ -261,7 +261,7 @@ function telaLado() {
         <span class="texto" style="color:#FEF3C7">Nasce na quadra, dentro da favela. Com polícia na quadra, nasce num canto do morro sem policial.</span>
         <span class="cresce"></span>
         <div class="linha" style="gap:6px;flex-wrap:wrap"><span class="tag" style="background:rgba(245,158,11,.22);color:#FEF3C7">AK-47 · AK-74 · AK-74 tática</span>
-          <span class="tag" style="background:rgba(245,158,11,.22);color:#FEF3C7">5 roupas grátis: Rubro, Alvinegro, Tricolor, Canarinho, Faixa</span></div>
+          <span class="tag" style="background:rgba(245,158,11,.22);color:#FEF3C7">4 roupas grátis com colete: Malandro, Vapor, Olheiro, Frente</span></div>
         <div class="linha" style="justify-content:space-between"><span style="font-size:12px;color:#FDE68A">4 robôs + você</span><span class="entrar" style="background:#F59E0B;color:#111827">ENTRAR</span></div>
       </button>
     </div></div>`), 'lado');
