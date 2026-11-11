@@ -892,6 +892,10 @@ void buildCharacter(const CharacterParams& p, LoadedModel& out, MeshBuilder& b) 
                             CJ_Hips, CJ_LThigh, CJ_LShin, CJ_Hips, CJ_RThigh, CJ_RShin};
     pos[CJ_Neck] = {0, 0.835f * H, 0};
     parent[CJ_Neck] = CJ_Chest;
+    if (p.temJuntas) {  // personagem de modelo: as juntas medidas nele
+        for (int i = 0; i < CJ_Count; ++i) pos[i] = p.juntas[i];
+        pos[CJ_Neck] = p.juntas[16];
+    }
     // dedos: palma de frente (+Z); polegar e indicador do lado de fora; 2 articulações por dedo
     const float palmBottom = 0.0575f * H;
     for (int side = 0; side < 2; ++side) {

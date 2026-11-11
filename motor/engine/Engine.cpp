@@ -384,24 +384,32 @@ int createCharacter(Engine* e, const CharacterParams& p, glm::vec3 pos, float ya
     if (e->characters.size() >= AnimatorPool::capacity()) { e->lastError = "limite de personagens"; return -1; }
     auto model = std::make_unique<LoadedModel>();
     MeshBuilder mb;
-    buildCharacter(p, *model, mb);
+    CharacterParams pm = p;  // com as juntas do modelo, se tiver
+    struct ModeloLido { std::vector<Vertex> v; std::vector<uint32_t> idx; bool juntas = false; glm::vec3 j[17]; };
+    const ModeloLido* lido = nullptr;
     if (!p.modelo.empty()) {  // personagem de modelo (Meshy): a malha com os pesos dos ossos, lida uma vez por modelo
-        static std::map<std::string, std::pair<std::vector<Vertex>, std::vector<uint32_t>>> cache;
+        static std::map<std::string, ModeloLido> cache;
         auto it = cache.find(p.modelo);
         if (it == cache.end()) {
-            std::pair<std::vector<Vertex>, std::vector<uint32_t>> m;
+            ModeloLido m;
             if (FILE* f = std::fopen(kitPath(e, "personagens/meshy/" + p.modelo + ".bin").c_str(), "rb")) {
                 char mg[4]; uint32_t nv = 0, ni = 0;
-                if (std::fread(mg, 1, 4, f) == 4 && std::memcmp(mg, "FSP1", 4) == 0 && std::fread(&nv, 4, 1, f) == 1 && std::fread(&ni, 4, 1, f) == 1 &&
-                    nv < 2000000 && ni < 6000000) {
+                const bool v2 = std::fread(mg, 1, 4, f) == 4 && std::memcmp(mg, "FSP2", 4) == 0;
+                const bool v1 = !v2 && std::memcmp(mg, "FSP1", 4) == 0;
+                if ((v1 || v2) && std::fread(&nv, 4, 1, f) == 1 && std::fread(&ni, 4, 1, f) == 1 && nv < 2000000 && ni < 6000000) {
+                    float jf[17 * 3];
+                    if (v2 && std::fread(jf, sizeof(jf), 1, f) == 1) {
+                        m.juntas = true;
+                        for (int k = 0; k < 17; ++k) m.j[k] = glm::vec3(jf[k * 3], jf[k * 3 + 1], jf[k * 3 + 2]);
+                    }
                     struct Reg { float p[3], n[3], u[2], t[4]; uint16_t j[4]; float w[4]; };
                     static_assert(sizeof(Reg) == 72, "registro do .bin");
                     std::vector<Reg> r(nv);
-                    m.second.resize(ni);
-                    if (std::fread(r.data(), sizeof(Reg), nv, f) == nv && std::fread(m.second.data(), 4, ni, f) == ni) {
-                        m.first.resize(nv);
+                    m.idx.resize(ni);
+                    if (std::fread(r.data(), sizeof(Reg), nv, f) == nv && std::fread(m.idx.data(), 4, ni, f) == ni) {
+                        m.v.resize(nv);
                         for (uint32_t i = 0; i < nv; ++i) {
-                            Vertex& v = m.first[i];
+                            Vertex& v = m.v[i];
                             v.pos = glm::vec3(r[i].p[0], r[i].p[1], r[i].p[2]);
                             v.normal = glm::vec3(r[i].n[0], r[i].n[1], r[i].n[2]);
                             v.uv = glm::vec2(r[i].u[0], r[i].u[1]);
@@ -410,16 +418,20 @@ int createCharacter(Engine* e, const CharacterParams& p, glm::vec3 pos, float ya
                             v.weights = glm::vec4(r[i].w[0], r[i].w[1], r[i].w[2], r[i].w[3]);
                             v.color = glm::vec4(1.f);
                         }
-                        for (uint32_t& k : m.second) if (k >= nv) k = 0;
+                        for (uint32_t& k : m.idx) if (k >= nv) k = 0;
                     } else m = {};
                 }
                 std::fclose(f);
             }
             it = cache.emplace(p.modelo, std::move(m)).first;
         }
-        if (!it->second.first.empty()) { mb.v = it->second.first; mb.idx = it->second.second; }
-        else std::printf("personagem: modelo %s não abriu, ficou o boneco\n", p.modelo.c_str());
+        if (!it->second.v.empty()) {
+            lido = &it->second;
+            if (lido->juntas) { pm.temJuntas = true; for (int k = 0; k < 17; ++k) pm.juntas[k] = lido->j[k]; }
+        } else std::printf("personagem: modelo %s não abriu, ficou o boneco\n", p.modelo.c_str());
     }
+    buildCharacter(pm, *model, mb);
+    if (lido) { mb.v = lido->v; mb.idx = lido->idx; }
     // malha do modelo na GPU uma vez só (por cena: a cena nova apaga as malhas) + a versão de longe (35% dos
     // triângulos, mesmos ossos e pesos)
     struct MalhaModelo { uint32_t rev; MeshId perto, longe; };

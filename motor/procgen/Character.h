@@ -57,6 +57,10 @@ struct CharacterParams {
     // Personagem de modelo (Meshy, shaders/kit/personagens/meshy/<modelo>.bin feito por tools/preparar_personagem.py):
     // a malha com os pesos dos ossos no lugar do boneco gerado; o esqueleto e as animações são os mesmos
     std::string modelo;
+    // juntas medidas no modelo (CJ_Hips..CJ_RFoot e o pescoço): o esqueleto e as animações saem delas, então cada osso
+    // dobra onde o corpo do modelo dobra (sem isso, as juntas ficam na proporção do boneco gerado)
+    bool temJuntas = false;
+    glm::vec3 juntas[17];
 };
 enum SkinPart { SP_Tronco, SP_Cabeca, SP_BracoEsq, SP_BracoDir, SP_PernaEsq, SP_PernaDir, SP_PeEsq, SP_PeDir };
 
