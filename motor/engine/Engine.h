@@ -441,6 +441,7 @@ std::string gameStatusText(Engine* e);
 // Efeitos do tiro de uma arma: o da skin dela (se tiver "disparo") ou o padrão. Chame no lugar de fxMuzzleFlash/fxBullet.
 void muzzleFx(Engine* e, Scene::Handle weapon, glm::vec3 muzzle, glm::vec3 dir);
 void atualizarAncoras(Engine* e, float dt);
+void atualizarEnergia(Engine* e, float dt);  // skin de energia (depois da arma posicionada: núcleo e cristais colados nela)
 bool tiroNasPortas(Engine* e, glm::vec3 de, glm::vec3 ate);  // bala que passa por uma porta: ela abre para o lado do tiro  // depois de posicionar as armas, antes de desenhar
 void bulletFx(Engine* e, Scene::Handle weapon, glm::vec3 from, glm::vec3 to);
 void applyKitTexture(Engine* e, GameObject& g, const std::string& kitName, float metal = -1.f, float rough = -1.f);  // textura de cor do kit no objeto

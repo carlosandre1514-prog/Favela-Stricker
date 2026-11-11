@@ -52,6 +52,10 @@ struct Material {
     float occlusionStrength = 1.f;
     bool doubleSided = false;
     int mode = 0;              // 0 padrão, 1 terreno simples, 2 água, 3 terreno com as camadas de textura reais
+    // skin de energia (AK-47 Energia Cósmica): x veias (0..1), y a arma se soltando em pedaços (ativação), z 1 = ligado;
+    // cor das veias e o centro do núcleo (espaço do modelo: os pedaços saem dele)
+    glm::vec4 energia{0.f};
+    glm::vec3 energiaCor{0.66f, 0.33f, 1.f}, energiaNuc{0.f};
 };
 
 struct DrawItem {
@@ -90,6 +94,7 @@ public:
     const Material* material(MaterialId id) const { return id < materialCount_ ? &materials_[id] : nullptr; }
     void setEmissive(MaterialId id, glm::vec3 f) { if (id < materialCount_) materials_[id].emissive_factor = f; }
     void setRim(MaterialId id, glm::vec4 r) { if (id < materialCount_) materials_[id].rim = r; }
+    void setEnergia(MaterialId id, glm::vec4 v) { if (id < materialCount_) materials_[id].energia = v; }
     uint32_t materialCount() const { return materialCount_; }
     const Mesh* mesh(MeshId id) const { return id < meshCount_ ? &meshes_[id] : nullptr; }
     // memória das malhas na placa de vídeo (vértices + índices), para medir
@@ -142,6 +147,7 @@ private:
         GLuint id = 0;
         GLint uModel = -1, uLightVP = -1;
         GLint uAlbedoF = -1, uRough = -1, uMetal = -1, uEmis = -1, uRim = -1, uAlphaCut = -1, uOccStrength = -1, uMode = -1, uTime = -1;
+        GLint uEnergia = -1, uEnergiaCor = -1, uEnergiaNuc = -1;
     };
 
     void updateEnvironment(const Environment& env);

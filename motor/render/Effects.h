@@ -1,4 +1,5 @@
 #pragma once
+#include <vector>
 #include <glm/glm.hpp>
 #include "procgen/Noise.h"
 #include "render/Particles.h"
@@ -45,6 +46,15 @@ struct Emitter {
     glm::vec3 corDisparo{0.2f, 0.55f, 1.f}, corDisparo2{1.f, 0.75f, 0.3f};
     float pulso = 0.f, emiBase = 1.f;
     glm::vec4 rimBase{0.f};
+    // skin de energia ("energia" no _efeito.json, AK-47 Energia Cósmica; igual ao artefato de prévia): ao aparecer na
+    // mão a arma se ativa (se solta em pedaços e libera o núcleo); depois fica com o núcleo, os cristais orbitando,
+    // raios na peça e partículas subindo (atualizarEnergia, depois da arma posicionada)
+    bool energia = false, ativo = false;
+    float ativT = -1.f, nivel = 0.35f, ondaT = -1.f, accEnergia = 0.f, accArcos = 0.f, luzEnergia = 0.f;
+    glm::vec3 nucleo{0.f};   // x = quanto o disco sai para os lados, y e z = centro (espaço do modelo)
+    glm::vec3 luzPos{0.f}, corEnergia{0.66f, 0.33f, 1.f};
+    glm::mat4 rel{1.f};      // modelo -> objeto da arma
+    const std::vector<float>* pontos = nullptr;  // pontos da superfície do modelo: x y z nx ny nz
     glm::vec3 ultimo{0.f};   // posição no frame anterior (as partículas acompanham a arma quando ela anda)
     bool temUltimo = false;
     GameObject* owner = nullptr;

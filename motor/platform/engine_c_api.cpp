@@ -167,6 +167,7 @@ void engine_frame(Engine* e, float dt) {
     eng::updateSupportHands(e, dt);
     eng::applyFirstPerson(e);
     eng::atualizarAncoras(e, dt);  // fogo do disparo preso à boca da arma já posicionada
+    eng::atualizarEnergia(e, dt);  // skin de energia: núcleo, cristais e raios na arma já posicionada
     eng::updateCuts(e);
     eng::updateLamps(e);
 

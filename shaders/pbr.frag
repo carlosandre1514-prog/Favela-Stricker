@@ -10,6 +10,12 @@ in vec4 vTangent;
 #endif
 in float vViewDepth;
 in vec4 vColor;
+in vec3 vObjPos;
+in float vSolto;
+in vec3 vCelula;
+flat in vec3 vCelulaTri;
+uniform vec4 uEnergia;
+uniform vec3 uEnergiaCor;
 flat in uint vCut;
 
 uniform sampler2D uAlbedoMap;
@@ -210,9 +216,20 @@ void terrainLayers(out vec3 albedo, out vec3 nt, out float cavity) {
     }
 }
 
+// ruído de valor 3D (veias da skin de energia)
+float vh3(vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
+float vnz3(vec3 x) {
+    vec3 i = floor(x), f = fract(x);
+    f = f * f * (3.0 - 2.0 * f);
+    return mix(mix(mix(vh3(i), vh3(i + vec3(1, 0, 0)), f.x), mix(vh3(i + vec3(0, 1, 0)), vh3(i + vec3(1, 1, 0)), f.x), f.y),
+               mix(mix(vh3(i + vec3(0, 0, 1)), vh3(i + vec3(1, 0, 1)), f.x), mix(vh3(i + vec3(0, 1, 1)), vh3(i + vec3(1, 1, 1)), f.x), f.y), f.z);
+}
+
 void main() {
     if (vCut != 0u && insideCut(vWorldPos, vCut)) discard;  // abertura cortada na parede
     if (uMode == 2) { oColor = vec4(toDisplay(waterColor()), 1.0); return; }
+    // skin de energia se abrindo: o triângulo na divisa entre dois pedaços some (senão estica entre eles)
+    if (uEnergia.y > 0.0 && vSolto > 0.01 && any(greaterThan(abs(vCelula - vCelulaTri), vec3(0.01)))) discard;
     vec4 albedoS = texture(uAlbedoMap, vUV) * uAlbedoFactor * vColor;  // textura em sRGB: o GL já linearizou
     if (albedoS.a < uAlphaCutoff) discard;
     if (uMode == 1) {
@@ -272,6 +289,18 @@ void main() {
 
     vec3 color = Lo + ambient;
     if (any(greaterThan(uEmissiveFactor, vec3(0.0)))) color += texture(uEmissiveMap, vUV).rgb * uEmissiveFactor;  // só o que brilha lê a textura
+    if (uEnergia.z > 0.0) {  // skin de energia: rachaduras de energia pulsando nas partes escuras (como no artefato)
+        vec3 q = vObjPos * 24.0;
+        vec3 w = q + 0.45 * vec3(vnz3(q * 1.7 + uTime * 0.15), vnz3(q * 1.7 + 5.0), vnz3(q * 1.7 + 9.0 - uTime * 0.1));
+        float A = 1.0 - abs(vnz3(w) * 2.0 - 1.0), B = 1.0 - abs(vnz3(w * 2.1 + 3.7) * 2.0 - 1.0);
+        float linha = pow(A, 16.0) + pow(B, 20.0) * 0.6, brilhoV = pow(A, 5.0) * 0.12;
+        float pulso = 0.6 + 0.4 * sin(uTime * 3.2 + vnz3(q * 0.8) * 12.0);
+        float escuro = 1.0 - smoothstep(0.08, 0.35, dot(albedoS.rgb, vec3(0.33)));
+        // (o artefato comprime o brilho com o tom ACES; aqui a mesma conta com a força já comprimida)
+        float v = (linha * 1.9 + brilhoV * 0.5) * pulso * uEnergia.x * (0.2 + 0.8 * escuro);
+        color += uEnergiaCor * (v / (1.0 + v)) * 1.1 + vec3(1.0) * pow(A, 60.0) * 0.35 * uEnergia.x * (0.2 + 0.8 * escuro);
+        color += uEnergiaCor * smoothstep(0.02, 0.4, vSolto) * (0.5 + pow(A, 6.0) * 2.5);
+    }
     if (uRim.a > 0.0) {  // aura: as bordas vistas de lado acendem, com um pulso suave que corre pela arma
         float borda = pow(1.0 - clamp(abs(dot(Nv, V)), 0.0, 1.0), 3.0);
         float pulso = 0.75 + 0.25 * sin(uTime * 2.6 + dot(vWorldPos, vec3(9.0, 13.0, 11.0)));

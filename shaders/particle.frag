@@ -30,6 +30,21 @@ void main() {
     } else if (vShape == 5) {                // cristal de gelo
         float k = abs(vUV.x) * 1.9 + abs(vUV.y);
         m = smoothstep(1.0, 0.75, k) * (0.7 + 0.3 * step(0.0, vUV.x * vUV.y));
+    } else if (vShape == 7) {                // núcleo de energia (skin): centro quente, raios, anéis girando e redemoinho
+        float t = vSeed, ang = atan(vUV.y, vUV.x) / 6.2832;
+        float c0 = exp(-d * d * 22.0) * 2.8;
+        float rays = pow(noise(vec2(ang * 24.0, t * 1.3) * 6.4), 3.0) * exp(-d * 2.6) * 2.6;
+        float r1 = smoothstep(0.04, 0.0, abs(d - 0.52)) * (0.5 + 0.5 * sin(ang * 6.2832 * 6.0 + t * 2.5));
+        float r2 = smoothstep(0.02, 0.0, abs(d - 0.76)) * step(0.0, sin(ang * 6.2832 * 14.0 - t * 1.7));
+        float r3 = smoothstep(0.05, 0.0, abs(d - 0.31)) * (0.4 + 0.6 * noise(vec2(ang * 18.0 - t, 3.0) * 6.4));
+        float sw = noise(vec2(ang * 12.0 + d * 8.0 - t * 1.8, d * 7.0 + t * 0.6) * 6.4) * exp(-d * 3.0) * 1.3;
+        float a = clamp(c0 + rays + r1 + r2 + r3 + sw, 0.0, 4.0) * (1.0 - smoothstep(0.9, 1.0, d));
+        // (a cor já vem multiplicada pela força; o branco do centro na mesma força: o maior canal da cor)
+        float forca = max(vColor.r, max(vColor.g, vColor.b));
+        vec3 c = mix(vColor.rgb, vec3(forca), clamp(c0 * 0.45 + rays * 0.12, 0.0, 1.0)) * 1.7;
+        if (a * forca < 0.004) discard;
+        oColor = vec4(c * a, 0.0);
+        return;
     } else {                                 // chama (gota com ruído subindo)
         vec2 q = vec2(vUV.x * (1.0 + (vUV.y + 1.0) * 0.65), vUV.y * 0.9 + 0.1);
         float n = noise(vec2(vUV.x * 3.0, vUV.y * 2.0 - vSeed * 20.0));

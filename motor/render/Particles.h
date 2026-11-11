@@ -14,7 +14,7 @@ namespace eng {
 class Renderer;
 
 // Formatos desenhados no shader (shaders/particle.frag)
-enum ParticleShape : uint8_t { PS_Glow, PS_Smoke, PS_Spark, PS_Ring, PS_Star, PS_Shard, PS_Flame };
+enum ParticleShape : uint8_t { PS_Glow, PS_Smoke, PS_Spark, PS_Ring, PS_Star, PS_Shard, PS_Flame, PS_Nucleo };
 
 struct ParticleSpawn {
     glm::vec3 pos{0.f}, vel{0.f};
@@ -29,6 +29,7 @@ struct ParticleSpawn {
     bool additive = true;      // aditivo (brilha) ou alfa (fumaça escura)
     float occlusion = 0.f;     // aditivo que também escurece um pouco o fundo (cor saturada mesmo de dia)
     bool presa = false;        // presa na boca do cano (âncora atual do sistema): anda junto com a arma desenhada
+    float seed = -1.f;         // >= 0: semente fixa (PS_Nucleo: o relógio da animação dos anéis e raios)
 };
 
 // Partículas com capacidade fixa, simuladas na CPU sem alocação e desenhadas num único draw call instanciado.

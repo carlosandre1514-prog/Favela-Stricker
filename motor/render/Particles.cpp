@@ -40,7 +40,7 @@ void ParticleSystem::emit(const ParticleSpawn& s) {
     p.s0 = s.size0; p.s1 = s.size1;
     p.rot = s.rot; p.rotVel = s.rotVel; p.drag = s.drag; p.gravity = s.gravity; p.stretch = s.stretch;
     seed_ = seed_ * 1664525u + 1013904223u;
-    p.seed = (seed_ >> 8) / float(1 << 24);
+    p.seed = s.seed >= 0.f ? s.seed : (seed_ >> 8) / float(1 << 24);
     p.shape = s.shape; p.additive = s.additive; p.occlusion = s.occlusion;
     p.ancora = s.presa && ancoraAtual >= 0 && ancoraAtual < kAncoras ? int8_t(ancoraAtual) : int8_t(-1);
 }

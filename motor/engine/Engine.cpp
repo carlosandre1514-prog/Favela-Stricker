@@ -1897,6 +1897,267 @@ void castSpell(Engine* e, int element) {
     }
 }
 
+// ---------- skin de energia (AK-47 Energia Cósmica): o mesmo efeito do artefato de prévia ----------
+// O artefato mostra a arma 2,3 vezes maior (ESC); aqui as medidas dele viram espaço do modelo dividindo por 2,3.
+namespace {
+constexpr float kEsc = 2.3f;
+float suave(float a, float b, float x) { const float t = std::clamp((x - a) / (b - a), 0.f, 1.f); return t * t * (3.f - 2.f * t); }
+glm::vec3 hsl(float h, float s, float l) {
+    auto f = [&](float n) { const float k = std::fmod(n + h * 12.f, 12.f), a = s * std::min(l, 1.f - l); return l - a * std::max(-1.f, std::min({k - 3.f, 9.f - k, 1.f})); };
+    return glm::vec3(f(0.f), f(8.f), f(4.f));
+}
+glm::vec3 srgbLin(glm::vec3 c) { return glm::pow(c, glm::vec3(2.2f)); }
+// um ponto da superfície (pontos tirados do modelo), no mundo, com a normal
+bool pontoEnergia(const Emitter& em, Rng& r, const glm::mat4& M, glm::vec3& p, glm::vec3& n) {
+    if (!em.pontos || em.pontos->size() < 6) return false;
+    const size_t i = size_t(r.f() * float(em.pontos->size() / 6)) % (em.pontos->size() / 6);
+    const float* v = em.pontos->data() + i * 6;
+    p = glm::vec3(M * glm::vec4(v[0], v[1], v[2], 1.f));
+    n = glm::normalize(glm::vec3(M * glm::vec4(v[3], v[4], v[5], 0.f)) + glm::vec3(1e-6f));
+    return true;
+}
+// caminho em zigue-zague (relâmpago) por deslocamento do ponto médio
+void zigue(Rng& r, glm::vec3 a, glm::vec3 b, float disp, int prof, std::vector<glm::vec3>& out) {
+    std::vector<glm::vec3> pts{a, b};
+    for (int d = 0; d < prof; ++d) {
+        std::vector<glm::vec3> np{pts[0]};
+        for (size_t i = 0; i + 1 < pts.size(); ++i) {
+            glm::vec3 m = (pts[i] + pts[i + 1]) * 0.5f + glm::vec3(r.range(-0.5f, 0.5f), r.range(-0.5f, 0.5f), r.range(-0.5f, 0.5f)) * disp;
+            np.push_back(m);
+            np.push_back(pts[i + 1]);
+        }
+        pts.swap(np);
+        disp *= 0.55f;
+    }
+    out.insert(out.end(), pts.begin(), pts.end());
+}
+// um traço de raio entre dois pontos: miolo branco fino + brilho colorido (como o shader de raio do artefato)
+void tracoRaio(ParticleSystem& ps, glm::vec3 p0, glm::vec3 p1, float largura, float forca, glm::vec3 cor, float vida, bool presa = false) {
+    const glm::vec3 dd = p1 - p0;
+    const float len = glm::length(dd);
+    if (len < 1e-5f) return;
+    const glm::vec3 d = dd / len;
+    const float v = 0.02f;
+    for (int camada = 0; camada < 2; ++camada) {
+        ParticleSpawn s;
+        const float tam = camada ? largura * 0.5f : largura * 0.12f;
+        s.pos = (p0 + p1) * 0.5f; s.vel = d * v;
+        s.stretch = std::max(0.f, (len * 0.5f - tam) / v);
+        s.life = vida; s.size0 = s.size1 = tam;
+        s.color0 = camada ? glm::vec4(cor * 1.6f * forca, 1.f) : glm::vec4(glm::vec3(3.f * forca), 1.f);
+        s.color1 = glm::vec4(glm::vec3(s.color0) * 0.6f, 0.f);
+        s.shape = camada ? PS_Glow : PS_Spark;
+        s.presa = presa;
+        ps.emit(s);
+    }
+}
+}  // namespace
+
+static void tiroEnergia(Engine* e, Emitter& em, glm::vec3 boca, glm::vec3 dir) {
+    (void)em;
+    // clarão na boca (estrela laranja com o centro branco) + fagulhas roxas e douradas + luz roxa
+    ParticleSpawn c;
+    c.pos = boca; c.life = 0.07f; c.size0 = 0.152f; c.size1 = 0.06f;
+    c.color0 = glm::vec4(srgbLin(glm::vec3(1.f, 0.70f, 0.28f)) * 2.2f, 1.f); c.color1 = glm::vec4(c.color0.r, c.color0.g, c.color0.b, 0.f);
+    c.shape = PS_Star; c.presa = true;
+    e->particles.emit(c);
+    ParticleSpawn w = c;
+    w.size0 = 0.05f; w.size1 = 0.02f; w.color0 = glm::vec4(3.f, 2.8f, 2.5f, 1.f); w.color1 = glm::vec4(1.f, 1.f, 1.f, 0.f); w.shape = PS_Glow;
+    e->particles.emit(w);
+    for (int i = 0; i < 14; ++i) {
+        ParticleSpawn s;
+        s.pos = boca;
+        s.vel = (dir * e->fxRng.range(1.f, 4.f) + glm::vec3(e->fxRng.range(-0.8f, 0.8f), e->fxRng.range(-0.8f, 0.8f), e->fxRng.range(-0.8f, 0.8f))) / kEsc;
+        s.life = e->fxRng.range(0.25f, 0.5f);
+        const glm::vec3 cor = srgbLin(i % 3 ? glm::vec3(0.77f, 0.55f, 1.f) : glm::vec3(1.f, 0.82f, 0.54f));
+        s.size0 = e->fxRng.range(8.f, 18.f) * 0.000478f; s.size1 = s.size0 * 0.3f;
+        s.color0 = glm::vec4(cor * 2.f, 1.f); s.color1 = glm::vec4(cor, 0.f);
+        s.shape = PS_Star; s.drag = 1.6f;
+        e->particles.emit(s);
+    }
+    addFlash(e, {boca, srgbLin(glm::vec3(0.75f, 0.56f, 1.f)), 12.f, 2.6f}, 0.16f);
+}
+// feixe roxo do tiro: um traço largo da boca para a frente (3,9 m, o do artefato) com 3 filamentos elétricos
+static void feixeEnergia(Engine* e, glm::vec3 from, glm::vec3 to) {
+    const glm::vec3 d = to - from;
+    const float dist = glm::length(d);
+    if (dist < 0.05f) return;
+    const glm::vec3 u = d / dist;
+    const glm::vec3 fim = from + u * std::min(dist, 9.f / kEsc);
+    const glm::vec3 cor = srgbLin(glm::vec3(0.70f, 0.40f, 1.f));
+    tracoRaio(e->particles, from, fim, 0.05f / kEsc * 2.f, 1.f, cor, 0.16f);
+    std::vector<glm::vec3> pts;
+    for (int j = 0; j < 3; ++j) {
+        pts.clear();
+        zigue(e->fxRng, from, fim, 0.12f / kEsc * 2.f, 4, pts);
+        for (size_t i = 0; i + 1 < pts.size(); ++i) tracoRaio(e->particles, pts[i], pts[i + 1], 0.016f / kEsc * 2.f, 0.55f, cor, 0.16f);
+    }
+}
+
+void atualizarEnergia(Engine* e, float dt) {
+    if (dt <= 0.f) return;
+    const glm::vec3 cam = e->camera.position;
+    e->emitters.forEach([&](Emitter& em, EmitterPool::Handle) {
+        GameObject* o = em.owner;
+        if (!em.energia || !o) return;
+        em.luzEnergia = 0.f;
+        if (!o->active) return;
+        // a arma guardada no corpo (costas, coxa) fica quieta: só a pintura
+        const Scene::Handle eu = Scene::handleOf(*o);
+        for (const CharacterInfo& c : e->characters)
+            if (c.holster.index == eu.index && c.holster.gen == eu.gen) {
+                Scene::forEachInSubtree(*o, [&](GameObject& p) {
+                    if (p.meshRenderer) e->renderer.setEnergia(p.meshRenderer->material, glm::vec4(0.35f, 0.f, 1.f, 0.f));
+                });
+                return;
+            }
+        em.timer += dt;
+        const float t = em.timer;
+        // ativação: sobe a energia, a arma se solta em pedaços (libera o núcleo), a onda passa e tudo volta
+        float frag = 0.f, flare = 0.f;
+        if (em.ativT >= 0.f) {
+            em.ativT += dt;
+            const float T = em.ativT;
+            em.nivel = 0.35f + 0.65f * suave(0.f, 0.8f, T);
+            frag = suave(0.55f, 1.15f, T) * (1.f - suave(1.9f, 2.7f, T));
+            flare = suave(0.7f, 1.f, T) * (1.f - suave(1.2f, 2.2f, T));
+            if (T > 0.85f && T - dt <= 0.85f) em.ondaT = 0.f;
+            if (T > 2.9f) { em.ativT = -1.f; em.ativo = true; }
+        } else {
+            em.nivel += ((em.ativo ? 1.f : 0.35f) - em.nivel) * std::min(1.f, dt * 2.f);
+        }
+        const float veia = em.nivel * (0.85f + 0.15f * std::sin(t * 2.3f));
+        Scene::forEachInSubtree(*o, [&](GameObject& p) {
+            if (!p.meshRenderer) return;
+            e->renderer.setEnergia(p.meshRenderer->material, glm::vec4(veia, frag, 1.f, 0.f));
+            e->renderer.setEmissive(p.meshRenderer->material, glm::vec3(em.emiBase * (0.5f + 0.5f * veia)));
+        });
+        const glm::mat4 M = o->transform.world() * em.rel;
+        const float ws = glm::length(glm::vec3(M[0]));
+        const glm::vec3 centroArma = glm::vec3(M * glm::vec4(0.f, em.nucleo.y, em.nucleo.z, 1.f));
+        if (glm::distance(cam, centroArma) > 30.f) return;  // longe: só a pintura
+        ParticleSystem& ps = e->particles;
+        Rng& r = e->fxRng;
+        const glm::vec3 cor = srgbLin(em.corEnergia);
+        const float vida1 = dt * 1.05f;  // partículas de um quadro (núcleo, cristais): redesenhadas a cada quadro
+
+        // núcleo, dos dois lados do disco (como um adesivo virado para fora: some quando visto de lado)
+        const float tamNuc = (0.55f + 0.45f * em.nivel + 0.9f * flare) * (1.f + 0.05f * std::sin(t * 5.f));
+        const float forcaNuc = 0.45f + 0.45f * em.nivel + 0.6f * flare;
+        for (int lado = -1; lado <= 1; lado += 2) {
+            const glm::vec3 pos = glm::vec3(M * glm::vec4(lado * (em.nucleo.x + 0.004f), em.nucleo.y, em.nucleo.z, 1.f));
+            const glm::vec3 nrm = glm::normalize(glm::vec3(M * glm::vec4(float(lado), 0.f, 0.f, 0.f)));
+            const float frente = glm::dot(nrm, glm::normalize(cam - pos));
+            const float vis = suave(0.f, 0.35f, frente);
+            if (vis <= 0.f) continue;
+            ParticleSpawn s;
+            s.pos = pos; s.life = vida1; s.size0 = s.size1 = 0.1f / kEsc * tamNuc * ws;
+            s.color0 = s.color1 = glm::vec4(srgbLin(glm::vec3(0.69f, 0.42f, 1.f)), forcaNuc * vis);
+            s.shape = PS_Nucleo; s.seed = std::fmod(t, 600.f);
+            ps.emit(s);
+        }
+        em.luzPos = centroArma;
+        em.luzEnergia = (0.8f + 1.6f * em.nivel + 5.f * flare) * (0.85f + 0.15f * std::sin(t * 7.f));
+
+        // onda de choque saindo do núcleo
+        if (em.ondaT >= 0.f) {
+            em.ondaT += dt;
+            const float k = em.ondaT / 0.9f;
+            if (k >= 1.f) em.ondaT = -1.f;
+            else {
+                const float raio = 0.5f * (0.4f + 4.2f * k) * (0.5f + 0.35f * k) / kEsc * ws;
+                ParticleSpawn s;
+                s.pos = centroArma; s.life = vida1; s.size0 = s.size1 = raio / 0.72f;
+                s.color0 = s.color1 = glm::vec4(srgbLin(glm::vec3(0.75f, 0.55f, 1.f)) * 1.6f, 0.6f * (1.f - k));
+                s.shape = PS_Ring;
+                ps.emit(s);
+            }
+            if (em.ondaT >= 0.f && em.ondaT <= dt * 1.01f) {  // chuva de faíscas no começo da onda
+                glm::vec3 p, n;
+                for (int i = 0; i < 90; ++i)
+                    if (pontoEnergia(em, r, M, p, n)) {
+                        ParticleSpawn s;
+                        s.pos = p; s.vel = n * r.range(1.2f, 3.4f) / kEsc * ws;
+                        s.life = r.range(0.6f, 1.2f);
+                        const glm::vec3 c = i % 4 ? srgbLin(glm::vec3(0.72f, 0.48f, 1.f)) : glm::vec3(1.f);
+                        s.size0 = r.range(6.f, 15.f) * 0.000478f * ws; s.size1 = s.size0 * 0.3f;
+                        s.color0 = glm::vec4(c * 1.6f, 1.f); s.color1 = glm::vec4(c, 0.f);
+                        s.shape = PS_Star; s.drag = 1.6f; s.gravity = -0.052f;
+                        ps.emit(s);
+                    }
+            }
+        }
+
+        // cristais orbitando (abrem na ativação)
+        {
+            const float abre = 0.6f + 0.4f * em.nivel + 0.9f * frag;
+            const float brilho = 0.25f + 0.6f * em.nivel + 1.2f * flare;
+            for (int i = 0; i < 28; ++i) {
+                auto h = [&](int k) { uint32_t x = uint32_t(i * 7919 + k * 104729 + 17); x ^= x >> 13; x *= 0x5bd1e995u; x ^= x >> 15; return (x & 0xffffff) / float(0x1000000); };
+                const float a0 = h(0) * 6.283f, rf = 0.7f + h(1) * 0.6f, hf = (h(2) - 0.5f) * 1.6f;
+                const float sp = (0.25f + h(3) * 0.6f) * (h(4) < 0.5f ? 1.f : -1.f), ph = h(5) * 6.283f, sz = 0.6f + h(6) * 0.9f, tw = 0.4f + h(7) * 1.6f;
+                const float a = a0 + t * sp * (0.6f + 0.8f * em.nivel);
+                const glm::vec3 lp(std::cos(a) * 0.32f * rf * abre / kEsc, (hf * 0.36f * abre + std::sin(t * 1.3f + ph) * 0.04f) / kEsc,
+                                   0.1f + std::sin(a) * 1.25f * rf * abre / kEsc);
+                ParticleSpawn s;
+                s.pos = glm::vec3(M * glm::vec4(lp, 1.f)); s.life = vida1;
+                s.size0 = s.size1 = 0.045f * sz * (0.6f + 0.4f * em.nivel) / kEsc * ws;
+                s.rot = t * tw + ph;
+                // cristal claro (no artefato a luz do ambiente reflete nas faces); acende roxo no clarão da ativação
+                const glm::vec3 c = glm::mix(glm::vec3(0.86f, 0.80f, 1.f), srgbLin(glm::vec3(0.62f, 0.30f, 1.f)) * 1.4f, std::min(1.f, flare * 0.7f));
+                s.color0 = s.color1 = glm::vec4(c, 0.95f);
+                s.shape = PS_Shard; s.additive = false;
+                ps.emit(s);
+                ParticleSpawn g = s;  // brilho roxo do cristal
+                g.size0 = g.size1 = s.size0 * 1.6f; g.color0 = g.color1 = glm::vec4(cor * 0.25f * brilho, 1.f); g.shape = PS_Glow; g.additive = true;
+                ps.emit(g);
+            }
+        }
+
+        // raios na peça: trocam 24 vezes por segundo; mais e maiores com a energia alta
+        em.accArcos += dt;
+        if (em.accArcos > 1.f / 24.f) {
+            em.accArcos = 0.f;
+            const int n = int(std::round(1.f + 6.f * em.nivel + 14.f * frag));
+            glm::vec3 A, B, nA, nB;
+            std::vector<glm::vec3> pts;
+            for (int k = 0; k < n; ++k) {
+                if (!pontoEnergia(em, r, M, A, nA)) break;
+                int tent = 0;
+                do { pontoEnergia(em, r, M, B, nB); ++tent; } while (glm::distance(A, B) > 0.55f / kEsc * ws && tent < 10);
+                const float len = glm::distance(A, B);
+                if (len < 0.02f / kEsc * ws) continue;
+                const glm::vec3 meio = (A + B) * 0.5f + nA * len * 0.3f;
+                pts.clear();
+                zigue(r, A, meio, len * 0.18f, 2, pts);
+                std::vector<glm::vec3> p2;
+                zigue(r, meio, B, len * 0.18f, 2, p2);
+                pts.insert(pts.end(), p2.begin() + 1, p2.end());
+                const float I = 0.45f + 0.55f * r.f();
+                for (size_t i = 0; i + 1 < pts.size(); ++i)
+                    tracoRaio(ps, pts[i], pts[i + 1], 0.014f / kEsc * ws * 2.f, I, srgbLin(glm::vec3(0.79f, 0.63f, 1.f)), 1.f / 24.f);
+            }
+        }
+
+        // partículas de energia saindo da peça
+        em.accEnergia += dt * (8.f + 22.f * em.nivel);
+        glm::vec3 p, n;
+        while (em.accEnergia > 1.f) {
+            em.accEnergia -= 1.f;
+            if (!pontoEnergia(em, r, M, p, n)) break;
+            ParticleSpawn s;
+            s.pos = p;
+            s.vel = (n * r.range(0.12f, 0.37f) + glm::vec3(0.f, 0.15f, 0.f)) / kEsc * ws;
+            s.life = r.range(1.f, 1.9f);
+            const glm::vec3 c = srgbLin(hsl(0.76f + r.f() * 0.05f, 1.f, 0.55f + r.f() * 0.2f));
+            s.size0 = r.range(4.f, 11.f) * 0.000478f * ws; s.size1 = s.size0 * 0.4f;
+            s.color0 = glm::vec4(c * 1.4f, 1.f); s.color1 = glm::vec4(c * 0.8f, 0.f);
+            s.shape = PS_Star; s.drag = 1.6f; s.gravity = -0.052f * ws;
+            ps.emit(s);
+        }
+    });
+}
+
 static Emitter* skinShot(Engine* e, Scene::Handle weapon) {
     GameObject* w = e->scene.get(weapon);
     return w && w->emitter && w->emitter->disparo ? w->emitter : nullptr;
@@ -1942,7 +2203,9 @@ void atualizarAncoras(Engine* e, float dt) {
 }
 void muzzleFx(Engine* e, Scene::Handle weapon, glm::vec3 muzzle, glm::vec3 dir) {
     e->particles.ancoraAtual = ancoraDaArma(e, weapon, muzzle);
-    if (Emitter* em = skinShot(e, weapon)) {
+    if (Emitter* em = skinShot(e, weapon); em && em->energia) {
+        tiroEnergia(e, *em, muzzle, dir);
+    } else if (em) {
         addFlash(e, fxDisparoSkin(e->particles, e->fxRng, muzzle, dir, em->corDisparo, em->corDisparo2), 0.08f);
         em->pulso = 1.f;  // a pintura acende forte e apaga (updateEffects)
     } else {
@@ -1953,6 +2216,7 @@ void muzzleFx(Engine* e, Scene::Handle weapon, glm::vec3 muzzle, glm::vec3 dir) 
 void bulletFx(Engine* e, Scene::Handle weapon, glm::vec3 from, glm::vec3 to) {
     tiroNasPortas(e, from, to);  // todo tiro (meu, dos robôs e de quem joga online) passa por aqui
     Emitter* em = skinShot(e, weapon);
+    if (em && em->energia) feixeEnergia(e, from, to);
     fxBullet(e->particles, from, to, em ? &em->corDisparo : nullptr);
 }
 
@@ -1962,7 +2226,7 @@ void updateEffects(Engine* e, float dt) {
     e->emitters.forEach([&](Emitter& em, EmitterPool::Handle) {
         GameObject* o = em.owner;
         if (!o || !o->active) return;
-        if (em.disparo && em.pulso > 0.f) {  // pulso do tiro: a pintura e a borda acendem e apagam
+        if (em.disparo && em.pulso > 0.f && !em.energia) {  // pulso do tiro: a pintura e a borda acendem e apagam
             em.pulso = std::max(0.f, em.pulso - dt * 7.f);
             const float k = em.pulso * em.pulso;
             Scene::forEachInSubtree(*o, [&](GameObject& p) {
@@ -2031,6 +2295,10 @@ int gatherLights(Engine* e, PointLight* out, int max) {
     e->emitters.forEach([&](Emitter& em, EmitterPool::Handle) {
         GameObject* o = em.owner;
         if (!o || !o->active || em.kind == FX_Smoke || em.kind == FX_Explosion) return;
+        if (em.energia && em.luzEnergia > 0.f) {  // núcleo da skin de energia: luz roxa
+            push({em.luzPos, glm::vec3(0.63f, 0.38f, 1.f), em.luzEnergia, 1.75f});
+            return;
+        }
         if (em.kind == FX_Raios && em.estilo < 0) return;
         if (em.kind == FX_Raios) {  // luz azul fraca no meio da arma, piscando como eletricidade
             const float pisca = em.estilo == 2 ? (std::sin(em.timer * 47.f) * std::sin(em.timer * 13.1f) > -0.2f ? 1.f : 0.35f)

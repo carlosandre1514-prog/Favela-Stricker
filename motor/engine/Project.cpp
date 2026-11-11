@@ -287,6 +287,11 @@ void applyMaterialTo(Engine* e, GameObject& g, bool subtree, const json& spec) {
         int estiloRaios = 0;
         bool disparo = false;
         glm::vec3 corDisparo(0.2f, 0.55f, 1.f), corDisparo2(1.f, 0.75f, 0.3f);
+        // skin de energia: cor das veias, centro do núcleo e pontos da superfície (tirados do modelo)
+        bool energia = false;
+        float albedoK = 1.f;
+        glm::vec3 eCor(0.66f, 0.33f, 1.f), eNuc(0.f);
+        const std::vector<float>* ePontos = nullptr;
         if (existe(base + "_efeito.json")) {
             std::ifstream in(base + "_efeito.json");
             json ef = json::parse(in, nullptr, false);
@@ -309,6 +314,21 @@ void applyMaterialTo(Engine* e, GameObject& g, bool subtree, const json& spec) {
                     };
                     cor3("cor", corDisparo);
                     cor3("cor2", corDisparo2);
+                }
+                if (ef.contains("albedo") && ef["albedo"].is_number()) albedoK = ef["albedo"].get<float>();
+                if (ef.contains("energia") && ef["energia"].is_object()) {
+                    const json& en = ef["energia"];
+                    energia = true;
+                    if (en.contains("cor") && en["cor"].is_array() && en["cor"].size() == 3)
+                        for (int k = 0; k < 3; ++k) eCor[k] = en["cor"][k].is_number() ? en["cor"][k].get<float>() : eCor[k];
+                    if (en.contains("nucleo") && en["nucleo"].is_array() && en["nucleo"].size() == 3)  // [y, z, x do disco]
+                        eNuc = glm::vec3(en["nucleo"][2].get<float>(), en["nucleo"][0].get<float>(), en["nucleo"][1].get<float>());
+                    static std::map<std::string, std::vector<float>> pontosPorSkin;  // lidos uma vez por skin
+                    std::vector<float>& pv = pontosPorSkin[base];
+                    if (pv.empty() && en.contains("pontos") && en["pontos"].is_array())
+                        for (const json& pt : en["pontos"])
+                            if (pt.is_array() && pt.size() == 6) for (int k = 0; k < 6; ++k) pv.push_back(pt[k].get<float>());
+                    if (!pv.empty()) ePontos = &pv;
                 }
                 if (ef.contains("aura_raios") && ef["aura_raios"].is_array() && ef["aura_raios"].size() == 3) {
                     for (int k = 0; k < 3; ++k) raios[k] = ef["aura_raios"][k].is_number() ? ef["aura_raios"][k].get<float>() : 0.f;
@@ -342,6 +362,12 @@ void applyMaterialTo(Engine* e, GameObject& g, bool subtree, const json& spec) {
                     copy.emissive_factor = glm::vec3(forcaEmi);
                 }
                 copy.rim = aura;
+                if (energia) {  // veias e pedaços no shader; a cor das veias em linear (como no artefato)
+                    copy.energia = glm::vec4(0.35f, 0.f, 1.f, 0.f);
+                    copy.energiaCor = glm::pow(eCor, glm::vec3(2.2f));
+                    copy.energiaNuc = glm::vec3(0.f, eNuc.y, eNuc.z);
+                    copy.albedoFactor *= glm::vec4(glm::vec3(albedoK), 1.f);
+                }
                 if (ormP) {
                     copy.orm = ormP;
                     copy.metallic = copy.roughness = 1.f;
@@ -362,6 +388,28 @@ void applyMaterialTo(Engine* e, GameObject& g, bool subtree, const json& spec) {
                 em.corDisparo2 = corDisparo2;
                 em.emiBase = forcaEmi;
                 em.rimBase = aura;
+            }
+            if (energia && g.emitter) {  // a arma acabou de aparecer: a ativação começa
+                Emitter& em = *g.emitter;
+                em.energia = true;
+                // (fotos da loja e do lobby: ENERGIA_ATIVA começa já ativa, sem a arma se abrir)
+                const bool jaAtiva = std::getenv("ENERGIA_ATIVA") != nullptr;
+                em.ativo = jaAtiva;
+                em.ativT = jaAtiva ? -1.f : 0.f;
+                em.nivel = jaAtiva ? 1.f : 0.35f;
+                em.ondaT = -1.f;
+                em.nucleo = eNuc;
+                em.corEnergia = eCor;
+                em.pontos = ePontos;
+                em.emiBase = forcaEmi;
+                bool achou = false;
+                Scene::forEachInSubtree(g, [&](GameObject& o) {
+                    if (achou || !o.meshRenderer || &o == &g) return;
+                    glm::mat4 rel = o.transform.local();
+                    for (Transform3D* p = o.transform.parent; p && p != &g.transform; p = p->parent) rel = p->local() * rel;
+                    em.rel = rel;
+                    achou = true;
+                });
             }
         } else {
             e->lastError = "não consegui ler a imagem " + it->get<std::string>();

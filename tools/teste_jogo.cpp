@@ -844,6 +844,34 @@ int main(int argc, char** argv) {
         std::printf(g_fail ? "FALHOU\n" : "OK\n");
         return g_fail ? 1 : 0;
     }
+    // Skin de energia (SO_ENERGIA=arma:skin, ex.: ak47:cosmica): a arma solta na cena, vista de lado como no artefato,
+    // fotografada durante a ativação (energia_<t>.png) e num tiro (energia_tiro.png). HORA (padrão 21: noite)
+    if (const char* sk = std::getenv("SO_ENERGIA")) {
+        using nlohmann::json;
+        std::string a = sk, g = a.substr(0, a.find(':')), skin = a.find(':') == std::string::npos ? "" : a.substr(a.find(':') + 1);
+        engine_new_scene(e);
+        engine_set_time_of_day(e, std::getenv("HORA") ? float(std::atof(std::getenv("HORA"))) : 21.f);
+        engine_set_quality(e, std::getenv("NIVEL") ? std::atoi(std::getenv("NIVEL")) : 3);
+        const std::string arq = eng::gunModelFile(reinterpret_cast<eng::Engine*>(e), g, skin, std::getenv("ALTA") != nullptr);
+        json spec = {{"tipo", "arma"}, {"arma", g}, {"pos", {0, 1.0, 0}}, {"arquivo", arq}};
+        if (arq != "kit:armas/" + g) spec["textura"] = "kit:armas/skins/" + arq.substr(10) + ".jpg";
+        int id = engine_add_spec(e, spec.dump().c_str());
+        if (id < 0) { std::printf("  [ERRO] %s\n", engine_last_error(e)); return 1; }
+        engine_set_camera(e, 0.f, 1.02f, 0.f, 1.5708f + 0.18f, 0.12f, std::getenv("DIST") ? float(std::atof(std::getenv("DIST"))) : 1.25f);
+        const float fotos[] = {0.3f, 0.7f, 1.0f, 1.3f, 1.7f, 2.4f, 4.0f};
+        float t = 0.f;
+        for (float alvo : fotos) {
+            while (t < alvo) { engine_frame(e, 1.f / 30.f); t += 1.f / 30.f; }
+            char nome[64]; std::snprintf(nome, sizeof(nome), "energia_%.1f.png", alvo);
+            save(out, nome);
+        }
+        engine_test_shot(e, id);
+        engine_frame(e, 1.f / 30.f); engine_frame(e, 1.f / 30.f);
+        save(out, "energia_tiro.png");
+        engine_destroy(e);
+        std::printf(g_fail ? "FALHOU\n" : "OK\n");
+        return g_fail ? 1 : 0;
+    }
     // Prévias das armas com as skins do mercado (fundo puro: o recorte é feito depois por tools/recortar_previas.py)
     // SO_PREVIAS = "arma:skin,arma:skin,..." (skin vazia = padrão)
     if (const char* lista = std::getenv("SO_PREVIAS")) {

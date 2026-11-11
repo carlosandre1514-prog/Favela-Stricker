@@ -112,6 +112,9 @@ void Renderer::setupPbr(Program& p) {
     p.uOccStrength = glGetUniformLocation(p.id, "uOcclusionStrength");
     p.uMode = glGetUniformLocation(p.id, "uMode");
     p.uTime = glGetUniformLocation(p.id, "uTime");
+    p.uEnergia = glGetUniformLocation(p.id, "uEnergia");
+    p.uEnergiaCor = glGetUniformLocation(p.id, "uEnergiaCor");
+    p.uEnergiaNuc = glGetUniformLocation(p.id, "uEnergiaNuc");
     static const char* kSamplers[] = {"uAlbedoMap", "uNormalMap", "uOrmMap", "uEmissiveMap", "uShadowMap",
                                       "uEnvMap", "uOcclusionMap", "uTerrainAlb", "uTerrainNh"};
     glUseProgram(p.id);
@@ -422,6 +425,9 @@ void Renderer::bindMaterial(const Program& p, const Material& m) {
     glUniform1f(p.uMetal, m.metallic);
     glUniform3fv(p.uEmis, 1, &m.emissive_factor[0]);
     if (p.uRim >= 0) glUniform4fv(p.uRim, 1, &m.rim[0]);
+    if (p.uEnergia >= 0) glUniform4fv(p.uEnergia, 1, &m.energia[0]);
+    if (p.uEnergiaCor >= 0) glUniform3fv(p.uEnergiaCor, 1, &m.energiaCor[0]);
+    if (p.uEnergiaNuc >= 0) glUniform3fv(p.uEnergiaNuc, 1, &m.energiaNuc[0]);
     glUniform1f(p.uAlphaCut, m.alphaCutoff);
     glUniform1i(p.uMode, m.mode);
     if (p.uTime >= 0) glUniform1f(p.uTime, time);
