@@ -6,6 +6,8 @@
 
 const ANDROID = typeof window.Nativo === 'object' && window.Nativo !== null;
 const TOQUE = ANDROID || matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
+// plataforma de quem joga (aparece no chat e no perfil; o multiplayer é o mesmo para as três)
+const PLATAFORMA = ANDROID ? 'android' : /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) ? 'ios' : 'pc';
 if (ANDROID) { document.documentElement.classList.add('android'); document.body.classList.add('android'); }
 if (TOQUE) document.body.classList.add('toque');
 

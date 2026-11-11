@@ -49,26 +49,7 @@ const armaInicial = (time) => {
   return comSkin ? comSkin.key : armaPadrao(time);
 };
 
-// Skins de arma (mercado, com moedas): só mudam o visual, não o dano. As com modelo: a arma inteira é outra (modelo
-// próprio feito na Meshy, shaders/kit/armas/<arma>_<skin>.glb), com o mesmo dano e o mesmo som da arma
-const SKINS_ARMA = [
-  { arma: 'ak47', key: 'cosmica', nome: 'AK-47 Energia Cósmica', raridade: 'lendaria', preco: 2200, modelo: true },
-  { arma: 'm4a1', key: 'dragao_raio', nome: 'M4A1 Dragão Relâmpago', raridade: 'lendaria', preco: 2200, modelo: true },
-  { arma: 'm4a1', key: 'mitica', nome: 'M4A1 Mítica', raridade: 'lendaria', preco: 2000, modelo: true },
-  { arma: 'ak47', key: 'dragao_azul', nome: 'AK-47 Dragão Azul', raridade: 'lendaria', preco: 1800 },
-  { arma: 'm4colt', key: 'carmesim', nome: 'M4 Colt Vermelho Carmesim', raridade: 'lendaria', preco: 1800 },
-  { arma: 'ak47', key: 'dourada', nome: 'AK-47 Dourada', raridade: 'lendaria', preco: 1499 },
-  { arma: 'm4colt', key: 'dourada', nome: 'M4 Colt Dourada', raridade: 'lendaria', preco: 1499 },
-  { arma: 'tt33', key: 'gold_relic', nome: 'TT-33 Gold Relic', raridade: 'lendaria', preco: 1499 },
-  { arma: 'ak47', key: 'dragao', nome: 'AK-47 Dragão', raridade: 'epica', preco: 899 },
-  { arma: 'tt33', key: 'nebula_shadow', nome: 'TT-33 Nebula Shadow', raridade: 'epica', preco: 899 },
-  { arma: 'm4a1', key: 'neon', nome: 'M4A1 Neon', raridade: 'rara', preco: 499 },
-  { arma: 'ak74', key: 'favela', nome: 'AK-74 Favela', raridade: 'rara', preco: 499 },
-  { arma: 'tt33', key: 'crimson_forge', nome: 'TT-33 Crimson Forge', raridade: 'rara', preco: 499 },
-  { arma: 'ak74_tatica', key: 'selva', nome: 'AK-74 tática Selva', raridade: 'comum', preco: 199 },
-  { arma: 'm4a1', key: 'urbana', nome: 'M4A1 Urbana', raridade: 'comum', preco: 199 },
-  { arma: 'ak47', key: 'deserto', nome: 'AK-47 Deserto', raridade: 'comum', preco: 199 },
-];
+// Skins de arma: web/catalogo.js (o mesmo arquivo no servidor, que confere os preços dos presentes)
 
 // Armas giratórias da loja (tools/recortar_giro.py: giro/<arma>_<skin>.webp, quadros lado a lado): tamanho de cada
 // quadro. A skin sem tira usa a foto parada (armas/<arma>_<skin>.png).
@@ -257,11 +238,11 @@ class Firebase {
   post(c, v) { return this.pedir('POST', c, v); }
   del(c) { return this.pedir('DELETE', c); }
   // Acompanha um caminho ao vivo (EventSource). cb(evento, subcaminho, dado). Devolve {fechar()}
-  ouvir(caminho, cb) {
+  ouvir(caminho, cb, consulta = '') {
     let fonte = null, fechado = false;
     const abrir = async () => {
       if (fechado) return;
-      fonte = new EventSource(await this.url(caminho));
+      fonte = new EventSource((await this.url(caminho)) + consulta);
       const trata = (tipo) => (ev) => { try { const j = JSON.parse(ev.data); cb(tipo, j.path || '/', j.data); } catch (_) {} };
       fonte.addEventListener('put', trata('put'));
       fonte.addEventListener('patch', trata('patch'));

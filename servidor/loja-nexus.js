@@ -156,4 +156,4 @@ async function tratar(req, res, url) {
   return true;
 }
 
-module.exports = { tratar };
+module.exports = { tratar, conferirLogin, limite };

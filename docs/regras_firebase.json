@@ -1,10 +1,16 @@
 {
   "rules": {
     "salas": {
-      "$codigo": { ".read": "auth != null", ".write": "auth != null" }
+      "$codigo": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      }
     },
     "usuarios": {
-      "$uid": { ".read": "auth != null && auth.uid === $uid", ".write": "auth != null && auth.uid === $uid" }
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid"
+      }
     },
     "ids": {
       "$id": {
@@ -19,7 +25,10 @@
       }
     },
     "perfis": {
-      "$uid": { ".read": "auth != null", ".write": "auth != null && auth.uid === $uid" }
+      "$uid": {
+        ".read": "auth != null",
+        ".write": "auth != null && auth.uid === $uid"
+      }
     },
     "amigos": {
       "$uid": {
@@ -32,20 +41,60 @@
     "pedidos": {
       "$uid": {
         ".read": "auth != null && auth.uid === $uid",
-        "$de": { ".write": "auth != null && (auth.uid === $de || auth.uid === $uid)" }
+        "$de": {
+          ".write": "auth != null && (auth.uid === $de || auth.uid === $uid)"
+        }
       }
     },
     "convites": {
       "$uid": {
         ".read": "auth != null && auth.uid === $uid",
-        "$de": { ".write": "auth != null && (auth.uid === $de || auth.uid === $uid)" }
+        "$de": {
+          ".write": "auth != null && (auth.uid === $de || auth.uid === $uid)"
+        }
       }
     },
     "grupos": {
       "$lider": {
         ".read": "auth != null",
         ".write": "auth != null && auth.uid === $lider",
-        "membros": { "$m": { ".write": "auth != null && (auth.uid === $m || auth.uid === $lider)" } }
+        "membros": {
+          "$m": {
+            ".write": "auth != null && (auth.uid === $m || auth.uid === $lider)"
+          }
+        }
+      }
+    },
+    "conversas": {
+      "$cid": {
+        ".read": "auth != null && ($cid.beginsWith(auth.uid + '_') || $cid.endsWith('_' + auth.uid))",
+        "$m": {
+          ".write": "auth != null && !data.exists() && ($cid.beginsWith(auth.uid + '_') || $cid.endsWith('_' + auth.uid)) && root.child('amigos').child(auth.uid).child($cid.replace(auth.uid, '').replace('_', '')).exists()",
+          ".validate": "newData.hasChildren(['de', 'txt', 'em']) && newData.child('de').val() === auth.uid && newData.child('txt').isString() && newData.child('txt').val().length > 0 && newData.child('txt').val().length <= 300 && newData.child('em').val() <= now"
+        }
+      }
+    },
+    "caixa": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        "$de": {
+          ".write": "auth != null && (auth.uid === $uid || (auth.uid === $de && root.child('amigos').child($uid).child($de).exists()))"
+        }
+      }
+    },
+    "presentes": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        "$id": {
+          "estado": {
+            ".write": "auth != null && auth.uid === $uid && data.val() === 'pendente' && newData.val() === 'recebido'"
+          }
+        }
+      }
+    },
+    "enviados": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid"
       }
     }
   }

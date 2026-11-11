@@ -8,7 +8,7 @@ function topo(titulo, voltar, extra = '', direita = chipMoedas(false)) {
   return h;
 }
 function ligarAtalhos(t) {
-  for (const b of $$('[data-ir]', t)) b.onclick = () => ({ moedas: telaMoedas, mercado: () => telaMercado('todas'), armas: telaArmas, config: () => telaConfig('sens'), multi: telaMultiplayer, amigos: () => telaAmigos('amigos') })[b.dataset.ir]();
+  for (const b of $$('[data-ir]', t)) b.onclick = () => ({ moedas: telaMoedas, mercado: () => telaMercado('todas'), armas: telaArmas, config: () => telaConfig('sens'), multi: telaMultiplayer, amigos: () => telaAmigos('amigos'), chat: telaChatGlobal })[b.dataset.ir]();
 }
 const nomeNivel = () => NIVEIS[motor.nivel()]?.nome || 'Leve';
 
@@ -181,6 +181,7 @@ function telaInicio() {
     <div class="direita-topo">
       ${chipMoedas()}
       <button class="chip amigos" data-ir="amigos" aria-label="Amigos">${ICONE.grupo}<span>Amigos</span><b class="badge-amigos" style="display:none">0</b></button>
+      <button class="chip" data-ir="chat" aria-label="Chat global"><span>💬</span><span>Chat</span></button>
       <button class="chip engrenagem" data-ir="config" aria-label="Configurações">${ICONE.engrenagem}</button>
       ${cartaoConta()}
     </div>
@@ -616,13 +617,15 @@ async function telaAmigos(aba = 'amigos') {
       ${social.id ? '<button class="btn btn-fraco" id="a-copiar">Copiar</button>' : ''}
       <span class="dica cresce">${social.pronto ? `Nick: <b>${esc(conta.nome())}</b> · passe o ID para os amigos te acharem (e use ele no site para comprar moedas)` : esc(social.erro || 'Criando o seu ID…')}</span></div>
     <div class="cartao coluna cresce" id="a-conteudo" style="overflow:auto;gap:6px"><span class="dica">Carregando…</span></div></div>`), 'amigos');
-  const abas = `<div class="abas">${[['amigos', 'Amigos'], ['pedidos', `Pedidos${npedidos ? ' (' + npedidos + ')' : ''}`], ['adicionar', 'Adicionar']]
+  const nl = naoLidas(), np = presentesPendentes();
+  const abas = `<div class="abas">${[['amigos', 'Amigos'], ['conversas', `Conversas${nl ? ' (' + nl + ')' : ''}`], ['presentes', `Presentes${np ? ' (' + np + ')' : ''}`],
+    ['pedidos', `Pedidos${npedidos ? ' (' + npedidos + ')' : ''}`], ['adicionar', 'Adicionar']]
     .map(([k, n]) => `<button class="aba ${k === aba ? 'sel' : ''}" data-aba="${k}">${n}</button>`).join('')}</div>`;
   t.prepend(topo('AMIGOS', telaInicio, abas, ''));
   for (const b of $$('[data-aba]', t)) b.onclick = () => telaAmigos(b.dataset.aba);
   const cp = $('#a-copiar', t);
   if (cp) cp.onclick = () => copiarTexto(social.id);
-  social.aoMudar = () => { if (telaAtual() === 'amigos' && aba === 'pedidos') telaAmigos('pedidos'); };
+  social.aoMudar = () => { if (telaAtual() === 'amigos' && ['pedidos', 'conversas', 'presentes'].includes(aba) && !palco.querySelector('.janela-chat')) telaAmigos(aba); };
   const c = $('#a-conteudo', t);
   if (!fb || !fb.token) { c.innerHTML = '<span class="dica">Entre na sua conta para ter amigos</span>'; return; }
   if (!social.pronto) { c.innerHTML = `<span class="dica">${esc(social.erro || 'Criando o seu ID…')}</span>`; return; }
@@ -634,7 +637,12 @@ async function telaAmigos(aba = 'amigos') {
     if (aba === 'amigos') {
       const lista = await meusAmigos();
       c.innerHTML = lista.length ? lista.map((p) => linha(p, `${estaOnline(p) && !p.jogando ? '<button class="btn btn-ouro" data-convidar>Convidar</button>' : ''}
+        <button class="btn btn-azul" data-conversar>Conversar${chat.caixa[p.uid] && chat.caixa[p.uid].nao ? ` (${chat.caixa[p.uid].nao})` : ''}</button>
+        <button class="btn btn-fraco" data-presente>🎁 Presente</button>
         <button class="btn btn-fraco" data-remover>Remover</button>`)).join('') : '<span class="dica">Nenhum amigo ainda. Vá em Adicionar e procure pelo ID ou pelo nick.</span>';
+      const porUid = (b) => lista.find((p) => p.uid === b.closest('[data-uid]').dataset.uid);
+      for (const b of $$('[data-conversar]', c)) b.onclick = () => telaConversa(porUid(b));
+      for (const b of $$('[data-presente]', c)) b.onclick = () => escolherPresente(porUid(b));
       for (const b of $$('[data-convidar]', c)) b.onclick = async () => {
         const erro = await convidarAmigo(b.closest('[data-uid]').dataset.uid);
         aviso(erro || 'Convite enviado! Ele vai entrar no seu grupo da Ressurgência');
@@ -644,6 +652,21 @@ async function telaAmigos(aba = 'amigos') {
         await desfazerAmizade(b.closest('[data-uid]').dataset.uid);
         telaAmigos('amigos');
       };
+    } else if (aba === 'conversas') {
+      const conv = Object.entries(chat.caixa).sort((a, b) => (b[1].em || 0) - (a[1].em || 0));
+      const perfis = await Promise.all(conv.map(([uid]) => perfil(uid)));
+      c.innerHTML = conv.length ? conv.map(([uid, cv], i) => {
+        const p = perfis[i] || { uid, nome: cv.nome };
+        return linha({ ...p, uid }, `<span class="dica cresce" style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(cv.txt || '')}</span>
+          ${cv.nao ? `<b class="badge-msg">${cv.nao}</b>` : ''}<button class="btn btn-azul" data-abrir-conversa>Abrir</button>`);
+      }).join('') : '<span class="dica">Nenhuma conversa ainda. Em Amigos, toque em Conversar.</span>';
+      for (const b of $$('[data-abrir-conversa]', c)) b.onclick = () => {
+        const uid = b.closest('[data-uid]').dataset.uid, i = conv.findIndex(([u]) => u === uid);
+        telaConversa({ ...(perfis[i] || {}), uid, nome: (perfis[i] && perfis[i].nome) || chat.caixa[uid].nome });
+      };
+    } else if (aba === 'presentes') {
+      c.innerHTML = await listaPresentesHtml();
+      for (const b of $$('[data-abrir]', c)) b.onclick = async () => { await abrirPresente(b.dataset.abrir); telaAmigos('presentes'); };
     } else if (aba === 'pedidos') {
       const ps = Object.entries(social.pedidos).map(([uid, p]) => ({ uid, ...p }));
       c.innerHTML = ps.length ? ps.map((p) => linha(p, '<button class="btn btn-ouro" data-aceitar>Aceitar</button><button class="btn btn-fraco" data-recusar>Recusar</button>')).join('')

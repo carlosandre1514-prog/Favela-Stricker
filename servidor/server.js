@@ -19,6 +19,7 @@ const path = require('path');
 const zlib = require('zlib');
 const { WebSocketServer } = require('ws');
 const loja = require('./loja-nexus');  // loja de moedas/skins do site NEXUS (Pix): /api/loja/...
+const social = require('./social');    // chat global (/chat) e presentes entre amigos (/api/social/...)
 
 const PORT = process.env.PORT || 10000;
 const WEB = path.join(__dirname, '..', 'web');
@@ -36,12 +37,14 @@ const TIPOS = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8',
   '.json': 'application/json', '.wasm': 'application/wasm', '.data': 'application/octet-stream',
   '.png': 'image/png', '.webp': 'image/webp', '.jpg': 'image/jpeg', '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.wav': 'audio/wav',
+  '.ogg': 'audio/ogg', '.m4a': 'audio/mp4', '.webmanifest': 'application/manifest+json',
 };
 
 // ---------------- site ----------------
 const servidor = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x');
   if (await loja.tratar(req, res, url)) return;  // rotas da loja (o token do jogador é conferido lá)
+  if (await social.tratar(req, res, url)) return;  // presentes (o servidor confere e faz a transferência)
   if (url.pathname === '/saude') { res.writeHead(200, { 'Content-Type': 'text/plain' }); res.end('ok'); return; }
   if (url.pathname === '/api/estado') {  // quantas pessoas jogando agora (para acompanhar a carga)
     res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' });
@@ -115,7 +118,16 @@ function pertoParaVoz(a, b) {
 }
 const salas = new Map();  // código -> Map(id -> {ws, time, vaga, id, estado, novo})
 
-const wss = new WebSocketServer({ server: servidor, path: '/partida', maxPayload: 32 * 1024 });
+const wss = new WebSocketServer({ noServer: true, maxPayload: 32 * 1024 });
+// chat global: outro WebSocket no mesmo servidor (cada caminho vai para o seu)
+const wssChat = new WebSocketServer({ noServer: true, maxPayload: 4096 });
+social.ligarChat(wssChat);
+servidor.on('upgrade', (req, socket, cabeca) => {
+  const caminho = new URL(req.url, 'http://x').pathname;
+  const alvo = caminho === '/partida' ? wss : caminho === '/chat' ? wssChat : null;
+  if (!alvo) { socket.destroy(); return; }
+  alvo.handleUpgrade(req, socket, cabeca, (ws) => alvo.emit('connection', ws, req));
+});
 
 // manda sem deixar acumular: se a fila desta pessoa já está grande, pula (o próximo pacote traz o estado novo)
 function mandar(p, dado, opcoes) {

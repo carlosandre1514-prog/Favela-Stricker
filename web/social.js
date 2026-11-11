@@ -82,6 +82,7 @@ async function garantirIdentidade() {
     social.erro = '';
     await sinalDeVida();
     ouvirSocial();
+    ligarChatEPresentes();  // conversas e presentes ao vivo (chat.js)
   } catch (e) { social.erro = 'Sem conexão com o banco: ' + e.message; }
 }
 
@@ -114,7 +115,7 @@ async function trocarNick(novo, silencioso) {
 async function sinalDeVida() {
   if (!social.id || !fb || !fb.token) return;
   const n = nivelDe(conta.xp);
-  await fb.patch('perfis/' + fb.uid, { nome: conta.nome(), id: social.id, nivel: n.nivel, visto: { '.sv': 'timestamp' },
+  await fb.patch('perfis/' + fb.uid, { nome: conta.nome(), id: social.id, nivel: n.nivel, visto: { '.sv': 'timestamp' }, plataforma: PLATAFORMA,
     jogando: typeof partida !== 'undefined' && partida ? (partida.modo === 1 ? 'Ressurgência' : 'Polícia x Bandidos') : '' }).catch(() => {});
 }
 setInterval(() => { if (!document.hidden) sinalDeVida(); }, 60000);
@@ -132,10 +133,7 @@ function ouvirSocial() {
   social.ouvintes.push(fb.ouvir('pedidos/' + fb.uid, juntar(social.pedidos)));
   social.ouvintes.push(fb.ouvir('convites/' + fb.uid, (ev, sub, dado) => { juntar(social.convites)(ev, sub, dado); mostrarConvites(); }));
 }
-function atualizarBadgeAmigos() {
-  const n = Object.keys(social.pedidos).length;
-  for (const b of $$('.badge-amigos')) { b.textContent = n; b.style.display = n ? '' : 'none'; }
-}
+function atualizarBadgeAmigos() { atualizarBadgesSociais(); }  // pedidos + mensagens + presentes (chat.js)
 
 // ---------------- busca, pedidos e amizades ----------------
 async function perfil(uid) {

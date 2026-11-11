@@ -81,8 +81,9 @@ Enquanto isso, a partida online segue pelo Firebase (sem voz).
 - **Authentication → Sign-in method:** ligar **E-mail/senha** e **Anônimo** (convidado).
 - **Realtime Database → Regras:**
 
-(ID único de 9 dígitos, nick único, amigos, pedidos de amizade, convites e grupo da Ressurgência: sem estas regras
-essas partes ficam desligadas no jogo)
+(ID único de 9 dígitos, nick único, amigos, pedidos de amizade, convites, grupo da Ressurgência, conversas entre amigos
+e presentes: sem estas regras essas partes ficam desligadas no jogo. `presentes`, `enviados` e `presentes_log` só o
+servidor do jogo grava — com a conta de serviço, que passa por cima das regras; quem recebe só marca "recebido".)
 
 ```json
 {
@@ -134,12 +135,43 @@ essas partes ficam desligadas no jogo)
         ".write": "auth != null && auth.uid === $lider",
         "membros": { "$m": { ".write": "auth != null && (auth.uid === $m || auth.uid === $lider)" } }
       }
+    },
+    "conversas": {
+      "$cid": {
+        ".read": "auth != null && ($cid.beginsWith(auth.uid + '_') || $cid.endsWith('_' + auth.uid))",
+        "$m": {
+          ".write": "auth != null && !data.exists() && ($cid.beginsWith(auth.uid + '_') || $cid.endsWith('_' + auth.uid)) && root.child('amigos').child(auth.uid).child($cid.replace(auth.uid, '').replace('_', '')).exists()",
+          ".validate": "newData.hasChildren(['de', 'txt', 'em']) && newData.child('de').val() === auth.uid && newData.child('txt').isString() && newData.child('txt').val().length > 0 && newData.child('txt').val().length <= 300 && newData.child('em').val() <= now"
+        }
+      }
+    },
+    "caixa": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        "$de": { ".write": "auth != null && (auth.uid === $uid || (auth.uid === $de && root.child('amigos').child($uid).child($de).exists()))" }
+      }
+    },
+    "presentes": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        "$id": { "estado": { ".write": "auth != null && auth.uid === $uid && data.val() === 'pendente' && newData.val() === 'recebido'" } }
+      }
+    },
+    "enviados": {
+      "$uid": { ".read": "auth != null && auth.uid === $uid" }
     }
   }
 }
 ```
 
 Os mesmos textos estão em `docs/regras_firebase.json`.
+
+### Servidor do jogo (Render) — variáveis para chat e presentes
+
+- `FIREBASE_SERVICE_ACCOUNT`: o JSON inteiro da conta de serviço (Firebase → Configurações do projeto → Contas de
+  serviço → Gerar nova chave privada). Sem ela os **presentes** ficam desligados (o jogo avisa); o chat funciona.
+- `MODERADORES` (opcional): IDs de 9 dígitos de quem modera o chat global, separados por vírgula. No chat:
+  `/calar ID minutos`, `/liberar ID`, `/apagar número`.
 
 ## Testes no PC (sem celular)
 
