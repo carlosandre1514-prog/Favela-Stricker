@@ -1076,7 +1076,9 @@ void updateSupportHands(Engine* e, float dt) {
         }
         glm::quat q = glm::normalize(glm::quat_cast(basis(d, upW) * glm::transpose(basis(glm::vec3(0.f, 0.f, 1.f), upW))));
         glm::vec3 shoulder = rup >= 0 ? world(rup) : R;
-        glm::vec3 pocket = shoulder + (fwd * glm::mix(0.09f, 0.05f, c.adsW) + left * 0.07f - upW * glm::mix(0.035f, -0.03f, c.adsW)) * scale;
+        // (os personagens de modelo têm peito e colete de verdade: a arma 6 cm mais para a frente, senão a mão do cabo
+        // entrava no corpo)
+        glm::vec3 pocket = shoulder + (fwd * glm::mix(0.15f, 0.09f, c.adsW) + left * 0.06f - upW * glm::mix(0.035f, -0.03f, c.adsW)) * scale;
         {
             glm::quat cur = w->transform.rotation;
             if (glm::dot(cur, q) < 0.f) q = -q;
@@ -1141,7 +1143,7 @@ void updateSupportHands(Engine* e, float dt) {
             glm::vec3 poleR = glm::vec3(toSkel * glm::vec4(-upW - left * 0.55f - fwd * 0.1f, 0.f));  // cotovelo direito para baixo e para fora
             twoBoneIK(*a, rup, rfo, rha, glm::mix(nowR, wristR, c.supportW), poleR);
             glm::vec3 gripAxis = glm::normalize(-wu + wf * 0.3f);
-            const float cr = fpView ? -1.1f : -0.45f;  // dedos fechando em volta do cabo
+            const float cr = fpView ? -1.1f : -0.95f;  // dedos fechando em volta do cabo
             poseHand(*a, rha, false, glm::normalize(wf * 0.8f + wl * 0.35f - wu * 0.35f), glm::normalize(wu + wl * 0.4f), gripAxis, cr, c.supportW);
         }
         // mão esquerda no guarda-mão: palma por baixo, dedos subindo pelo lado direito, polegar pelo lado esquerdo
@@ -1151,8 +1153,15 @@ void updateSupportHands(Engine* e, float dt) {
             glm::vec3 nowL = glm::vec3(a->global[ha][3]);
             glm::vec3 poleL = glm::vec3(toSkel * glm::vec4(-upW + left * 0.35f, 0.f));  // cotovelo esquerdo por baixo da arma
             twoBoneIK(*a, up, fo, ha, glm::mix(nowL, wristL, c.supportW), poleL);
-            const float cl = fpView ? -1.0f : -0.4f;   // dedos subindo pelo lado do guarda-mão (de perto: bem fechados)
-            poseHand(*a, ha, true, glm::normalize(wf * 0.5f - wl * 0.6f + wu * 0.25f), glm::normalize(wf + wu * 0.5f), wf, cl, c.supportW);
+            const float cl = fpView ? -1.0f : -1.15f;  // dedos subindo pelo lado do guarda-mão (de perto: bem fechados)
+            // dedos por baixo do guarda-mão, mas sem quebrar o pulso: na terceira pessoa a direção dos dedos puxa
+            // para a do antebraço (a mão saía torta, dobrada para o lado)
+            glm::vec3 dedosL = glm::normalize(wf * 0.5f - wl * 0.6f + wu * 0.25f);
+            if (!fpView) {
+                const glm::vec3 ant = glm::vec3(a->global[ha][3]) - glm::vec3(a->global[fo][3]);
+                if (glm::length(ant) > 1e-4f) dedosL = glm::normalize(glm::mix(dedosL, glm::normalize(ant), 0.45f));
+            }
+            poseHand(*a, ha, true, dedosL, glm::normalize(wf + wu * 0.5f), wf, cl, c.supportW);
         }
     }
 }
