@@ -159,6 +159,7 @@ void legs(ClipWriter& w, const Joints& J, float legAmp, float knee, float bob) {
 }
 
 // Pose de locomoção (andar / correr) sem arma
+void fingers(ClipWriter& w, bool left, float curl, bool trigger);
 void locomotion(ClipWriter& w, const Joints& J, float legAmp, float knee, float armAmp, float elbow, float lean, float bob) {
     legs(w, J, legAmp, knee, bob);
     w.rot(CJ_Spine, [=](float) { return rx(lean); });
@@ -167,6 +168,8 @@ void locomotion(ClipWriter& w, const Joints& J, float legAmp, float knee, float 
     w.rot(CJ_RUpper, [=](float ph) { return rz(-0.07f) * rx(-armAmp * std::sin(ph)) * ry(kTorcaoBraco); });
     w.rot(CJ_LFore, [=](float ph) { return rx(-elbow - 0.15f * armAmp * std::max(0.f, std::sin(ph))) * ry(-kTorcaoAntebraco); });
     w.rot(CJ_RFore, [=](float ph) { return rx(-elbow - 0.15f * armAmp * std::max(0.f, -std::sin(ph))) * ry(kTorcaoAntebraco); });
+    fingers(w, false, 0.3f + 0.4f * std::min(1.f, armAmp), false);  // mão meio fechada (correndo, quase punho)
+    fingers(w, true, 0.3f + 0.4f * std::min(1.f, armAmp), false);
 }
 
 // Dedos: curl > 0 fecha a mão (polegar junto); trigger: indicador meio esticado (no gatilho)
