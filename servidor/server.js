@@ -5,7 +5,7 @@
 //   binário [1][estado]        o meu lutador -> o servidor guarda o último de cada um e, 30 vezes por segundo,
 //                              manda a cada pessoa UM pacote com os lutadores da sala que mudaram
 //                              (antes repassava cada mensagem para cada um: 9 vezes mais pacotes)
-//   binário [2][áudio]         voz -> só para o mesmo time, como [2][vaga de quem falou][áudio]
+//   binário [2][áudio]         voz -> para o mesmo time e para inimigos a até 5 m, como [2][vaga de quem falou][áudio]
 //   texto  {"k":"ev",...}      evento (dano, abate, granada) -> para todos da sala na hora
 //   texto  {"k":"pg",...}      ping -> volta só para quem mandou
 //   o servidor manda {"k":"vagas","d":{vaga: id}} quando alguém entra ou sai (quem é cada vaga no pacote)
@@ -106,6 +106,13 @@ function enviarEmSequencia(arquivos, destino, i = 0) {
 }
 
 // ---------------- partidas ao vivo ----------------
+// Voz por proximidade: inimigos ouvem quem fala a até 5 m (posição real do último estado: x/y/z em int16 de 2 cm)
+const VOZ_PERTO_M = 5;
+function pertoParaVoz(a, b) {
+  if (!a || !b || a.length < 6 || b.length < 6) return false;
+  const dx = (a.readInt16LE(0) - b.readInt16LE(0)) / 50, dy = (a.readInt16LE(2) - b.readInt16LE(2)) / 50, dz = (a.readInt16LE(4) - b.readInt16LE(4)) / 50;
+  return dx * dx + dy * dy + dz * dz <= VOZ_PERTO_M * VOZ_PERTO_M;
+}
 const salas = new Map();  // código -> Map(id -> {ws, time, vaga, id, estado, novo})
 
 const wss = new WebSocketServer({ server: servidor, path: '/partida', maxPayload: 32 * 1024 });
@@ -167,12 +174,15 @@ wss.on('connection', (ws, req) => {
           if (dado.length !== 1 + TAM_ESTADO) return;
           eu.estado = Buffer.from(dado.subarray(1));
           eu.novo = true;
-        } else if (tipo === 2) {  // voz: só para o próprio time, com a vaga de quem falou
+        } else if (tipo === 2) {  // voz: o próprio time e, por proximidade, inimigos a até 5 m (com a vaga de quem falou)
           if (dado.length < 2 || dado.length > 2000) return;
           const pacote = Buffer.allocUnsafe(dado.length + 1);
           pacote[0] = 2; pacote[1] = eu.vaga;
           dado.copy(pacote, 2, 1);
-          for (const p of sala.values()) if (p !== eu && p.time === eu.time) mandar(p, pacote, { binary: true });
+          for (const p of sala.values()) {
+            if (p === eu) continue;
+            if (p.time === eu.time || pertoParaVoz(eu.estado, p.estado)) mandar(p, pacote, { binary: true });
+          }
         }
         return;
       }

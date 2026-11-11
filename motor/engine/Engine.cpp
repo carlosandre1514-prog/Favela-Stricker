@@ -1,11 +1,13 @@
 #include "engine/Engine.h"
 #include <algorithm>
+#include <map>
 #include <cctype>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include "assets/MeshUtils.h"
+#include "procgen/Simplify.h"
 #include <stb_image.h>
 #include "assets/TextureManager.h"
 #include "scene/Humanoid.h"
@@ -383,7 +385,60 @@ int createCharacter(Engine* e, const CharacterParams& p, glm::vec3 pos, float ya
     auto model = std::make_unique<LoadedModel>();
     MeshBuilder mb;
     buildCharacter(p, *model, mb);
-    MeshId mesh = mb.build(e->renderer, true);
+    if (!p.modelo.empty()) {  // personagem de modelo (Meshy): a malha com os pesos dos ossos, lida uma vez por modelo
+        static std::map<std::string, std::pair<std::vector<Vertex>, std::vector<uint32_t>>> cache;
+        auto it = cache.find(p.modelo);
+        if (it == cache.end()) {
+            std::pair<std::vector<Vertex>, std::vector<uint32_t>> m;
+            if (FILE* f = std::fopen(kitPath(e, "personagens/meshy/" + p.modelo + ".bin").c_str(), "rb")) {
+                char mg[4]; uint32_t nv = 0, ni = 0;
+                if (std::fread(mg, 1, 4, f) == 4 && std::memcmp(mg, "FSP1", 4) == 0 && std::fread(&nv, 4, 1, f) == 1 && std::fread(&ni, 4, 1, f) == 1 &&
+                    nv < 2000000 && ni < 6000000) {
+                    struct Reg { float p[3], n[3], u[2], t[4]; uint16_t j[4]; float w[4]; };
+                    static_assert(sizeof(Reg) == 72, "registro do .bin");
+                    std::vector<Reg> r(nv);
+                    m.second.resize(ni);
+                    if (std::fread(r.data(), sizeof(Reg), nv, f) == nv && std::fread(m.second.data(), 4, ni, f) == ni) {
+                        m.first.resize(nv);
+                        for (uint32_t i = 0; i < nv; ++i) {
+                            Vertex& v = m.first[i];
+                            v.pos = glm::vec3(r[i].p[0], r[i].p[1], r[i].p[2]);
+                            v.normal = glm::vec3(r[i].n[0], r[i].n[1], r[i].n[2]);
+                            v.uv = glm::vec2(r[i].u[0], r[i].u[1]);
+                            v.tangent = glm::vec4(r[i].t[0], r[i].t[1], r[i].t[2], r[i].t[3]);
+                            v.joints = glm::u16vec4(r[i].j[0], r[i].j[1], r[i].j[2], r[i].j[3]);
+                            v.weights = glm::vec4(r[i].w[0], r[i].w[1], r[i].w[2], r[i].w[3]);
+                            v.color = glm::vec4(1.f);
+                        }
+                        for (uint32_t& k : m.second) if (k >= nv) k = 0;
+                    } else m = {};
+                }
+                std::fclose(f);
+            }
+            it = cache.emplace(p.modelo, std::move(m)).first;
+        }
+        if (!it->second.first.empty()) { mb.v = it->second.first; mb.idx = it->second.second; }
+        else std::printf("personagem: modelo %s não abriu, ficou o boneco\n", p.modelo.c_str());
+    }
+    // malha do modelo na GPU uma vez só (por cena: a cena nova apaga as malhas) + a versão de longe (35% dos
+    // triângulos, mesmos ossos e pesos)
+    struct MalhaModelo { uint32_t rev; MeshId perto, longe; };
+    static std::map<std::string, MalhaModelo> naGpu;
+    MeshId mesh = kInvalidId, meshLonge = kInvalidId;
+    if (!p.modelo.empty() && mb.v.size() > 0 && !mb.idx.empty()) {
+        auto g = naGpu.find(p.modelo);
+        if (g != naGpu.end() && g->second.rev == uint32_t(e->renderer.geracao) && e->renderer.mesh(g->second.perto)) {
+            mesh = g->second.perto; meshLonge = g->second.longe;
+        } else {
+            mesh = mb.build(e->renderer, true);
+            std::vector<Vertex> v = mb.v;
+            std::vector<uint32_t> idx = mb.idx;
+            simplifyMesh(v, idx, 0.35f);
+            meshLonge = e->renderer.createMesh(v.data(), uint32_t(v.size()), idx.data(), uint32_t(idx.size()), true);
+            naGpu[p.modelo] = {uint32_t(e->renderer.geracao), mesh, meshLonge};
+        }
+    }
+    if (mesh == kInvalidId) mesh = mb.build(e->renderer, true);
     if (mesh == kInvalidId) return -1;
 
     char name[32];
@@ -411,6 +466,7 @@ int createCharacter(Engine* e, const CharacterParams& p, glm::vec3 pos, float ya
     anim->time = float(e->characters.size()) * 0.37f;  // personagens não ficam sincronizados
     anim->update(0.f, false);
     mr->mesh = mesh; mr->material = e->mats[int(Mat::Painted)];
+    if (meshLonge != kInvalidId) { mr->meshLonge = meshLonge; mr->distLonge = 14.f; }
     body->meshRenderer = mr;
     body->animator = anim;
     e->animators.push_back(anim);
@@ -564,8 +620,10 @@ static Scene::Handle spawnWeaponModel(Engine* e, int kind, const WeaponLook& loo
             const int nv = std::clamp(e->nivel, 0, 3);
             std::vector<ProtoPart> low;
             AABB lb;
+            // a versão com a geometria original (_alta, só na mão do jogador, sempre perto) não ganha cópia reduzida
+            const bool original = look.file.size() > 5 && look.file.compare(look.file.size() - 5, 5, "_alta") == 0;
             e->renderer.simplifyOverride = kLowFrac[nv];
-            const bool okLow = modelParts(e, look.file, nullptr, low, lb);
+            const bool okLow = !original && modelParts(e, look.file, nullptr, low, lb);
             e->renderer.simplifyOverride = 0.f;
             if (okLow && low.size() == parts.size()) {
                 for (ProtoPart& p : parts) p.lodFar = kLowDist[nv];

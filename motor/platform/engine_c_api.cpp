@@ -194,6 +194,12 @@ void engine_frame(Engine* e, float dt) {
                 if (dist > viewDist) return;
             }
         }
+        if (palette && mr->distLonge > 0.f) {  // personagem longe: a versão leve do corpo (mesmos ossos)
+            const eng::Mesh* mesh = e->renderer.mesh(mr->mesh);
+            const glm::vec3 c = glm::vec3(m[3]) + (mesh ? glm::vec3(0.f, (mesh->bounds.max.y + mesh->bounds.min.y) * 0.5f, 0.f) : glm::vec3(0.f));
+            const float dl = mr->distLonge * lodScale;
+            if (glm::dot(c - camPos, c - camPos) > dl * dl) { e->renderer.submit(go, m, palette, mr->meshLonge); return; }
+        }
         e->renderer.submit(go, m, palette);
     });
 

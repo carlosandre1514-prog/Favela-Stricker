@@ -106,6 +106,7 @@ public:
     uint32_t meshTotal() const { return meshCount_; }
     // Libera todos os meshes/materiais (nova cena). Texturas ficam a cargo do TextureManager.
     void clearAssets();
+    uint32_t geracao = 0;  // muda a cada clearAssets (as malhas e materiais antigos deixam de valer)
     // Malhas de arquivos já carregados (caminho#malha#primitiva): o mesmo modelo de novo usa as mesmas
     // (lutador que renasce, 2ª partida, armas iguais) em vez de ocupar memória outra vez
     std::map<std::string, MeshId> meshCache;
@@ -120,7 +121,7 @@ public:
 
     // Frame: beginFrame -> submit* -> (linhas) -> render
     void beginFrame(const Camera& cam, const DirectionalLight& sun);
-    void submit(const GameObject& go, const glm::mat4& model, const glm::mat4* jointPalette);
+    void submit(const GameObject& go, const glm::mat4& model, const glm::mat4* palette, MeshId meshAlt = kInvalidId);  // meshAlt: versão de longe
     void render(const Camera& cam, const DirectionalLight& sun, const Environment& env,
                 const PointLight* points, int pointCount);
 

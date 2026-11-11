@@ -6,7 +6,7 @@ Jogo de tiro em primeira pessoa **Polícia x Bandidos** no mapa da favela.
 - **Online:** jogadores contra jogadores, em salas com código (até 10 pessoas). A partida é ao vivo: os outros
   veem você andar, pular, agachar, mirar, atirar, recarregar e trocar de arma na hora. Tem chat de voz com o seu time.
 - **Login:** conta com e-mail e senha (ou convidado). Moedas e itens comprados ficam na conta.
-- **Personagens:** bonecos em bloco no estilo Roblox, sempre o mesmo boneco; muda só a roupa (10, 5 de cada lado, todas grátis).
+- **Personagens:** modelos da Meshy com o esqueleto e as animações do jogo (polícia: soldado; bandidos: 4), todos grátis.
 - **Lojas:** armas se compram **na partida**, na base do time, com o $ dos abates. Skins de arma e roupas se compram
   no **mercado**, com moedas. Cada lado tem as suas roupas (polícia só farda, bandido só roupa de bandido);
   quantos quiserem podem usar a mesma.
@@ -40,7 +40,7 @@ O Favela Stricker é um jogo feito **com** o motor, do mesmo jeito que os jogos 
 | `web/` | as telas do jogo (HTML/JS): `motor.js` (ponte com o motor), `conta.js` (catálogo, conta, salas), `ui.js`, `partida.js` (HUD, controles, editor do HUD, partida ao vivo, voz), `jogo.js` (telas) |
 | `app/` | o app Android (Kotlin): motor + WebView com as telas (`JogoActivity`, `PonteJogo`), sons |
 | `servidor/` | o servidor (Node.js) do Render: entrega o site e faz as partidas ao vivo e a voz |
-| `tools/` | testes do jogo sem celular (`teste_jogo.cpp`), molde e montador de skins, gerador das skins de fuzil e das prévias da loja, conversor dos modelos da Meshy (`converter_meshy.cpp`) |
+| `tools/` | testes do jogo sem celular (`teste_jogo.cpp`), gerador das skins de fuzil e das prévias da loja, armas giratórias (`recortar_giro.py`), conversor dos modelos da Meshy (`converter_meshy.cpp`, `--original` mantém todos os triângulos) e o preparador de personagens (`preparar_personagem.py`: braços na pose do esqueleto do jogo e pesos dos ossos) |
 
 A configuração do Firebase e o endereço do servidor ficam em `app/src/main/assets/config_jogo.json` (APK)
 e `web/config_jogo.js` (site).

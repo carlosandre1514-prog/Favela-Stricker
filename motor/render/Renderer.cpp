@@ -261,6 +261,7 @@ void Renderer::shutdown() {
 }
 
 void Renderer::clearAssets() {
+    ++geracao;
     for (uint32_t i = 0; i < meshCount_; ++i) {
         glDeleteVertexArrays(1, &meshes_[i].vao);
         glDeleteBuffers(1, &meshes_[i].vbo);
@@ -379,16 +380,24 @@ void Renderer::beginFrame(const Camera& cam, const DirectionalLight& sun) {
     if (!sun.castShadows) for (auto& f : cascadeFrustum_) f = Frustum{};
 }
 
-void Renderer::submit(const GameObject& go, const glm::mat4& model, const glm::mat4* palette) {
+void Renderer::submit(const GameObject& go, const glm::mat4& model, const glm::mat4* palette, MeshId meshAlt) {
     if (!go.active || !go.meshRenderer || drawCount_ >= kMaxDraws) return;
     const MeshRenderer& mr = *go.meshRenderer;
-    if (mr.mesh >= meshCount_ || mr.material >= materialCount_) return;
-    const Mesh& mesh = meshes_[mr.mesh];
+    const MeshId meshId = meshAlt != kInvalidId ? meshAlt : mr.mesh;
+    if (meshId >= meshCount_ || mr.material >= materialCount_) return;
+    const Mesh& mesh = meshes_[meshId];
     uint32_t mask = 0;
     glm::mat4 m = model;
     if (palette) {
-        // Skinned: a pose muda os limites; sem culling (são poucos objetos)
-        mask = 1u | (mr.castShadows ? (0xEu & ((2u << shadowCascadesMax) - 2u)) : 0u);
+        // Skinned: a pose muda os limites; a caixa da pose de bind com folga (braços para cima, arma apontada,
+        // caído no chão) cobre todas as poses: fora da câmera ou da faixa de sombra, não desenha
+        AABB b = transformAABB(mesh.bounds, model);
+        const glm::vec3 folga(0.9f);
+        b.min -= folga; b.max += folga;
+        if (camFrustum_.intersects(b)) mask |= 1u;
+        if (mr.castShadows)
+            for (int c = 0; c < shadowCascadesMax && c < kNumCascades; ++c)
+                if (cascadeFrustum_[c].planes[0] != glm::vec4(0.f) && cascadeFrustum_[c].intersects(b)) mask |= 2u << c;
     } else {
         AABB world = transformAABB(mesh.bounds, model);
         if (camFrustum_.intersects(world)) mask |= 1u;            // culling da câmera
@@ -416,7 +425,7 @@ void Renderer::submit(const GameObject& go, const glm::mat4& model, const glm::m
         while (!n.empty() && (std::isdigit((unsigned char)n.back()) || n.back() == ' ' || n.back() == '_')) n.pop_back();
         (*trisPorNome)[n] += mesh.indexCount / 3;
     }
-    draws_[drawCount_++] = {(uint64_t(mr.material) << 32) | mr.mesh, m, mr.mesh, mr.material, palette, mask};
+    draws_[drawCount_++] = {(uint64_t(mr.material) << 32) | meshId, m, meshId, mr.material, palette, mask};
 }
 
 void Renderer::bindMaterial(const Program& p, const Material& m) {

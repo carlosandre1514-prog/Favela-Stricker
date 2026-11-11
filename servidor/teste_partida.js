@@ -1,5 +1,6 @@
 // Teste rápido das partidas ao vivo (protocolo 2) contra um servidor já rodando: node teste_partida.js [porta]
-// Confere: estados chegam no pacote da sala com o id certo (vagas), voz só para o mesmo time, eventos passam,
+// Confere: estados chegam no pacote da sala com o id certo (vagas), voz para o mesmo time e para inimigos a até 5 m
+// (proximidade), eventos passam,
 // jogo antigo (sem v=2) é recusado.
 const path = require('path');
 const WebSocket = require('ws');
@@ -30,9 +31,11 @@ function jogador(id, time) {
 const espera = (ms) => new Promise((ok) => setTimeout(ok, ms));
 
 (async () => {
-  const a = jogador('ana', 0), b = jogador('beto', 0), c = jogador('caio', 1);
-  await Promise.all([a.aberto, b.aberto, c.aberto]);
+  const a = jogador('ana', 0), b = jogador('beto', 0), c = jogador('caio', 1), d = jogador('davi', 1);
+  await Promise.all([a.aberto, b.aberto, c.aberto, d.aberto]);
   await espera(200);
+  c.ws.send(PROTO.codificarEstado({ p: [60, 2, -30], y: 0, pi: 0, a: true, w: 'm4a1', n: 0, vel: [0, 0, 0] }));   // inimigo longe
+  d.ws.send(PROTO.codificarEstado({ p: [13, 2.5, -31], y: 0, pi: 0, a: true, w: 'm4a1', n: 0, vel: [0, 0, 0] }));  // inimigo a ~2,7 m
   a.ws.send(PROTO.codificarEstado({ p: [10.5, 2, -30.25], y: 1.5, pi: -0.2, a: true, w: 'ak47', n: 42, vel: [0, 0, 3] }));
   a.ws.send(PROTO.codificarVoz(new Uint8Array(160).fill(7)));
   a.ws.send(JSON.stringify({ k: 'ev', d: { t: 'dano', alvo: 'caio', v: 30 } }));
@@ -45,11 +48,12 @@ const espera = (ms) => new Promise((ok) => setTimeout(ok, ms));
   }
   conferir(!a.estados.ana, 'a ana recebeu o próprio estado de volta');
   conferir(b.vozes === 1, `voz para o mesmo time: ${b.vozes}`);
-  conferir(c.vozes === 0, `voz vazou para o outro time: ${c.vozes}`);
+  conferir(c.vozes === 0, `voz vazou para inimigo longe: ${c.vozes}`);
+  conferir(d.vozes === 1, `voz por proximidade (inimigo a menos de 5 m): ${d.vozes}`);
   const velho = new WebSocket(url('sala=TESTE&id=velho&time=0'));
   const codigo = await new Promise((ok) => velho.on('close', ok));
   conferir(codigo === 4003, `jogo antigo devia ser recusado (4003), veio ${codigo}`);
-  for (const j of [a, b, c]) j.ws.close();
-  console.log(falhas.length ? 'FALHOU:\n  ' + falhas.join('\n  ') : 'partida ao vivo OK (estado, vagas, voz por time, eventos, versão)');
+  for (const j of [a, b, c, d]) j.ws.close();
+  console.log(falhas.length ? 'FALHOU:\n  ' + falhas.join('\n  ') : 'partida ao vivo OK (estado, vagas, voz por time e por proximidade, eventos, versão)');
   process.exit(falhas.length ? 1 : 0);
 })();

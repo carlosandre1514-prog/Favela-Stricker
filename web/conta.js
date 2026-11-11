@@ -11,21 +11,14 @@ const guardado = {
 // ---------------- catálogo (preços provisórios) ----------------
 const RARIDADES = { comum: 'Comum', rara: 'Rara', epica: 'Épica', lendaria: 'Lendária' };
 
-// Roupas (skins de personagem): o personagem é sempre o mesmo e sempre usa uma delas. Todas gratuitas
-// (polícia 6, bandidos 5).
-// A ordem de cada lado é a do motor (Game.cpp kSkins). Polícia só usa farda; bandido só roupa de bandido.
+// Roupas (skins de personagem): os personagens da Meshy (motor: jogo/Partida.cpp kSkins, na mesma ordem). Todas
+// gratuitas. Polícia só usa farda; bandido só roupa de bandido.
 const ROUPAS = [
-  { key: 'pm', nome: 'PM', time: 0, i: 0, preco: 0, raridade: 'comum' },
-  { key: 'civil', nome: 'Polícia Civil', time: 0, i: 1, preco: 0, raridade: 'comum' },
-  { key: 'exercito', nome: 'Exército', time: 0, i: 2, preco: 0, raridade: 'comum' },
-  { key: 'choque', nome: 'Choque', time: 0, i: 3, preco: 0, raridade: 'comum' },
-  { key: 'especial', nome: 'BOPE', time: 0, i: 4, preco: 0, raridade: 'comum' },
-  { key: 'bope_caveira', nome: 'BOPE Caveira', time: 0, i: 5, preco: 0, raridade: 'comum' },
-  { key: 'rubro', nome: 'Rubro', time: 1, i: 0, preco: 0, raridade: 'comum' },
-  { key: 'alvinegro', nome: 'Alvinegro', time: 1, i: 1, preco: 0, raridade: 'comum' },
-  { key: 'tricolor', nome: 'Tricolor', time: 1, i: 2, preco: 0, raridade: 'comum' },
-  { key: 'canarinho', nome: 'Canarinho', time: 1, i: 3, preco: 0, raridade: 'comum' },
-  { key: 'faixa', nome: 'Faixa', time: 1, i: 4, preco: 0, raridade: 'comum' },
+  { key: 'soldado', nome: 'Soldado', time: 0, i: 0, preco: 0, raridade: 'comum' },
+  { key: 'criminoso1', nome: 'Malandro', time: 1, i: 0, preco: 0, raridade: 'comum' },
+  { key: 'criminoso2', nome: 'Vapor', time: 1, i: 1, preco: 0, raridade: 'comum' },
+  { key: 'criminoso3', nome: 'Olheiro', time: 1, i: 2, preco: 0, raridade: 'comum' },
+  { key: 'criminoso4', nome: 'Frente', time: 1, i: 3, preco: 0, raridade: 'comum' },
 ];
 
 // Armas (compradas na partida com o $ dos abates). Os números são os do motor (Partida.cpp kGuns).

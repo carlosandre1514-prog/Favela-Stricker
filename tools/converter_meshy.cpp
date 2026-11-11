@@ -19,11 +19,12 @@
 //   g++ -O2 -std=c++17 -DGLM_ENABLE_EXPERIMENTAL -Imotor -Ibuild/_deps/glm-src -Ibuild/_deps/ufbx-src \
 //       -Ibuild/_deps/tinygltf-src -I<xatlas> tools/converter_meshy.cpp motor/procgen/Simplify.cpp \
 //       build/_deps/ufbx-src/ufbx.c <xatlas>/xatlas.cpp -o converter_meshy -lpthread
-// Uso: ./converter_meshy <pasta_do_zip> saida.glb triangulos [--tam 1024] [--arma] [--comprimento 0.95] [--brilho 0.55]
+// Uso: ./converter_meshy <pasta_do_zip> saida.glb triangulos [--tam 1024] [--arma] [--comprimento 0.95] [--brilho 0.55] [--original]
 //                        [--skin shaders/kit/armas/skins/ak47_cosmica]
 #include <ufbx.h>
 #include <xatlas.h>
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -207,6 +208,7 @@ int main(int argc, char** argv) {
     int T = 1024;
     float comprimento = 0.f, brilho = -1.f;
     std::string skin;
+    bool original = false;  // --original: sem reduzir triângulos (UV e geometria da Meshy como vieram)
     for (int i = 1; i < argc; ++i) {
         std::string a = argv[i];
         if (a == "--arma") arma = true;
@@ -214,6 +216,7 @@ int main(int argc, char** argv) {
         else if (a == "--comprimento" && i + 1 < argc) comprimento = float(std::atof(argv[++i]));
         else if (a == "--brilho" && i + 1 < argc) brilho = float(std::atof(argv[++i]));
         else if (a == "--skin" && i + 1 < argc) skin = argv[++i];
+        else if (a == "--original") original = true;
         else pos.push_back(a);
     }
     if (pos.size() < 3) { std::printf("uso: %s <pasta_do_zip> saida.glb triangulos [--tam 1024] [--arma] [--comprimento 0.95] [--brilho 0.55]\n", argv[0]); return 1; }
@@ -303,6 +306,63 @@ int main(int argc, char** argv) {
     }
     const float tamanho = glm::length(mx - mn);
 
+    std::vector<Vertex> fv;
+    std::vector<uint32_t> fi;
+    std::vector<unsigned char> oCor, oNor, oOrm;
+    if (original) {
+        // ---- geometria original: todos os triângulos e o UV da Meshy; as texturas originais só reduzidas ao tamanho
+        // pedido (média dos pixels). O normal map vira para o UV do glTF (v para baixo): o verde inverte.
+        struct H { size_t operator()(const std::array<float, 8>& k) const { uint32_t h = 2166136261u; for (float f : k) { uint32_t x; std::memcpy(&x, &f, 4); h = (h ^ x) * 16777619u; } return h; } };
+        std::unordered_map<std::array<float, 8>, uint32_t, H> mapa;
+        mapa.reserve(hp.size());
+        for (size_t k = 0; k < hp.size(); ++k) {
+            const std::array<float, 8> chave{hp[k].x, hp[k].y, hp[k].z, hn[k].x, hn[k].y, hn[k].z, huv[k].x, huv[k].y};
+            auto it = mapa.emplace(chave, uint32_t(fv.size()));
+            if (it.second) {
+                Vertex v{};
+                v.pos = hp[k]; v.normal = hn[k]; v.uv = vec2(huv[k].x, 1.f - huv[k].y); v.color = vec4(1.f); v.weights = vec4(1, 0, 0, 0);
+                fv.push_back(v);
+            }
+            fi.push_back(it.first->second);
+        }
+        eng::generateTangents(fv, fi);
+        std::printf("  original: %zu triângulos, %zu vértices (nada reduzido)\n", fi.size() / 3, fv.size());
+        Imagem iCor, iNormal, iMetal, iRug;
+        if (!iCor.ler(fCor, 3)) { std::printf("erro: cor\n"); return 1; }
+        const bool temN = !fNormal.empty() && iNormal.ler(fNormal, 3);
+        const bool temM = !fMetal.empty() && iMetal.ler(fMetal, 1);
+        const bool temR = !fRug.empty() && iRug.ler(fRug, 1);
+        auto reduzir = [&](const Imagem& im, int canal) {  // média da área de cada pixel novo, no canal pedido
+            std::vector<float> out(size_t(T) * T, 0.f);
+            const float kx = float(im.w) / T, ky = float(im.h) / T;
+            for (int y = 0; y < T; ++y)
+                for (int x = 0; x < T; ++x) {
+                    const int x0 = int(x * kx), x1 = std::max(x0 + 1, int((x + 1) * kx)), y0 = int(y * ky), y1 = std::max(y0 + 1, int((y + 1) * ky));
+                    float soma = 0.f; int n = 0;
+                    for (int yy = y0; yy < y1 && yy < im.h; ++yy)
+                        for (int xx = x0; xx < x1 && xx < im.w; ++xx) { soma += im.px[(size_t(yy) * im.w + xx) * im.c + canal]; ++n; }
+                    out[size_t(y) * T + x] = n ? soma / n : 0.f;
+                }
+            return out;
+        };
+        oCor.assign(size_t(T) * T * 3, 0); oNor.assign(size_t(T) * T * 3, 0); oOrm.assign(size_t(T) * T * 3, 0);
+        for (int c = 0; c < 3; ++c) {
+            std::vector<float> a = reduzir(iCor, c);
+            for (size_t k = 0; k < a.size(); ++k) oCor[k * 3 + c] = (unsigned char)std::clamp(a[k] + 0.5f, 0.f, 255.f);
+            if (temN) {
+                std::vector<float> nn = reduzir(iNormal, c);
+                for (size_t k = 0; k < nn.size(); ++k) oNor[k * 3 + c] = (unsigned char)std::clamp((c == 1 ? 255.f - nn[k] : nn[k]) + 0.5f, 0.f, 255.f);
+            } else for (size_t k = 0; k < size_t(T) * T; ++k) oNor[k * 3 + c] = c == 2 ? 255 : 128;
+        }
+        std::vector<float> me = temM ? reduzir(iMetal, 0) : std::vector<float>(size_t(T) * T, 0.f);
+        std::vector<float> ru = temR ? reduzir(iRug, 0) : std::vector<float>(size_t(T) * T, 178.f);
+        for (size_t k = 0; k < size_t(T) * T; ++k) {
+            oOrm[k * 3] = 255;
+            oOrm[k * 3 + 1] = (unsigned char)std::clamp(std::max(ru[k], 0.3f * 255.f) + 0.5f, 0.f, 255.f);
+            oOrm[k * 3 + 2] = (unsigned char)std::clamp(me[k] + 0.5f, 0.f, 255.f);
+        }
+        mn = vec3(1e30f); mx = vec3(-1e30f);
+    } else {
     // ---- malha leve: vértices juntos pela posição, simplificada
     std::vector<Vertex> lv;
     std::vector<uint32_t> li;
@@ -330,8 +390,6 @@ int main(int argc, char** argv) {
     }
 
     // ---- UV novo (xatlas), sempre num atlas só
-    std::vector<Vertex> fv;
-    std::vector<uint32_t> fi;
     {
         std::vector<float> P, N;
         for (const Vertex& v : lv) { P.insert(P.end(), {v.pos.x, v.pos.y, v.pos.z}); N.insert(N.end(), {v.normal.x, v.normal.y, v.normal.z}); }
@@ -394,7 +452,8 @@ int main(int argc, char** argv) {
     for (uint32_t k = 0; k < hidx.size(); ++k) hidx[k] = k;
     Arvore arv;
     arv.montar(hp, hidx);
-    std::vector<unsigned char> oCor(size_t(T) * T * 3, 0), oNor(size_t(T) * T * 3, 0), oOrm(size_t(T) * T * 3, 0), cheio(size_t(T) * T, 0);
+    oCor.assign(size_t(T) * T * 3, 0); oNor.assign(size_t(T) * T * 3, 0); oOrm.assign(size_t(T) * T * 3, 0);
+    std::vector<unsigned char> cheio(size_t(T) * T, 0);
     size_t acertos = 0, faltas = 0;
     const float D = tamanho * 0.02f;
     for (size_t t = 0; t + 2 < fi.size(); t += 3) {
@@ -474,6 +533,7 @@ int main(int argc, char** argv) {
         dilatar(oNor, c2, T, 3, 12);
         dilatar(oOrm, c3, T, 3, 12);
     }
+    }  // (fim do caminho reduzido)
     // emissiva: o que é claro e bem colorido acende (energia, raios); o resto fica apagado
     std::vector<unsigned char> oEmi;
     if (brilho >= 0.f) {

@@ -166,7 +166,13 @@ input:focus { border-color: var(--ouro); }
 .item img { width: 100%; height: 64px; object-fit: contain; }
 /* arma girando (loja): tira com os ângulos lado a lado; arrastar troca o quadro */
 .giro-arma { height: 64px; max-width: 100%; background-size: calc(var(--n) * 100%) 100%; background-repeat: no-repeat; touch-action: pan-y; cursor: grab; }
-.giro-arma.grande { height: auto; width: 92%; max-height: 92%; }
+.giro-arma.grande { height: auto; width: 100%; max-width: 760px; }
+.ver360 { position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: none; border: 0; cursor: zoom-in; }
+.ver360 img { max-width: 92%; max-height: 92%; object-fit: contain; }
+.selo360 { position: absolute; right: 8px; bottom: 8px; font-size: 11px; font-weight: 800; letter-spacing: 1px; color: #111827; background: var(--ouro); border-radius: 999px; padding: 2px 8px; }
+.arma360 { position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; background: rgba(5, 8, 14, 0.82);
+  padding: calc(16px + env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) calc(16px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
+.arma360-caixa { display: flex; flex-direction: column; gap: 10px; width: min(820px, 100%); background: var(--painel); border: 1px solid rgba(252, 211, 77, 0.45); border-radius: 16px; padding: 14px; }
 .item .n { font-size: 11px; font-weight: 800; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 .item .r { font-size: 10px; font-weight: 800; letter-spacing: .5px; }
 .item .p { display: flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 800; }
@@ -246,6 +252,8 @@ input[type=range]::-moz-range-thumb { width: 18px; height: 18px; border-radius: 
 #placar .num { font-family: 'Bebas Neue', sans-serif; font-size: 18px; line-height: 1; }
 #placar .relogio { display: flex; align-items: center; padding: 0 12px; font-size: 13px; font-weight: 800; }
 #placar .meta { font-size: 11px; padding: 1px 8px; border-radius: 6px; background: rgba(11, 15, 23, 0.6); }
+.mic-aberto { position: absolute; left: 50%; top: 52px; transform: translateX(-50%); font-size: 11px; font-weight: 800; letter-spacing: 1px;
+  color: #FECACA; background: rgba(127, 29, 29, 0.85); border: 1px solid #F87171; border-radius: 999px; padding: 3px 10px; pointer-events: none; }
 #abates { position: absolute; right: 66px; top: 10px; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
 #abates span { font-size: 12px; padding: 3px 9px; border-radius: 7px; background: var(--escuro); }
 /* abate com a AK-47 Dragão Azul: linha azul e dourada no quadro de abates */

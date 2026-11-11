@@ -1,1 +1,0 @@
-Coloque aqui as skins pintadas (pm.png, civil.png, ..., faixa.png). Veja docs/skins/COMO_FAZER_SKIN.md

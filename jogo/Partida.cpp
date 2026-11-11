@@ -20,48 +20,21 @@ namespace {
 
 bool sameHandle(Scene::Handle a, Scene::Handle b) { return a.index == b.index && a.gen == b.gen; }
 // ================= Polícia x Bandidos (partida de times) =================
-// Roupas da partida: o personagem é sempre o mesmo boneco em blocos (estilo Roblox); cada roupa é um conjunto
-// de cores, estampa da camisa, colete, chapéu e luvas. As 10 são gratuitas (pagas novas entram no mercado).
-struct SkinDef { const char* name; int price; const char* look; };
-const SkinDef kSkins[2][6] = {
-    {{"PM", 0, R"({"camisa":"#6E86A8","calca":"#25324A","tenis":"#16161A","chapeu":"bone","cor_chapeu":"#25324A","colete":true,"cor_colete":"#1E1E22","manga_comprida":true})"},
-     {"Polícia Civil", 0, R"({"camisa":"#1C1C20","calca":"#2E4A78","tenis":"#3A2A20","chapeu":"bone","cor_chapeu":"#1C1C20","colete":true,"cor_colete":"#2A2A2E","estampa":"gola","cor2":"#D9B24A"})"},
-     {"Exército", 0, R"({"camisa":"#5C6B3A","calca":"#4A5530","tenis":"#3B2E22","chapeu":"capacete","cor_chapeu":"#4E5A32","colete":true,"cor_colete":"#6B7A45","manga_comprida":true,"luvas":"#2E2A22"})"},
-     {"Choque", 0, R"({"camisa":"#16181C","calca":"#16181C","tenis":"#0E0E10","chapeu":"viseira","cor_chapeu":"#202228","colete":true,"cor_colete":"#2B2E34","manga_comprida":true,"luvas":"#0E0E10"})"},
-     {"BOPE", 0, R"({"camisa":"#1E1F22","calca":"#1E1F22","tenis":"#121214","manga_comprida":true,"luvas":"#141416","colete":true,"cor_colete":"#1A1B1E"})"},
-     // BOPE Caveira: a skin pintada (boina, caveira, camuflagem) já tem o colete com a placa "BOPE"; o colete 3D a esconderia
-     {"BOPE Caveira", 0, R"({"camisa":"#1E1F22","calca":"#1E1F22","tenis":"#121214","manga_comprida":true,"luvas":"#141416","colete":false})"}},
-    {{"Rubro", 0, R"({"camisa":"#C8202A","calca":"#18181C","tenis":"#F2F2F2","estampa":"listras","cor2":"#18181C","bermuda":true,"chapeu":"bone","cor_chapeu":"#F2F2F2","colete":true,"cor_colete":"#33382C"})"},
-     {"Alvinegro", 0, R"({"camisa":"#F2F2F2","calca":"#18181C","tenis":"#18181C","estampa":"listras_em_pe","cor2":"#18181C","bermuda":true,"chapeu":"bone","cor_chapeu":"#18181C","colete":true,"cor_colete":"#33382C"})"},
-     {"Tricolor", 0, R"({"camisa":"#1E7A3C","calca":"#F2F2F2","tenis":"#F2F2F2","estampa":"tres_cores","cor2":"#F2F2F2","cor3":"#8E1B2E","bermuda":true,"chapeu":"bone","cor_chapeu":"#F2F2F2","colete":true,"cor_colete":"#33382C"})"},
-     {"Canarinho", 0, R"({"camisa":"#F5D21E","calca":"#1F4FA8","tenis":"#F2F2F2","estampa":"gola","cor2":"#1E8A3C","bermuda":true,"chapeu":"touca","cor_chapeu":"#1F4FA8","colete":true,"cor_colete":"#33382C"})"},
-     {"Faixa", 0, R"({"camisa":"#18181C","calca":"#18181C","tenis":"#F2F2F2","estampa":"faixa","cor2":"#F2F2F2","bermuda":true,"chapeu":"bone","cor_chapeu":"#18181C","colete":true,"cor_colete":"#33382C"})"},
-     {"Faixa", 0, R"({"camisa":"#18181C","calca":"#18181C","tenis":"#F2F2F2","estampa":"faixa","cor2":"#F2F2F2","bermuda":true,"chapeu":"bone","cor_chapeu":"#18181C","colete":true,"cor_colete":"#33382C"})"}}};
-
-// Nome do arquivo da skin pintada de cada roupa: shaders/kit/personagens/texturas/<nome>.png (molde em docs/skins).
-// Com o arquivo, o boneco usa a imagem; sem ele, as cores acima.
-// (a BOPE clássica, "", é só nas cores; a BOPE Caveira usa a folha pintada especial.png)
-const char* kSkinFile[2][6] = {{"pm", "civil", "exercito", "choque", "", "especial"},
-                               {"rubro", "alvinegro", "tricolor", "canarinho", "faixa", "faixa"}};
-// quantas roupas cada lado tem (a polícia tem 6; o 6º espaço dos bandidos não é usado)
-const int kSkinCount[2] = {6, 5};
+// Roupas da partida: os personagens da Meshy (shaders/kit/personagens/meshy, tools/preparar_personagem.py), com o
+// esqueleto e as animações do jogo. Polícia: o soldado; bandidos: 4. Todas gratuitas.
+struct SkinDef { const char* name; int price; const char* modelo; };
+const SkinDef kSkins[2][4] = {{{"Soldado", 0, "soldado"}, {"", 0, ""}, {"", 0, ""}, {"", 0, ""}},
+                              {{"Malandro", 0, "criminoso1"}, {"Vapor", 0, "criminoso2"}, {"Olheiro", 0, "criminoso3"}, {"Frente", 0, "criminoso4"}}};
+// quantas roupas cada lado tem
+const int kSkinCount[2] = {1, 4};
 int clampSkin(int team, int skin) { return std::clamp(skin, 0, kSkinCount[std::clamp(team, 0, 1)] - 1); }
 
-// Aparência do boneco de um lutador: a roupa do lado + tom de pele e cabelo que variam de pessoa para pessoa
+// Aparência de um lutador: o modelo da roupa do lado, na altura do esqueleto dos modelos
 json fighterLook(int team, int skin, const std::string& name) {
+    (void)name;
     team = std::clamp(team, 0, 1);
     skin = clampSkin(team, skin);
-    json a = json::parse(kSkins[team][skin].look);
-    if (kSkinFile[team][skin][0]) a["textura"] = std::string("kit:personagens/texturas/") + kSkinFile[team][skin] + ".png";
-    static const char* peles[] = {"#F2CCA8", "#E0AC84", "#C68C69", "#9A6444", "#6E4630", "#4E3222"};
-    static const char* cabelos[] = {"#1A1410", "#3C2818", "#5A3A20", "#141414"};
-    uint32_t h = 2166136261u;
-    for (char ch : name) h = (h ^ uint8_t(ch)) * 16777619u;
-    a["estilo"] = "bloco";
-    a["pele"] = peles[h % 6];
-    a["cabelo"] = cabelos[(h >> 8) % 4];
-    a["estilo_cabelo"] = "curto";
-    return a;
+    return json{{"modelo", kSkins[team][skin].modelo}, {"altura", 1.78}};
 }
 // Armas da partida (tabela de dano aprovada): dano no corpo (cabeça = 2,5x), intervalo entre tiros, dispersão do
 // robô, rajada do robô, bagos, pente, reserva e a partir de quantos metros o dano cai (até 30% bem de longe)

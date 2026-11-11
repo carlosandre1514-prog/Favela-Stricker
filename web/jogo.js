@@ -119,7 +119,7 @@ function cartaoConta() {
 // Personagem da tela inicial: o da última partida (lado, roupa e arma com a skin equipada), que gira 360 graus
 // arrastando o dedo. Duas camadas do mesmo tamanho (tools/recortar_lobby.py), cada uma uma tira com os ângulos
 // lado a lado: o personagem na pose de segurar e a arma por cima.
-const LOBBY = { quadros: 24, largura: 350, altura: 480 };
+const LOBBY = { quadros: 24, largura: 351, altura: 480 };
 let anguloBoneco = 0;  // quadro mostrado (fica onde a pessoa deixou enquanto o app está aberto)
 function bonecoInicio() {
   const u = guardado.get('ultimo', null) || { time: guardado.get('lado', 0) };
@@ -315,33 +315,48 @@ async function comprarComMoedas(nome, preco, id) {
   return true;
 }
 
-// Arma girando 360 graus (loja): a tira com os ângulos, arrastando o dedo para os lados (um ângulo a cada 12 px).
-// Sem tira: a foto parada.
-function giroArma(nome, img, classe = '') {
+// Arma em 360 graus (loja): só na visualização ampliada (tocar na arma do painel). Lá ela gira devagar sozinha e
+// arrastando o dedo; ao fechar, para tudo (a animação e os ouvintes saem junto). Na grade e no painel: foto parada.
+function abrirArma360(nome, titulo) {
   const g = GIRO[nome];
-  if (!g) return `<img src="${img}" alt="" class="${classe}">`;
-  return `<div class="giro-arma ${classe}" data-giro="${nome}" style="aspect-ratio:${g.largura} / ${g.altura};--n:${g.quadros};background-image:url(giro/${nome}.webp)"
-    role="img" aria-label="Arraste para girar"></div>`;
-}
-function ligarGiroArmas(raiz) {
-  for (const el of $$('.giro-arma', raiz)) {
-    const n = GIRO[el.dataset.giro].quadros;
-    let i = 0, x0 = null, i0 = 0, arrastou = false;
-    const mostrar = (k) => { i = ((k % n) + n) % n; el.style.backgroundPosition = `${n > 1 ? (i / (n - 1)) * 100 : 0}% 0`; };
-    mostrar(0);
-    el.addEventListener('pointerdown', (ev) => { x0 = ev.clientX; i0 = i; arrastou = false; el.setPointerCapture(ev.pointerId); });
-    el.addEventListener('pointermove', (ev) => {
-      if (x0 === null) return;
-      const dx = ev.clientX - x0;
-      if (Math.abs(dx) > 6) arrastou = true;
-      if (arrastou) mostrar(i0 - Math.round(dx / 12));
-    });
-    const soltar = () => { x0 = null; };
-    el.addEventListener('pointerup', soltar);
-    el.addEventListener('pointercancel', soltar);
-    // girou: o toque não conta como escolher o item
-    el.addEventListener('click', (ev) => { if (arrastou) { ev.stopPropagation(); ev.preventDefault(); arrastou = false; } }, true);
-  }
+  if (!g) return;
+  const fundo = document.createElement('div');
+  fundo.className = 'arma360';
+  fundo.innerHTML = `<div class="arma360-caixa" role="dialog" aria-modal="true" aria-label="${esc(titulo)} em 360 graus">
+      <div class="linha" style="justify-content:space-between;align-items:center"><span class="bebas" style="font-size:26px">${esc(titulo.toUpperCase())}</span>
+      <button class="btn btn-fraco" id="a360-fechar" aria-label="Fechar">✕</button></div>
+      <div class="giro-arma grande" style="aspect-ratio:${g.largura} / ${g.altura};--n:${g.quadros};background-image:url(giro/${nome}.webp)"></div>
+      <span class="dica">Arraste para girar · 360°</span></div>`;
+  document.body.appendChild(fundo);
+  const el = fundo.querySelector('.giro-arma'), n = g.quadros;
+  let i = 0, x0 = null, i0 = 0, raf = 0, ultimo = 0, parado = 0;
+  const mostrar = (k) => { i = ((k % n) + n) % n; el.style.backgroundPosition = `${n > 1 ? (i / (n - 1)) * 100 : 0}% 0`; };
+  const girar = (t) => {  // um ângulo a cada 110 ms; para enquanto o dedo arrasta e um pouco depois
+    raf = requestAnimationFrame(girar);
+    if (x0 !== null || t < parado) return;
+    if (t - ultimo > 110) { ultimo = t; mostrar(i + 1); }
+  };
+  const reduzir = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  mostrar(0);
+  if (!reduzir) raf = requestAnimationFrame(girar);
+  const down = (ev) => { x0 = ev.clientX; i0 = i; el.setPointerCapture(ev.pointerId); };
+  const move = (ev) => { if (x0 !== null) mostrar(i0 - Math.round((ev.clientX - x0) / 12)); };
+  const up = () => { x0 = null; parado = performance.now() + 1500; };
+  el.addEventListener('pointerdown', down);
+  el.addEventListener('pointermove', move);
+  el.addEventListener('pointerup', up);
+  el.addEventListener('pointercancel', up);
+  const fechar = () => {
+    cancelAnimationFrame(raf);
+    el.removeEventListener('pointerdown', down); el.removeEventListener('pointermove', move);
+    el.removeEventListener('pointerup', up); el.removeEventListener('pointercancel', up);
+    removeEventListener('keydown', tecla);
+    fundo.remove();
+  };
+  const tecla = (ev) => { if (ev.key === 'Escape') fechar(); };
+  addEventListener('keydown', tecla);
+  fundo.querySelector('#a360-fechar').onclick = fechar;
+  fundo.addEventListener('click', (ev) => { if (ev.target === fundo) fechar(); });
 }
 
 // ---------------- mercado de skins (moedas) ----------------
@@ -375,10 +390,9 @@ function telaMercado(aba = 'todas', selId = null) {
   for (const b of $$('[data-aba]', t)) b.onclick = () => telaMercado(b.dataset.aba);
   const desenhar = () => {
     $('#m-grade', t).innerHTML = itens.map((it) => `<button class="item ${it === sel ? 'sel' : ''}" data-id="${it.id}">
-      ${it.giro ? giroArma(it.giro, it.img) : `<img src="${it.img}" alt="">`}<span class="n">${esc(it.nome)}</span><span class="r raridade-${it.raridade}">${RARIDADES[it.raridade]}</span>
+      <img src="${it.img}" alt=""><span class="n">${esc(it.nome)}</span><span class="r raridade-${it.raridade}">${RARIDADES[it.raridade]}</span>
       <span class="p ${it.tem ? 'azul' : 'amarelo'}">${it.usando ? 'usando' : it.tem ? (it.preco ? '✓ sua' : 'grátis') : `${ICONE.moeda(12)} ${fmt(it.preco)}`}</span></button>`).join('');
     for (const d of $$('.item', t)) d.onclick = () => { sel = itens.find((i) => i.id === d.dataset.id); desenhar(); };
-    ligarGiroArmas(t);
     const det = $('#m-det', t);
     let botao;
     if (!sel.tem) botao = `<button class="btn btn-ouro" id="m-acao" style="font-size:15px;letter-spacing:1px">COMPRAR POR ${ICONE.moeda(14).replace('#FCD34D', '#111827')} ${fmt(sel.preco)}</button>`;
@@ -386,8 +400,10 @@ function telaMercado(aba = 'todas', selId = null) {
     else botao = sel.usando ? '<button class="btn btn-fraco" disabled>USANDO</button>' : '<button class="btn btn-azul" id="m-acao">USAR</button>';
     det.innerHTML = `<div class="linha" style="gap:8px"><span class="etiqueta fundo-${sel.raridade}">${RARIDADES[sel.raridade].toUpperCase()}</span><span class="dica">${esc(sel.desc)}</span></div>
       <span class="bebas" style="font-size:30px">${esc(sel.nome.toUpperCase())}</span>
-      <div class="previa">${sel.giro ? giroArma(sel.giro, sel.img, 'grande') : `<img src="${sel.img}" alt="${esc(sel.nome)}">`}</div>
+      <div class="previa">${sel.giro && GIRO[sel.giro] ? `<button class="ver360" id="m-360" aria-label="Ver ${esc(sel.nome)} em 360 graus"><img src="${sel.img}" alt=""><span class="selo360">360°</span></button>` : `<img src="${sel.img}" alt="${esc(sel.nome)}">`}</div>
       <span class="dica" style="font-size:11px">${sel.arma ? 'Só visual, não muda o dano · a skin é da sua arma: no online os outros veem ela na sua mão e nas suas costas' : (sel.roupa.time ? 'Usada quando você joga de bandido' : 'Usada quando você joga de polícia') + ' · quantos quiserem podem usar a mesma'}</span>${botao}`;
+    const b360 = $('#m-360', det);
+    if (b360) b360.onclick = () => abrirArma360(sel.giro, sel.nome);
     const acao = $('#m-acao', det);
     if (!acao) return;
     acao.onclick = async () => {

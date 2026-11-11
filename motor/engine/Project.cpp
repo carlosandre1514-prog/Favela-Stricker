@@ -357,6 +357,8 @@ void applyMaterialTo(Engine* e, GameObject& g, bool subtree, const json& spec) {
                 }
                 copy.albedoFactor = glm::vec4(1.f);
                 copy.mode = 0;
+                if (auto nm = spec.find("textura_normal"); nm != spec.end() && nm->is_string())
+                    if (GLuint nt = carregar(nm->get<std::string>(), false)) copy.normal = nt;
                 if (emiP) {
                     copy.emissive = emiP;
                     copy.emissive_factor = glm::vec3(forcaEmi);
@@ -481,6 +483,7 @@ CharacterParams characterParams(const json& spec, uint32_t seed) {
     p.bermuda = flag(a, "bermuda", false);
     if (auto k = a.find("luvas"); k != a.end() && colorOf(*k, c)) p.luvas = linear(c);
     if (auto k = a.find("cabelo_modelo"); k != a.end() && k->is_string()) p.cabeloModelo = k->get<std::string>();
+    if (auto k = a.find("modelo"); k != a.end() && k->is_string()) p.modelo = k->get<std::string>();
     if (auto k = a.find("cabelo_3d"); k != a.end() && k->is_string())
         p.cabelo3d = lookup(k->get<std::string>(), {{"nenhum", 0}, {"cacheado", 1}, {"black", 2}, {"afro", 2}, {"curto", 3}, {"dreads", 4}}, 0);
     if (p.bloco) { p.height = 1.75f; p.build = 1; }  // todos do mesmo tamanho
@@ -1116,6 +1119,12 @@ int createFromSpecJson(Engine* e, const std::string& specJson, std::string* err)
         int id = createCharacter(e, p, pos, yaw, controllable);
         if (id < 0) return fail(e->lastError.empty() ? "não consegui criar o personagem" : e->lastError);
         int ci = int(e->characters.size()) - 1;
+        if (!p.modelo.empty())  // personagem de modelo: a pintura dele (cor + _orm.jpg ao lado) e o normal map
+            if (GameObject* root = objectById(e, id)) {
+                const std::string base = "kit:personagens/meshy/" + p.modelo;
+                applyMaterialTo(e, *root, true, json{{"textura", base + ".jpg"}, {"textura_normal", base + "_normal.jpg"}});
+                e->lastError.clear();
+            }
         if (p.bloco && p.colete) {  // colete: peça separada, por cima da roupa (preso no peito)
             // modelo 3D do colete ("Armor vest" de 3DWorkbench, CC BY 4.0: créditos em CREDITOS.txt), tingido na cor da
             // roupa; sem o arquivo, o colete de blocos

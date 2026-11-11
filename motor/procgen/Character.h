@@ -54,6 +54,9 @@ struct CharacterParams {
     int cabelo3d = 0;         // cabelo 3D de blocos por cima da cabeça: 0 nenhum, 1 cacheado, 2 black, 3 curto, 4 dreads
     bool texturizado = false;
     glm::vec4 molde[8][6];
+    // Personagem de modelo (Meshy, shaders/kit/personagens/meshy/<modelo>.bin feito por tools/preparar_personagem.py):
+    // a malha com os pesos dos ossos no lugar do boneco gerado; o esqueleto e as animações são os mesmos
+    std::string modelo;
 };
 enum SkinPart { SP_Tronco, SP_Cabeca, SP_BracoEsq, SP_BracoDir, SP_PernaEsq, SP_PernaDir, SP_PeEsq, SP_PeDir };
 

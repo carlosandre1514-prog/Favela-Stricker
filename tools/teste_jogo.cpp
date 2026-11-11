@@ -401,6 +401,9 @@ int main(int argc, char** argv) {
                 w += pr[0]; sb += pr[1]; rd += pr[2];
             }
             std::printf("  CPU por quadro: mundo %.2f ms · preparar desenho %.2f ms · desenhar %.2f ms\n", w / nq, sb / nq, rd / nq);
+            float st[6]; engine_get_stats(e, st);
+            float me[4]; engine_memory_stats(e, me);
+            std::printf("  último quadro: %.0f chamadas de desenho · %.0f triângulos · memória: texturas %.0f MB, malhas %.0f MB\n", st[3], st[4], me[0], me[1]);
         }
         if (std::getenv("HORAS")) {  // o dia passando: um quadro de 0,5 s por vez
             for (int min = 1; min <= (std::getenv("HORAS") ? std::atoi(std::getenv("HORAS")) : 1); ++min) {
@@ -739,7 +742,7 @@ int main(int argc, char** argv) {
     if (std::getenv("SO_LOBBY")) {
         using nlohmann::json;
         eng::Engine* E = reinterpret_cast<eng::Engine*>(e);
-        static const char* keys[2][6] = {{"pm", "civil", "exercito", "choque", "especial", "bope_caveira"}, {"rubro", "alvinegro", "tricolor", "canarinho", "faixa", ""}};
+        static const char* keys[2][6] = {{"soldado", "", "", "", "", ""}, {"criminoso1", "criminoso2", "criminoso3", "criminoso4", "", ""}};
         const float cam[6] = {0.f, 1.0f, 0.f, std::getenv("CAM_YAW") ? float(std::atof(std::getenv("CAM_YAW"))) : -0.62f, 0.05f,
                               std::getenv("CAM_DIST") ? float(std::atof(std::getenv("CAM_DIST"))) : 2.4f};
         auto camera = [&] { engine_set_camera(e, cam[0], cam[1], cam[2], cam[3], cam[4], cam[5]); };
@@ -813,7 +816,7 @@ int main(int argc, char** argv) {
     }
     if (std::getenv("SO_RETRATOS_BLOCO")) {
         using nlohmann::json;
-        static const char* keys[2][6] = {{"pm", "civil", "exercito", "choque", "especial", "bope_caveira"}, {"rubro", "alvinegro", "tricolor", "canarinho", "faixa", ""}};
+        static const char* keys[2][6] = {{"soldado", "", "", "", "", ""}, {"criminoso1", "criminoso2", "criminoso3", "criminoso4", "", ""}};
         engine_new_scene(e);
         engine_set_time_of_day(e, 13.f);
         engine_set_quality(e, 0);  // sem sombra no chão (o recorte pega só o boneco)

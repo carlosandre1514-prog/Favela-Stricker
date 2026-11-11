@@ -82,6 +82,10 @@ struct MeshRenderer {
     bool castShadows = true;
     // LOD por distância: só desenha com a câmera entre lodNear e lodFar (metros) do centro do mesh
     float lodNear = 0.f, lodFar = 1e30f;
+    // personagem animado: a partir de distLonge (metros, vezes o nível gráfico) desenha meshLonge (a mesma malha com
+    // menos triângulos, os mesmos ossos); 0 = sem
+    MeshId meshLonge = 0;
+    float distLonge = 0.f;
     glm::vec3 localAabbMin{-0.5f}, localAabbMax{0.5f};
 };
 

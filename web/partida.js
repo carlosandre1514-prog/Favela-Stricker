@@ -51,7 +51,7 @@ function pecaHtml(id) {
     case 'recarregar': return `<button class="peca so-toque redondo" data-peca="recarregar" id="b-recarregar" style="width:48px;height:48px">${ICONE.recarregar}</button>`;
     case 'armas': return `<div class="peca" data-peca="armas" id="armas"><button class="slot ativa" data-slot="0"><img alt=""><span>–</span></button><button class="slot" data-slot="1"><img alt=""><span>–</span></button><button class="troca" id="b-trocar" aria-label="Troca rápida de arma">${ICONE.trocar}</button></div>`;
     case 'minimapa': return '<canvas class="peca" data-peca="minimapa" id="minimapa" width="168" height="168" style="width:84px;height:84px"></canvas>';
-    case 'falar': return `<button class="peca redondo" data-peca="falar" id="b-falar" style="width:48px;height:48px" aria-label="Segure para falar">${ICONE.microfone}</button>`;
+    case 'falar': return `<button class="peca redondo" data-peca="falar" id="b-falar" style="width:48px;height:48px" aria-label="Microfone (tocar liga e desliga)" aria-pressed="false">${ICONE.microfone}</button>`;
     case 'ouvir': return `<button class="peca redondo" data-peca="ouvir" id="b-ouvir" style="width:40px;height:40px" aria-label="Som da voz">${ICONE.altofalante}</button>`;
   }
   return '';
@@ -233,7 +233,7 @@ function montarHud(online, br = false) {
     <div id="centro"></div>
     <button id="botao-loja">${ICONE.sacola}<span>Loja de armas</span></button>
     ${ids.map(pecaHtml).join('')}
-    <div id="teclas" class="so-teclado">WASD andar · Shift correr · mouse olhar · clique atirar · botão direito mirar · Espaço pular · C agachar · R recarregar · Q trocar arma · G granada · E loja${online ? ' · V falar (segure)' : ''} · Esc pausa</div>
+    <div id="teclas" class="so-teclado">WASD andar · Shift correr · mouse olhar · clique atirar · botão direito mirar · Espaço pular · C agachar · R recarregar · Q trocar arma · G granada · E loja${online ? ' · V microfone (liga/desliga)' : ''} · Esc pausa</div>
   </div>`), 'hud');
   partida.hud = t;
   posicionarTodas(t);
@@ -250,11 +250,8 @@ function montarHud(online, br = false) {
   for (const s of $$('.slot', t)) toque(s, () => { if (Number(s.dataset.slot) !== ultimoHud.slot) motor.trocar(); });
   toque($('#b-trocar', t), () => motor.trocar());
   if (online) {
-    const fala = $('#b-falar', t);
-    const on = (e) => { e.preventDefault(); falar(true); fala.classList.add('ligado'); };
-    const off = (e) => { e.preventDefault(); falar(false); fala.classList.remove('ligado'); };
-    fala.addEventListener('pointerdown', on);
-    for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) fala.addEventListener(ev, off);
+    // microfone aberto: um toque liga (fica transmitindo), outro toque desliga
+    $('#b-falar', t).addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); alternarMicrofone(); });
     $('#b-ouvir', t).onclick = () => {
       if (!voz) return;
       voz.ouvindo = !voz.ouvindo;
@@ -593,13 +590,12 @@ addEventListener('keydown', (e) => {
     case 'KeyQ': case 'Digit1': case 'Digit2': motor.trocar(); break;
     case 'KeyG': motor.granada(); break;
     case 'KeyE': if (/Loja de armas/.test(ultimoHud.interagir || '')) abrirLojaPartida(); else motor.interagir(); break;
-    case 'KeyV': falar(true); break;
+    case 'KeyV': if (!e.repeat) alternarMicrofone(); break;
   }
   enviarAndar();
 });
 addEventListener('keyup', (e) => {
   teclas.delete(e.code);
-  if (e.code === 'KeyV') falar(false);
   enviarAndar();
 });
 addEventListener('blur', () => { teclas.clear(); if (partida) { motor.atirar(false); enviarAndar(); } });
@@ -919,11 +915,31 @@ function desligarAoVivo() {
   if (voz) { voz.desligar(); voz = null; }
 }
 
-function falar(on) { if (voz) voz.falar(on); }
+// Microfone aberto: liga e fica transmitindo até desligar (o botão fica aceso e mostra "MIC ABERTO")
+function alternarMicrofone() {
+  if (!voz) return;
+  const ligar = !voz.falando;
+  voz.falar(ligar).then((ok) => mostrarMicrofone(ok && ligar));
+}
+function mostrarMicrofone(aberto) {
+  const b = partida && partida.hud && $('#b-falar', partida.hud);
+  if (b) { b.classList.toggle('ligado', aberto); b.setAttribute('aria-pressed', aberto ? 'true' : 'false'); }
+  if (partida && partida.hud) {
+    let tag = $('#mic-aberto', partida.hud);
+    if (aberto && !tag) {
+      tag = document.createElement('div');
+      tag.id = 'mic-aberto';
+      tag.className = 'mic-aberto';
+      tag.textContent = '● MIC ABERTO';
+      partida.hud.appendChild(tag);
+    } else if (!aberto && tag) tag.remove();
+  }
+}
 
-// Chat de voz: 8 kHz μ-law, pacotes de 20 ms (o mesmo formato do servidor). Microfone só enquanto aperta para falar.
+// Chat de voz: 8 kHz μ-law, pacotes de 20 ms (o mesmo formato do servidor). Microfone aberto: ligado, transmite sem
+// parar; desligado, o microfone é solto (o sistema apaga o aviso de gravação). Uma captura só por vez.
 class ChatDeVoz {
-  constructor(enviar) { this.enviar = enviar; this.ouvindo = true; this.falando = false; this.prox = {}; this.mic = null; }
+  constructor(enviar) { this.enviar = enviar; this.ouvindo = true; this.falando = false; this.prox = {}; this.mic = null; this.abrindo = null; }
   static dec(u) { u = ~u & 0xFF; let s = ((u & 0x0F) << 3) + 0x84; s <<= (u & 0x70) >> 4; return (u & 0x80 ? 0x84 - s : s - 0x84) / 32768; }
   static cod(x) {
     let s = Math.max(-32635, Math.min(32635, Math.round(x * 32767))), sinal = 0;
@@ -946,9 +962,16 @@ class ChatDeVoz {
     src.start(quando);
     this.prox[quem] = quando + buf.duration;
   }
+  // liga (true) ou desliga (false) o microfone; devolve se ficou como pedido
   async falar(on) {
     this.falando = on;
-    if (!on || this.mic) return;
+    if (!on) { this.soltarMic(); return true; }
+    if (this.mic) return true;
+    if (this.abrindo) return this.abrindo;  // já pedindo o microfone: não abre outra captura
+    this.abrindo = this.abrirMic().finally(() => { this.abrindo = null; });
+    return this.abrindo;
+  }
+  async abrirMic() {
     try {
       const a = ctxAudio();
       const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
@@ -970,11 +993,22 @@ class ChatDeVoz {
       const mudo = a.createGain();
       mudo.gain.value = 0;
       proc.connect(mudo).connect(a.destination);
+      if (!this.falando) { stream.getTracks().forEach((t) => t.stop()); proc.disconnect(); fonte.disconnect(); return false; }  // desligou enquanto abria
       this.mic = { stream, proc, fonte };
-    } catch (e) { aviso('Microfone bloqueado: libere o microfone para falar'); }
+      return true;
+    } catch (e) { this.falando = false; aviso('Microfone bloqueado: libere o microfone para falar'); return false; }
+  }
+  soltarMic() {
+    if (!this.mic) return;
+    this.mic.stream.getTracks().forEach((t) => t.stop());
+    this.mic.proc.onaudioprocess = null;
+    this.mic.proc.disconnect();
+    this.mic.fonte.disconnect();
+    this.mic = null;
   }
   desligar() {
     this.falando = false;
-    if (this.mic) { this.mic.stream.getTracks().forEach((t) => t.stop()); this.mic.proc.disconnect(); this.mic = null; }
+    this.soltarMic();
+    mostrarMicrofone(false);
   }
 }
