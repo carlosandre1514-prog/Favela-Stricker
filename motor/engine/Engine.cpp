@@ -1954,7 +1954,7 @@ void tracoRaio(ParticleSystem& ps, glm::vec3 p0, glm::vec3 p1, float largura, fl
 }  // namespace
 
 static void tiroEnergia(Engine* e, Emitter& em, glm::vec3 boca, glm::vec3 dir) {
-    (void)em;
+    em.atirou = true;  // conta como "fez alguma coisa": a arma parada volta e o relógio dos 2 minutos zera
     // clarão na boca (estrela laranja com o centro branco) + fagulhas roxas e douradas + luz roxa
     ParticleSpawn c;
     c.pos = boca; c.life = 0.07f; c.size0 = 0.152f; c.size1 = 0.06f;
@@ -2013,9 +2013,42 @@ void atualizarEnergia(Engine* e, float dt) {
             }
         em.timer += dt;
         const float t = em.timer;
+        // 2 minutos parada na mão (o dono não anda e ninguém atira com ela): a arma se estilhaça
+        {
+            glm::vec3 pos(0.f);
+            bool temDono = false;
+            const Scene::Handle eu = Scene::handleOf(*o);
+            for (const CharacterInfo& c : e->characters)
+                if (c.weapon.index == eu.index && c.weapon.gen == eu.gen)
+                    if (GameObject* r = e->scene.get(c.root)) { pos = r->transform.worldPosition(); temDono = true; break; }
+            const bool andou = temDono && glm::distance(pos, em.posParado) > 0.15f;
+            if (andou) em.posParado = pos;
+            if (andou || em.atirou) {
+                em.parado = 0.f;
+                if (em.ativT >= 0.f && em.ativT < 2.7f) {  // no meio do estilhaço: volta rápido
+                    const float T = em.ativT;
+                    em.fragVolta = suave(0.55f, 1.15f, T) * (1.f - suave(1.9f, 2.7f, T));
+                    em.flareVolta = suave(0.7f, 1.f, T) * (1.f - suave(1.2f, 2.2f, T));
+                    em.volta = 0.25f;
+                    em.ativT = -1.f;
+                    em.ondaT = -1.f;
+                    em.ativo = true;
+                }
+            } else if (temDono && em.ativT < 0.f && em.volta <= 0.f) {
+                em.parado += dt;
+                if (em.parado >= 120.f) { em.parado = 0.f; em.ativT = 0.f; em.nivel = 0.35f; }
+            }
+            em.atirou = false;
+        }
         // ativação: sobe a energia, a arma se solta em pedaços (libera o núcleo), a onda passa e tudo volta
         float frag = 0.f, flare = 0.f;
-        if (em.ativT >= 0.f) {
+        if (em.volta > 0.f) {  // voltando rápido ao normal (atirou ou andou no meio)
+            em.volta = std::max(0.f, em.volta - dt);
+            const float k = suave(0.f, 0.25f, em.volta);
+            frag = em.fragVolta * k;
+            flare = em.flareVolta * k;
+            em.nivel = 1.f;
+        } else if (em.ativT >= 0.f) {
             em.ativT += dt;
             const float T = em.ativT;
             em.nivel = 0.35f + 0.65f * suave(0.f, 0.8f, T);

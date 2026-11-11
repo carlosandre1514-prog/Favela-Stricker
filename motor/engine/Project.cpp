@@ -392,11 +392,16 @@ void applyMaterialTo(Engine* e, GameObject& g, bool subtree, const json& spec) {
             if (energia && g.emitter) {  // a arma acabou de aparecer: a ativação começa
                 Emitter& em = *g.emitter;
                 em.energia = true;
-                // (fotos da loja e do lobby: ENERGIA_ATIVA começa já ativa, sem a arma se abrir)
-                const bool jaAtiva = std::getenv("ENERGIA_ATIVA") != nullptr;
-                em.ativo = jaAtiva;
-                em.ativT = jaAtiva ? -1.f : 0.f;
-                em.nivel = jaAtiva ? 1.f : 0.35f;
+                // aparece já ativa (energia ligada); estilhaçar é só depois de 2 minutos parada (atualizarEnergia).
+                // ENERGIA_ESTILHACA (testes): estilhaça já ao aparecer
+                const bool jaAbre = std::getenv("ENERGIA_ESTILHACA") != nullptr;
+                em.ativo = true;
+                em.ativT = jaAbre ? 0.f : -1.f;
+                em.nivel = 1.f;
+                em.parado = 0.f;
+                em.volta = 0.f;
+                em.atirou = false;
+                em.posParado = glm::vec3(1e9f);
                 em.ondaT = -1.f;
                 em.nucleo = eNuc;
                 em.corEnergia = eCor;

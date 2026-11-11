@@ -408,6 +408,17 @@ int main(int argc, char** argv) {
                 std::printf("  %2d min de partida: %.1f h\n", min, engine_get_time_of_day(e));
             }
         }
+        if (std::getenv("PARADO")) {  // skin de energia: 2 minutos parado -> estilhaça; atirou no meio -> volta rápido
+            for (int k = 0; k < 1180; ++k) frames(e, 1, 0.1f);  // 118 s (o motor limita o quadro a 0,1 s)
+            save(out, ("parado_118s_" + nomeSkin + ".png").c_str());
+            for (int k = 0; k < 90; ++k) frames(e, 1, 1.f / 30.f);  // 121 s: abrindo
+            save(out, ("parado_121s_" + nomeSkin + ".png").c_str());
+            engine_player_fire(e);
+            frames(e, 1, 1.f / 30.f);
+            save(out, ("parado_tiro_" + nomeSkin + ".png").c_str());
+            for (int k = 0; k < 9; ++k) frames(e, 1, 1.f / 30.f);
+            save(out, ("parado_depois_" + nomeSkin + ".png").c_str());
+        }
         if (std::getenv("CORRER")) {  // correndo e atirando: o clarão tem que ficar na boca do cano
             for (int k = 0; k < 40; ++k) { engine_player_input(e, 0.f, 1.f, 1); frames(e, 1); }
             for (int k = 0; k < 3; ++k) { engine_player_input(e, 0.f, 1.f, 1); engine_player_fire(e); frames(e, 1); }
@@ -855,6 +866,34 @@ int main(int argc, char** argv) {
         const std::string arq = eng::gunModelFile(reinterpret_cast<eng::Engine*>(e), g, skin, std::getenv("ALTA") != nullptr);
         json spec = {{"tipo", "arma"}, {"arma", g}, {"pos", {0, 1.0, 0}}, {"arquivo", arq}};
         if (arq != "kit:armas/" + g) spec["textura"] = "kit:armas/skins/" + arq.substr(10) + ".jpg";
+        if (std::getenv("PARADO")) {  // um personagem segurando a arma, parado 2 minutos; depois atira no meio do estilhaço
+            json look = json::parse(jogo_aparencia_roupa(1, 0));
+            const int pid = engine_add_spec(e, json{{"tipo", "personagem"}, {"aparencia", look}, {"semente", 7}, {"pos", {0, 0, 0}}, {"rot", {0, 90, 0}}}.dump().c_str());
+            json ps = spec; ps.erase("pos"); ps["portador"] = pid;
+            if (pid < 0 || engine_add_spec(e, ps.dump().c_str()) < 0) { std::printf("  [ERRO] %s\n", engine_last_error(e)); return 1; }
+            int wid = -1;
+            eng::Engine* E = reinterpret_cast<eng::Engine*>(e);
+            for (const eng::CharacterInfo& c : E->characters)
+                if (eng::GameObject* w = E->scene.get(c.weapon)) {
+                    wid = w->id;
+                    if (arq != "kit:armas/" + g) eng::applyKitTexture(E, *w, "armas/skins/" + arq.substr(10) + ".jpg");
+                }
+            engine_set_camera(e, 0.f, 1.2f, 0.f, 0.3f, 0.1f, 1.6f);
+            for (int k = 0; k < 1180; ++k) engine_frame(e, 0.1f);  // 118 s parado
+            save(out, "parado_118s.png");
+            for (int k = 0; k < 90; ++k) engine_frame(e, 1.f / 30.f);  // 121 s: estilhaçando
+            save(out, "parado_121s.png");
+            engine_test_shot(e, wid);
+            engine_frame(e, 1.f / 30.f); engine_frame(e, 1.f / 30.f);
+            save(out, "parado_tiro.png");
+            for (int k = 0; k < 8; ++k) engine_frame(e, 1.f / 30.f);
+            save(out, "parado_depois.png");
+            for (int k = 0; k < 600; ++k) engine_frame(e, 0.1f);  // mais 60 s: ainda não (o relógio zerou no tiro)
+            save(out, "parado_60s_depois.png");
+            engine_destroy(e);
+            std::printf(g_fail ? "FALHOU\n" : "OK\n");
+            return g_fail ? 1 : 0;
+        }
         int id = engine_add_spec(e, spec.dump().c_str());
         if (id < 0) { std::printf("  [ERRO] %s\n", engine_last_error(e)); return 1; }
         engine_set_camera(e, 0.f, 1.02f, 0.f, 1.5708f + 0.18f, 0.12f, std::getenv("DIST") ? float(std::atof(std::getenv("DIST"))) : 1.25f);
@@ -868,6 +907,64 @@ int main(int argc, char** argv) {
         engine_test_shot(e, id);
         engine_frame(e, 1.f / 30.f); engine_frame(e, 1.f / 30.f);
         save(out, "energia_tiro.png");
+        engine_destroy(e);
+        std::printf(g_fail ? "FALHOU\n" : "OK\n");
+        return g_fail ? 1 : 0;
+    }
+    // Armas da loja girando 360 graus (SO_GIRO="arma:skin,..."): a arma gira em volta do próprio centro na frente da
+    // câmera parada; giro_<nome>_fundo.png (sem a arma) e giro_<nome>_NN.png (ANGULOS, padrão 24). Depois:
+    // python3 tools/recortar_giro.py <saida> app/src/main/assets/giro
+    if (const char* lista = std::getenv("SO_GIRO")) {
+        using nlohmann::json;
+        eng::Engine* E = reinterpret_cast<eng::Engine*>(e);
+        const int angulos = std::max(1, std::getenv("ANGULOS") ? std::atoi(std::getenv("ANGULOS")) : 24);
+        std::string l = lista;
+        size_t a = 0;
+        while (a < l.size()) {
+            size_t b = l.find(',', a); if (b == std::string::npos) b = l.size();
+            std::string item = l.substr(a, b - a); a = b + 1;
+            size_t c = item.find(':');
+            std::string g = item.substr(0, c), sk = c == std::string::npos ? "" : item.substr(c + 1);
+            const std::string nome = g + (sk.empty() ? "" : "_" + sk);
+            engine_new_scene(e);
+            engine_set_time_of_day(e, 13.f);
+            engine_set_quality(e, 0);
+            const glm::vec3 p0(0.f, 3.f, 0.f);  // no alto: a luz da skin não acende o chão
+            const std::string arq = eng::gunModelFile(E, g, sk);
+            json spec = {{"tipo", "arma"}, {"arma", g}, {"pos", {p0.x, p0.y, p0.z}}, {"arquivo", arq}};
+            if (arq != "kit:armas/" + g) spec["textura"] = "kit:armas/skins/" + arq.substr(10) + ".jpg";
+            else if (!sk.empty()) {
+                spec["textura"] = "kit:armas/skins/" + g + "_" + sk + ".jpg";
+                float metal = -1.f, rough = -1.f;
+                eng::gunSkinFinish(g, sk, metal, rough);
+                if (metal >= 0.f) { spec["metal"] = metal; spec["rugosidade"] = rough; }
+            }
+            const int id = engine_add_spec(e, spec.dump().c_str());
+            eng::GameObject* w = eng::objectById(E, id);
+            if (id < 0 || !w) { std::printf("  [ERRO] %s: %s\n", item.c_str(), engine_last_error(e)); ++g_fail; continue; }
+            E->scene.updateTransforms();
+            eng::AABB bb;
+            eng::subtreeBounds(E, *w, bb);
+            const glm::vec3 centro = (bb.min + bb.max) * 0.5f;
+            const float dist = g == "tt33" ? 0.6f : 1.05f;
+            engine_set_camera(e, centro.x, centro.y, centro.z, 1.5708f + 0.18f, 0.12f, dist);
+            // fundo: a arma escondida
+            eng::Scene::forEachInSubtree(*w, [](eng::GameObject& o) { o.active = false; });
+            frames(e, 3);
+            save(out, ("giro_" + nome + "_fundo.png").c_str());
+            eng::Scene::forEachInSubtree(*w, [](eng::GameObject& o) { o.active = true; });
+            frames(e, 40);  // efeitos da skin já aparecendo
+            for (int i = 0; i < angulos; ++i) {
+                const float th = 6.2831853f * float(i) / float(angulos);
+                const glm::vec3 rel = p0 - centro;
+                const glm::vec3 pr(centro.x + rel.x * std::cos(th) + rel.z * std::sin(th), p0.y, centro.z - rel.x * std::sin(th) + rel.z * std::cos(th));
+                float pos[3] = {pr.x, pr.y, pr.z}, rot[3] = {0.f, glm::degrees(th), 0.f}, sc[3] = {1.f, 1.f, 1.f};
+                engine_set_transform(e, id, pos, rot, sc);
+                frames(e, 3);
+                char nn[8]; std::snprintf(nn, sizeof(nn), "_%02d", i);
+                save(out, ("giro_" + nome + nn + ".png").c_str());
+            }
+        }
         engine_destroy(e);
         std::printf(g_fail ? "FALHOU\n" : "OK\n");
         return g_fail ? 1 : 0;

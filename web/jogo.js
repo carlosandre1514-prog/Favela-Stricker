@@ -315,11 +315,40 @@ async function comprarComMoedas(nome, preco, id) {
   return true;
 }
 
+// Arma girando 360 graus (loja): a tira com os ângulos, arrastando o dedo para os lados (um ângulo a cada 12 px).
+// Sem tira: a foto parada.
+function giroArma(nome, img, classe = '') {
+  const g = GIRO[nome];
+  if (!g) return `<img src="${img}" alt="" class="${classe}">`;
+  return `<div class="giro-arma ${classe}" data-giro="${nome}" style="aspect-ratio:${g.largura} / ${g.altura};--n:${g.quadros};background-image:url(giro/${nome}.webp)"
+    role="img" aria-label="Arraste para girar"></div>`;
+}
+function ligarGiroArmas(raiz) {
+  for (const el of $$('.giro-arma', raiz)) {
+    const n = GIRO[el.dataset.giro].quadros;
+    let i = 0, x0 = null, i0 = 0, arrastou = false;
+    const mostrar = (k) => { i = ((k % n) + n) % n; el.style.backgroundPosition = `${n > 1 ? (i / (n - 1)) * 100 : 0}% 0`; };
+    mostrar(0);
+    el.addEventListener('pointerdown', (ev) => { x0 = ev.clientX; i0 = i; arrastou = false; el.setPointerCapture(ev.pointerId); });
+    el.addEventListener('pointermove', (ev) => {
+      if (x0 === null) return;
+      const dx = ev.clientX - x0;
+      if (Math.abs(dx) > 6) arrastou = true;
+      if (arrastou) mostrar(i0 - Math.round(dx / 12));
+    });
+    const soltar = () => { x0 = null; };
+    el.addEventListener('pointerup', soltar);
+    el.addEventListener('pointercancel', soltar);
+    // girou: o toque não conta como escolher o item
+    el.addEventListener('click', (ev) => { if (arrastou) { ev.stopPropagation(); ev.preventDefault(); arrastou = false; } }, true);
+  }
+}
+
 // ---------------- mercado de skins (moedas) ----------------
 // categorias: todas, armas (skins de arma) e personagem (roupas da polícia e dos bandidos)
 function itensMercado(aba) {
   const armas = aba === 'personagem' ? [] : SKINS_ARMA.map((s) => ({
-    id: `skin_arma:${s.arma}:${s.key}`, nome: s.nome, raridade: s.raridade, preco: s.preco, img: `armas/${s.arma}_${s.key}.png`,
+    id: `skin_arma:${s.arma}:${s.key}`, nome: s.nome, raridade: s.raridade, preco: s.preco, img: `armas/${s.arma}_${s.key}.png`, giro: `${s.arma}_${s.key}`,
     tem: conta.temSkinArma(s), usando: conta.skinArma(s.arma) === s.key, arma: s.arma, key: s.key,
     desc: s.arma === 'tt33' ? 'Skin de pistola' : s.modelo ? 'Arma com modelo próprio · vale nos dois lados' : 'Skin de arma · vale nos dois lados',
   }));
@@ -346,9 +375,10 @@ function telaMercado(aba = 'todas', selId = null) {
   for (const b of $$('[data-aba]', t)) b.onclick = () => telaMercado(b.dataset.aba);
   const desenhar = () => {
     $('#m-grade', t).innerHTML = itens.map((it) => `<button class="item ${it === sel ? 'sel' : ''}" data-id="${it.id}">
-      <img src="${it.img}" alt=""><span class="n">${esc(it.nome)}</span><span class="r raridade-${it.raridade}">${RARIDADES[it.raridade]}</span>
+      ${it.giro ? giroArma(it.giro, it.img) : `<img src="${it.img}" alt="">`}<span class="n">${esc(it.nome)}</span><span class="r raridade-${it.raridade}">${RARIDADES[it.raridade]}</span>
       <span class="p ${it.tem ? 'azul' : 'amarelo'}">${it.usando ? 'usando' : it.tem ? (it.preco ? '✓ sua' : 'grátis') : `${ICONE.moeda(12)} ${fmt(it.preco)}`}</span></button>`).join('');
     for (const d of $$('.item', t)) d.onclick = () => { sel = itens.find((i) => i.id === d.dataset.id); desenhar(); };
+    ligarGiroArmas(t);
     const det = $('#m-det', t);
     let botao;
     if (!sel.tem) botao = `<button class="btn btn-ouro" id="m-acao" style="font-size:15px;letter-spacing:1px">COMPRAR POR ${ICONE.moeda(14).replace('#FCD34D', '#111827')} ${fmt(sel.preco)}</button>`;
@@ -356,7 +386,7 @@ function telaMercado(aba = 'todas', selId = null) {
     else botao = sel.usando ? '<button class="btn btn-fraco" disabled>USANDO</button>' : '<button class="btn btn-azul" id="m-acao">USAR</button>';
     det.innerHTML = `<div class="linha" style="gap:8px"><span class="etiqueta fundo-${sel.raridade}">${RARIDADES[sel.raridade].toUpperCase()}</span><span class="dica">${esc(sel.desc)}</span></div>
       <span class="bebas" style="font-size:30px">${esc(sel.nome.toUpperCase())}</span>
-      <div class="previa"><img src="${sel.img}" alt="${esc(sel.nome)}"></div>
+      <div class="previa">${sel.giro ? giroArma(sel.giro, sel.img, 'grande') : `<img src="${sel.img}" alt="${esc(sel.nome)}">`}</div>
       <span class="dica" style="font-size:11px">${sel.arma ? 'Só visual, não muda o dano · a skin é da sua arma: no online os outros veem ela na sua mão e nas suas costas' : (sel.roupa.time ? 'Usada quando você joga de bandido' : 'Usada quando você joga de polícia') + ' · quantos quiserem podem usar a mesma'}</span>${botao}`;
     const acao = $('#m-acao', det);
     if (!acao) return;

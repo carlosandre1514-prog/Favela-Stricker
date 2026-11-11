@@ -53,7 +53,7 @@ jobs:
           cp -r web/. dist/web/
           rm -f dist/web/exportadas.txt
           cp build-web/favela.js build-web/favela.wasm build-web/favela.data dist/web/
-          cp -r app/src/main/assets/armas app/src/main/assets/retratos app/src/main/assets/lobby app/src/main/assets/sons app/src/main/assets/exemplos dist/web/
+          cp -r app/src/main/assets/armas app/src/main/assets/giro app/src/main/assets/retratos app/src/main/assets/lobby app/src/main/assets/sons app/src/main/assets/exemplos dist/web/
           cp -r servidor dist/servidor
           rm -rf dist/servidor/node_modules
           cp render.yaml dist/

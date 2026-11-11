@@ -49,8 +49,13 @@ struct Emitter {
     // skin de energia ("energia" no _efeito.json, AK-47 Energia Cósmica; igual ao artefato de prévia): ao aparecer na
     // mão a arma se ativa (se solta em pedaços e libera o núcleo); depois fica com o núcleo, os cristais orbitando,
     // raios na peça e partículas subindo (atualizarEnergia, depois da arma posicionada)
+    // A arma se estilhaça só depois de 2 minutos parada na mão (sem andar e sem atirar). Atirou ou andou no meio:
+    // os pedaços voltam rápido (volta) e o tiro sai normal.
     bool energia = false, ativo = false;
     float ativT = -1.f, nivel = 0.35f, ondaT = -1.f, accEnergia = 0.f, accArcos = 0.f, luzEnergia = 0.f;
+    float parado = 0.f, volta = 0.f, fragVolta = 0.f, flareVolta = 0.f;
+    bool atirou = false;
+    glm::vec3 posParado{0.f};
     glm::vec3 nucleo{0.f};   // x = quanto o disco sai para os lados, y e z = centro (espaço do modelo)
     glm::vec3 luzPos{0.f}, corEnergia{0.66f, 0.33f, 1.f};
     glm::mat4 rel{1.f};      // modelo -> objeto da arma

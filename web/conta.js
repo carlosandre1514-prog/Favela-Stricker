@@ -73,6 +73,10 @@ const SKINS_ARMA = [
   { arma: 'ak47', key: 'deserto', nome: 'AK-47 Deserto', raridade: 'comum', preco: 199 },
 ];
 
+// Armas giratórias da loja (tools/recortar_giro.py: giro/<arma>_<skin>.webp, quadros lado a lado): tamanho de cada
+// quadro. A skin sem tira usa a foto parada (armas/<arma>_<skin>.png).
+const GIRO = {"ak47_cosmica":{"altura":138,"largura":400,"quadros":24},"ak47_deserto":{"altura":132,"largura":400,"quadros":24},"ak47_dourada":{"altura":132,"largura":400,"quadros":24},"ak47_dragao":{"altura":132,"largura":400,"quadros":24},"ak47_dragao_azul":{"altura":132,"largura":400,"quadros":24},"ak74_favela":{"altura":115,"largura":400,"quadros":24},"ak74_tatica_selva":{"altura":118,"largura":400,"quadros":24},"m4a1_dragao_raio":{"altura":150,"largura":400,"quadros":24},"m4a1_mitica":{"altura":153,"largura":400,"quadros":24},"m4a1_neon":{"altura":143,"largura":400,"quadros":24},"m4a1_urbana":{"altura":143,"largura":400,"quadros":24},"m4colt_carmesim":{"altura":160,"largura":374,"quadros":24},"m4colt_dourada":{"altura":160,"largura":374,"quadros":24},"tt33_crimson_forge":{"altura":160,"largura":217,"quadros":24},"tt33_gold_relic":{"altura":160,"largura":217,"quadros":24},"tt33_nebula_shadow":{"altura":160,"largura":217,"quadros":24}};
+
 const PACOTES = [
   { moedas: 100, bonus: 0, preco: 'R$ 4,99' },
   { moedas: 310, bonus: 10, preco: 'R$ 14,99' },
