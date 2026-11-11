@@ -21,7 +21,14 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Dependências (Mesa EGL/GLES para gerar o cache de texturas)
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq libegl-dev libgles-dev libegl-mesa0 > /dev/null
+        run: |
+          # a rede do servidor do GitHub às vezes não acha os espelhos do Ubuntu: tenta de novo antes de desistir
+          for i in 1 2 3 4; do
+            timeout 420 sudo apt-get update -qq -o Acquire::Retries=3 && \
+            timeout 420 sudo apt-get install -y -qq -o Acquire::Retries=3 --fix-missing libegl-dev libgles-dev libegl-mesa0 > /dev/null && exit 0
+            echo "apt falhou (tentativa $i), esperando 45 s"; sleep 45
+          done
+          exit 1
 
       # As pichações e grafites são gerados pelo motor (demora). O motor do PC gera e grava em shaders/cache
       # com a mesma chave que o motor do navegador vai procurar: no site o mapa abre bem mais rápido.
