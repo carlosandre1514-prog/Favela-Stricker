@@ -73,6 +73,8 @@ class PonteJogo(private val jogo: JogoActivity) {
         gl { NativeBridge.nativeTeamLoadout(time, roupa, principal, segunda) }
     @JavascriptInterface fun skinArma(arma: String, skin: String) = gl { NativeBridge.nativeTeamGunSkin(arma, skin) }
     @JavascriptInterface fun modo(m: Int) = gl { NativeBridge.nativeGameMode(m) }
+    @JavascriptInterface fun aquecimento(s: Float) = gl { NativeBridge.nativeWarmup(s) }
+    @JavascriptInterface fun equipar(arma: String) = gl { NativeBridge.nativeEquip(arma) }
     @JavascriptInterface fun camera(tx: Float, ty: Float, tz: Float, yaw: Float, pitch: Float, dist: Float) =
         gl { NativeBridge.nativeSetCamera(tx, ty, tz, yaw, pitch, dist) }
 

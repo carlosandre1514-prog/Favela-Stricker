@@ -312,7 +312,8 @@ void killFighter(Engine* e, int vi, int ai) {
     TeamMatch& M = matchOf(e);
     Fighter& v = M.f[vi];
     if (v.dead) return;
-    v.dead = true; v.deadTime = 0.f; ++v.deaths; v.path.clear();
+    const bool valendo = M.aquecimento <= 0.f;  // aquecimento: ninguém soma abate, queda, ponto nem dinheiro
+    v.dead = true; v.deadTime = 0.f; if (valendo) ++v.deaths; v.path.clear();
     int ci = charIndexOfRoot(e, v.root);
     if (ci >= 0) playDeath(e->characters[ci]);
     if (GameObject* g = e->scene.get(v.root); g && g->rigidBody) e->physics.setEnabled(*g->rigidBody, false);
@@ -340,13 +341,16 @@ void killFighter(Engine* e, int vi, int ai) {
     }
     if (ai >= 0 && ai != vi && M.f[ai].team != v.team) {
         Fighter& a = M.f[ai];
-        ++a.kills;
-        if (v.ultimoCabeca) ++a.cabecas;
-        if (M.modo == 0) { ++M.score[a.team]; a.money += 300; }
+        if (valendo) {
+            ++a.kills;
+            if (v.ultimoCabeca) ++a.cabecas;
+            if (M.modo == 0) { ++M.score[a.team]; a.money += 300; }
+        }
         msg = std::string(kTeamIcon[a.lado]) + " " + a.name + " abateu " + kTeamIcon[v.lado] + " " + v.name;
-        if (!a.bot && M.modo == 0) msg += "  (+$300)";
+        if (!a.bot && M.modo == 0 && valendo) msg += "  (+$300)";
     } else msg = std::string(kTeamIcon[v.lado]) + " " + v.name + " caiu";
-    if (!v.bot) {
+    if (!v.bot && !valendo) msg = "Aquecimento: você volta em 2 s (não conta)";
+    else if (!v.bot) {
         if (M.modo == 0) msg = "Você foi abatido! Renasce na base em 5 s";
         else {
             bool companheiro = false;
@@ -519,6 +523,7 @@ glm::vec3 lugarNaZona(Engine* e) {
 }
 
 void botUpdate(Engine* e, int fi, float dt);
+void fimAquecimento(Engine* e);
 void updateNades(Engine* e, float dt);
 void remoteUpdate(Engine* e, Fighter& f, float dt);
 
@@ -552,6 +557,7 @@ void brStart(Engine* e) {
         }
         pousos.push_back(cand[best]);
     }
+    M.pousos = pousos;
     static const char* armas[] = {"m4a1", "m4colt", "ak47", "ak74", "ak74_tatica"};
     int nome = e->fxRng.irange(0, int(std::size(kNomesBR)) - 1);
     if (online) {
@@ -671,8 +677,10 @@ void brUpdate(Engine* e, float dt) {
     M.lastDamage += dt;
     updateDrops(e, dt);
     if (G.state == 0) regenerate(e, dt);
-    // a zona fecha em fases: espera (o próximo círculo já aparece) e depois fecha até ele
-    if (G.state == 0 && z.fase < kFasesN) {
+    const bool aquecendo = M.aquecimento > 0.f;
+    if (aquecendo && G.state == 0 && (M.aquecimento -= dt) <= 0.f) { fimAquecimento(e); return; }
+    // a zona fecha em fases: espera (o próximo círculo já aparece) e depois fecha até ele (parada no aquecimento)
+    if (G.state == 0 && !aquecendo && z.fase < kFasesN) {
         const FaseZona& F = kFases[z.fase];
         z.t += dt;
         if (!z.fechando) {
@@ -732,7 +740,7 @@ void brUpdate(Engine* e, float dt) {
         }
     }
     // fora da zona perde vida (duas vezes por segundo)
-    if (G.state == 0 && (z.tick += dt) >= 0.5f) {
+    if (G.state == 0 && !aquecendo && (z.tick += dt) >= 0.5f) {
         z.tick -= 0.5f;
         const float dano = kFases[std::min(z.fase, kFasesN - 1)].dano * 0.5f;
         for (size_t i = 0; i < M.f.size(); ++i) {
@@ -756,6 +764,12 @@ void brUpdate(Engine* e, float dt) {
     };
     for (size_t i = 0; i < M.f.size(); ++i) {
         Fighter& f = M.f[i];
+        if (f.dead && aquecendo) {  // aquecimento: ninguém sai; cada celular faz os seus voltarem em 3 s
+            f.deadTime += dt;
+            if (f.remote) remoteUpdate(e, f, dt);
+            else if (f.deadTime >= 3.f) brRenascer(e, f);
+            continue;
+        }
         if (f.dead) {
             if (f.fora) continue;
             // de outro celular: só o celular dela sabe se ela volta (o meu pode estar atrasado); saiu da sala: fora
@@ -779,6 +793,7 @@ void brUpdate(Engine* e, float dt) {
         }
         if (G.state == 0) botUpdate(e, int(i), dt);
     }
+    if (aquecendo) return;
     // times que ficaram todos fora: a colocação é quantos times ainda estavam vivos
     int vivos = 0;
     for (int t = 0; t < M.times; ++t) if (!M.colocacao[t]) ++vivos;
@@ -806,6 +821,34 @@ void brUpdate(Engine* e, float dt) {
         G.state = 1;
         G.message = "Vitória! Último time de pé";
     }
+}
+
+// Fim do aquecimento: zera abates, quedas, placar e dinheiro; todos voltam vivos para o começo (base na Polícia x
+// Bandidos, caindo do céu no ponto do time na Ressurgência) e o relógio da partida começa a contar
+void fimAquecimento(Engine* e) {
+    TeamMatch& M = matchOf(e);
+    M.aquecimento = 0.f;
+    M.tempoValendo = e->game.time;
+    M.score[0] = M.score[1] = 0;
+    M.feed.clear();
+    for (auto& c : M.colocacao) c = 0;
+    std::vector<int> noTime(64, 0);
+    for (Fighter& f : M.f) {
+        f.kills = f.deaths = 0; f.danoCausado = 0.f; f.cabecas = 0; f.ultimoCabeca = false;
+        f.money = M.modo == 1 ? 0 : 800; f.owned.clear(); f.fora = false; f.deadTime = 0.f;
+        if (f.remote) continue;  // cada celular cuida dos seus
+        if (M.modo == 1 && !M.pousos.empty()) {
+            const int k = noTime[std::clamp(f.team, 0, 63)]++;
+            const float a = 6.2831853f * k / std::max(1, M.tamanhoTime) + 0.3f;
+            glm::vec3 p = groundAt(e, M.pousos[std::clamp(f.team, 0, int(M.pousos.size()) - 1)] + glm::vec3(std::cos(a), 0.f, std::sin(a)) * 1.8f);
+            p.y += kAlturaQueda;
+            reviveAt(e, f, p, "VALENDO! Caindo na favela");
+        } else {
+            respawn(e, f);
+        }
+        if (!f.bot) { f.grenades = 2; e->game.playerHp = e->game.playerMax; }
+    }
+    e->game.message = M.modo == 1 ? "VALENDO! A zona vai fechar" : "VALENDO! A partida começou";
 }
 
 void botUpdate(Engine* e, int fi, float dt) {
@@ -902,14 +945,17 @@ void teamStart(Engine* e) {
     int chosen = M.playerTeam, skin = M.playerSkin;
     std::string primary = M.playerPrimary, secondary = M.playerSecondary;
     auto gunSkins = M.gunSkins;
+    const float aquecimentoDur = M.aquecimentoDur;
     bool online = M.online, host = M.host;
     std::string localId = M.localId, roster = M.roster;
     const int modo = M.modo;
     M = TeamMatch{};
     M.playerTeam = chosen; M.playerSkin = skin; M.playerPrimary = primary; M.playerSecondary = secondary;
     M.gunSkins = gunSkins;
+    M.aquecimentoDur = aquecimentoDur;
     M.online = online; M.host = host; M.localId = localId; M.roster = roster;
     M.modo = modo;
+    M.aquecimento = M.aquecimentoDur;
     if (e->rules.objetivo != "times") return;
     M.active = true;
     // a partida começa de manhã: o dia passa (manhã, tarde, noite) e volta a amanhecer até acabar o tempo
@@ -1202,11 +1248,12 @@ void teamUpdate(Engine* e, float dt) {
     M.lastDamage += dt;
     updateDrops(e, dt);
     if (G.state == 0) regenerate(e, dt);
+    if (M.aquecimento > 0.f && G.state == 0 && (M.aquecimento -= dt) <= 0.f) fimAquecimento(e);
     for (size_t i = 0; i < M.f.size(); ++i) {
         Fighter& f = M.f[i];
         if (f.remote) { remoteUpdate(e, f, dt); continue; }
         if (f.dead) {
-            if ((f.deadTime += dt) > 5.f) respawn(e, f);
+            if ((f.deadTime += dt) > (M.aquecimento > 0.f ? 2.f : 5.f)) respawn(e, f);
             continue;
         }
         if (!f.bot) {
@@ -1216,10 +1263,10 @@ void teamUpdate(Engine* e, float dt) {
         }
         if (G.state == 0) botUpdate(e, int(i), dt);
     }
-    if (G.state != 0) return;
+    if (G.state != 0 || M.aquecimento > 0.f) return;
     int need = e->rules.quantidade > 0 ? e->rules.quantidade : 50;
     int winner = M.score[0] >= need ? 0 : M.score[1] >= need ? 1 : -2;
-    if (winner < -1 && e->rules.tempo > 0.f && G.time >= e->rules.tempo)
+    if (winner < -1 && e->rules.tempo > 0.f && G.time - M.tempoValendo >= e->rules.tempo)
         winner = M.score[0] > M.score[1] ? 0 : M.score[1] > M.score[0] ? 1 : -1;
     if (winner >= -1) {
         int pt = -1;
@@ -1240,7 +1287,7 @@ bool teamDamage(Engine* e, GameObject* root, float dmg) {
         if (att >= 0 && att < int(M.f.size()) && M.f[att].team == f.team) return true;  // sem fogo amigo
         // histórico: dano de verdade (o que tirou da vida) e se o golpe foi na cabeça (tiro marcado agora)
         f.ultimoCabeca = g_killWeapon.empty() && e->hitMarker >= 0.249f && e->hitHead;
-        if (att >= 0 && att < int(M.f.size()))
+        if (att >= 0 && att < int(M.f.size()) && M.aquecimento <= 0.f)
             M.f[att].danoCausado += std::min(dmg, f.remote ? 100.f : f.bot ? std::max(0.f, f.hp) : std::max(0.f, e->game.playerHp));
         if (f.remote) {  // online: o dano vai para o celular de quem levou o tiro (lá ele perde vida e cai)
             if (M.online && att >= 0 && att < int(M.f.size()) && !M.f[att].remote)
@@ -1268,12 +1315,14 @@ void teamStop(Engine* e) {
     int chosen = M.playerTeam, skin = M.playerSkin;
     std::string primary = M.playerPrimary, secondary = M.playerSecondary;
     auto gunSkins = M.gunSkins;
+    const float aquecimentoDur = M.aquecimentoDur;
     bool online = M.online, host = M.host;
     std::string localId = M.localId, roster = M.roster;
     const int modo = M.modo;
     M = TeamMatch{};
     M.playerTeam = chosen; M.playerSkin = skin; M.playerPrimary = primary; M.playerSecondary = secondary;
     M.gunSkins = gunSkins;
+    M.aquecimentoDur = aquecimentoDur;
     M.online = online; M.host = host; M.localId = localId; M.roster = roster;
     M.modo = modo;
 }
@@ -1465,6 +1514,30 @@ std::string teamSkinLook(int team, int skin) {
 
 void teamGunSkin(Engine* e, const std::string& gun, const std::string& skin) { matchOf(e).gunSkins[gun] = skin; }
 
+void teamWarmup(Engine* e, float segundos) {
+    TeamMatch& M = matchOf(e);
+    segundos = std::max(0.f, segundos);
+    if (!M.active) { M.aquecimentoDur = segundos; return; }
+    if (M.aquecimento > 0.f) M.aquecimento = std::min(M.aquecimento, std::max(segundos, 0.001f));  // acaba no próximo quadro
+}
+
+bool teamEquip(Engine* e, const std::string& gun) {
+    TeamMatch& M = matchOf(e);
+    const int pf = playerFighter(e);
+    if (!M.active || M.aquecimento <= 0.f || pf < 0 || !knownGun(gun) || gun == "tt33") return false;
+    Fighter& f = M.f[pf];
+    M.playerPrimary = gun;
+    f.primary = gun;
+    f.slot = 0;
+    f.weapon = gun;
+    const GunDef& g = gunOf(gun);
+    f.mag[0] = g.mag; f.reserve[0] = g.reserve;
+    if (f.secondary == gun) f.secondary = "tt33";
+    equipGun(e, f);
+    e->game.message = std::string("Equipado: ") + g.name;
+    return true;
+}
+
 bool teamSwapWeapon(Engine* e) {
     TeamMatch& M = matchOf(e);
     int pf = playerFighter(e);
@@ -1523,7 +1596,8 @@ std::string hudJson(Engine* e) {
     j["estado"] = G.state;
     j["placar"] = {M.score[0], M.score[1]};
     j["meta"] = need;
-    j["tempo"] = e->rules.tempo > 0.f ? std::max(0, int(std::ceil(e->rules.tempo - G.time))) : -1;
+    j["tempo"] = e->rules.tempo > 0.f ? std::max(0, int(std::ceil(e->rules.tempo - (M.aquecimento > 0.f ? 0.f : G.time - M.tempoValendo)))) : -1;
+    j["aquecimento"] = M.aquecimento > 0.f ? int(std::ceil(M.aquecimento)) : 0;
     j["vida"] = int(std::ceil(G.playerHp));
     j["vidaMax"] = int(G.playerMax);
     j["dano"] = M.lastDamage < 0.35f;

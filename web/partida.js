@@ -155,6 +155,9 @@ async function iniciarPartida(time, roupa, sala, armaPrincipal, modo = 0) {
   const arma = armaPrincipal || armaInicial(time);
   if (motor.modo) motor.modo(br ? 1 : 0);
   motor.escolhas(time, roupa.i, arma, 'tt33');
+  // aquecimento: antes de valer todo mundo troca tiro e escolhe o equipamento (online 30 s, contra robôs 20 s)
+  if (motor.aquecimento) motor.aquecimento(sala ? 30 : 20);
+  partida.equipAberto = false;
   // a tela inicial mostra o personagem desta partida (lado, roupa e arma), mesmo depois de fechar o jogo
   guardado.set('ultimo', { time, roupa: roupa.key, arma });
   motor.primeiraPessoa(true);
@@ -232,6 +235,9 @@ function montarHud(online, br = false) {
     <div id="abates"></div>
     <button id="pausar" aria-label="Pausar">${ICONE.pausa}</button>
     <div id="centro"></div>
+    <div id="aquec" hidden><div class="aq-faixa"><span class="bebas">AQUECIMENTO</span><b id="aq-t">0:20</b><span>não conta · troque tiro à vontade</span></div>
+      <div class="linha" style="gap:8px;justify-content:center"><button class="btn btn-ouro" id="aq-equip">${ICONE.armas} EQUIPAMENTO</button>
+      ${online ? '' : '<button class="btn btn-escuro" id="aq-pronto">COMEÇAR AGORA</button>'}</div></div>
     <button id="botao-loja">${ICONE.sacola}<span>Loja de armas</span></button>
     ${ids.map(pecaHtml).join('')}
     <div id="teclas" class="so-teclado">WASD andar · Shift correr · mouse olhar · clique atirar · botão direito mirar · Espaço pular · C agachar · R recarregar · Q trocar arma · G granada · E loja${online ? ' · V microfone (liga/desliga)' : ''} · Esc pausa</div>
@@ -240,6 +246,9 @@ function montarHud(online, br = false) {
   aplicarOpacidadeHud();
   posicionarTodas(t);
   $('#pausar', t).onclick = pausar;
+  $('#aq-equip', t).onclick = abrirEquipamento;
+  const pronto = $('#aq-pronto', t);
+  if (pronto) pronto.onclick = () => { motor.aquecimento(0); fecharEquipamento(); };
   $('#botao-loja', t).onclick = () => {
     const rot = ultimoHud.interagir || '';
     if (/Loja de armas/.test(rot)) abrirLojaPartida();
@@ -363,6 +372,7 @@ function atualizarHud(j) {
   $('#hp', t).textContent = hp;
   $('#dinheiro', t).textContent = j.modo === 1 ? (j.br ? `TIME ${j.br.meuTime}` : '') : '$ ' + fmt(j.dinheiro | 0);
   $('#kd', t).textContent = `${j.abates | 0} abate${(j.abates | 0) === 1 ? '' : 's'} · ${j.mortes | 0} morte${(j.mortes | 0) === 1 ? '' : 's'}`;
+  atualizarAquecimento(t, j);
   if (j.modo === 1 && j.br) atualizarHudBR(t, j);
   else {
     const pl = j.placar || [0, 0];
@@ -1026,4 +1036,64 @@ class ChatDeVoz {
     this.soltarMic();
     mostrarMicrofone(false);
   }
+}
+
+// ---------------- aquecimento e equipamento ----------------
+// Antes de valer: faixa com o tempo, todo mundo troca tiro (nada conta) e o jogador escolhe a arma principal.
+// No fim, todos voltam para o começo e a partida começa valendo.
+function atualizarAquecimento(t, j) {
+  const el = $('#aquec', t);
+  if (!el) return;
+  const s = j.aquecimento | 0;
+  if (s > 0) {
+    el.hidden = false;
+    $('#aq-t', el).textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+    if (!partida.aquecViu) { partida.aquecViu = true; abrirEquipamento(); }  // abre sozinho no começo
+    const eq = $('#equipamento');
+    if (eq) { const r = $('#eq-tempo', eq); if (r) r.textContent = `começa a valer em ${s} s`; }
+  } else if (!el.hidden) {
+    el.hidden = true;
+    fecharEquipamento();
+    aviso(partida.modo === 1 ? 'VALENDO! A zona vai fechar' : 'VALENDO! A partida começou', 2600);
+  }
+}
+function abrirEquipamento() {
+  if (!partida || $('#equipamento')) return;
+  motor.atirar(false);
+  if (document.pointerLockElement) document.exitPointerLock();
+  const c = html(`<div class="camada fixo" id="equipamento"><div class="janela equipamento">
+    <div class="linha" style="align-items:center;gap:10px"><span class="bebas" style="font-size:30px">EQUIPAMENTO</span>
+      <span class="dica cresce" id="eq-tempo"></span><button class="voltar" id="eq-fechar" aria-label="Fechar">${ICONE.fechar}</button></div>
+    <span class="dica" style="font-size:11px;font-weight:800;letter-spacing:2px">ARMA PRINCIPAL</span>
+    <div class="equip-grade" id="eq-armas"></div>
+    <div class="linha equip-fixos"><span>+ TT-33 (pistola)</span><span>+ 2 granadas</span><span class="cresce"></span>
+      <button class="btn btn-ouro" id="eq-ok">PRONTO</button></div>
+  </div></div>`);
+  palco.appendChild(c);
+  const desenhar = () => {
+    const atual = ((ultimoHud.armas || [])[0] || {}).arma || partida.arma;
+    $('#eq-armas', c).innerHTML = ARMAS.filter((a) => a.key !== 'tt33').map((a) => {
+      const sk = conta.skinArma(a.key);
+      return `<button class="equip-arma ${a.key === atual ? 'sel' : ''}" data-arma="${a.key}">
+        <img src="armas/${a.key}${sk ? '_' + sk : ''}.png" alt="" onerror="this.src='armas/${a.key}.png'">
+        <b>${esc(a.nome)}</b><span>${a.key === atual ? '✓ equipada' : sk ? '★ com a sua skin' : a.luneta ? 'com luneta' : 'pente ' + a.pente}</span></button>`;
+    }).join('');
+    for (const b of $$('[data-arma]', c)) b.onclick = () => {
+      const k = b.dataset.arma;
+      motor.equipar(k);
+      guardado.set('arma_inicial', k);
+      partida.arma = k;
+      if (ultimoHud.armas && ultimoHud.armas[0]) ultimoHud.armas[0].arma = k;
+      desenhar();
+    };
+  };
+  desenhar();
+  $('#eq-fechar', c).onclick = fecharEquipamento;
+  $('#eq-ok', c).onclick = fecharEquipamento;
+}
+function fecharEquipamento() {
+  const c = $('#equipamento');
+  if (!c) return;
+  c.remove();
+  if (!TOQUE && partida) travarMouse();
 }

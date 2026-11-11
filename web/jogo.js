@@ -369,8 +369,7 @@ function telaRoupa(time, pronto, modo = 0) {
       ${br ? `<div class="lados-roupa"><button data-lado="0"><span class="bebas">POLÍCIA</span><small>5 fardas</small></button>
         <button data-lado="1"><span class="bebas">BANDIDOS</span><small>4 roupas com colete</small></button></div>` : ''}
       <div class="grade-roupas" id="r-grade"></div>
-      <div class="linha" style="gap:8px;flex-wrap:wrap;align-items:center"><span class="dica">Arma inicial:</span><span id="r-armas" class="linha" style="gap:6px;flex-wrap:wrap"></span></div>
-      <div class="linha" style="gap:10px;align-items:center"><span class="dica cresce">${br ? '+ TT-33 · você cai com ela e pega munição de quem abater' : '+ TT-33 · as outras armas compra na base com o $ dos abates'}</span>
+      <div class="linha" style="gap:10px;align-items:center"><span class="dica cresce">As armas você escolhe dentro da partida, no aquecimento (antes de valer)</span>
         <button class="btn btn-ouro btn-grande" id="r-ir" style="height:48px;font-size:24px;min-width:200px">${pronto ? 'PRONTO' : br ? `${ICONE.play} CONTINUAR` : `${ICONE.play} COMEÇAR`}</button></div>
     </div></div></div>`), 'roupa');
   t.prepend(topo(br ? 'SEU PERSONAGEM · RESSURGÊNCIA' : lado ? 'SEU PERSONAGEM · BANDIDOS' : 'SEU PERSONAGEM · POLÍCIA',
@@ -396,13 +395,6 @@ function telaRoupa(time, pronto, modo = 0) {
   };
   for (const b of $$('[data-lado]', t)) b.onclick = () => { lado = Number(b.dataset.lado); sel = conta.roupa(lado); desenhar(); };
   desenhar();
-  const desenharArmas = () => {
-    const atual = armaInicial(lado);
-    $('#r-armas', t).innerHTML = opcoesArmaInicial().map((a) => `<button class="chip ${a.key === atual ? 'sel' : ''}" data-arma="${a.key}"
-      style="${a.key === atual ? 'background:#FCD34D;color:#111827;font-weight:800' : ''}">${esc(a.nome)}${conta.skinArma(a.key) ? ' ★' : ''}</button>`).join('');
-    for (const b of $$('[data-arma]', t)) b.onclick = () => { guardado.set('arma_inicial', b.dataset.arma); desenharArmas(); };
-  };
-  desenharArmas();
   $('#r-ir', t).onclick = () => {
     conta.usarRoupa(lado, sel.key);
     guardado.set('lado', lado);
@@ -508,7 +500,7 @@ function telaMercado(aba = 'todas', selId = null) {
     const comprar = $('#m-comprar', det);
     if (comprar) comprar.onclick = async () => { if (await comprarComMoedas(sel.nome, sel.preco, sel.id)) telaMercado(aba, sel.id); };
     const ars = $('#m-arsenal', det);
-    if (ars) ars.onclick = () => telaArmas('skins', sel.arma);
+    if (ars) ars.onclick = () => telaArmas(sel.arma);
     $('#m-enviar', det).onclick = () => escolherAmigoParaPresente(sel);
   };
   desenhar();
@@ -534,68 +526,58 @@ function telaMoedas() {
 }
 
 // ---------------- armas e dano ----------------
-function telaArmas(aba = 'skins', armaSel = null) {
+// Arsenal: todas as armas do jogo. Tocar numa arma abre as skins dela: as compradas equipam na hora (vale no jogo e no
+// online); as que ainda não são suas aparecem com cadeado e levam ao mercado.
+function telaArmas(armaSel = null) {
   motor.girarMenu(true);
-  const abas = `<div class="abas">${[['skins', 'Minhas skins'], ['numeros', 'Dano das armas']].map(([k, n]) => `<button class="aba ${k === aba ? 'sel' : ''}" data-aba="${k}">${n}</button>`).join('')}</div>`;
-  if (aba === 'numeros') {
-  const linhas = ARMAS.map((a) => `<tr><td><b>${esc(a.nome)}</b>${a.luneta ? ' <span class="dica">luneta</span>' : ''}</td><td>${a.dano}</td><td class="cab">${Math.round(a.dano * 2.5)}</td>
-      <td><b>${Math.ceil(100 / a.dano)}</b></td><td>${String(a.cadencia).replace('.', ',')}</td><td>${a.pente}</td><td>${a.cai} m</td></tr>`).join('');
-    const t = mostrar(html(`<div class="tela">
-      <div class="linha cresce" style="align-items:stretch;gap:14px">
-        <div class="cartao cresce" style="padding:6px 10px;overflow:auto"><table class="tabela">
-          <tr><th>ARMA</th><th>CORPO</th><th>CABEÇA</th><th>TIROS P/<br>ABATER</th><th>TIROS/S</th><th>PENTE</th><th>CAI APÓS</th></tr>${linhas}</table></div>
-        <div class="cartao coluna" style="width:250px;gap:6px">
-          <span class="bebas ouro" style="font-size:28px">GRANADA</span>
-          <svg width="118" height="118" viewBox="0 0 160 160" style="align-self:center">
-            <circle cx="80" cy="80" r="74" fill="rgba(245,158,11,.25)" stroke="#F59E0B" stroke-width="2" stroke-dasharray="6 5"/>
-            <circle cx="80" cy="80" r="37" fill="rgba(239,68,68,.5)" stroke="#EF4444" stroke-width="2"/>
-            <circle cx="80" cy="80" r="6" fill="#FBBF24"/>
-            <text x="80" y="18" text-anchor="middle" font-size="11" font-weight="800" fill="#FDE68A">8 m</text>
-            <text x="80" y="55" text-anchor="middle" font-size="11" font-weight="800" fill="#fff">4 m</text></svg>
-          <span class="linha" style="gap:6px;font-size:12px"><i style="width:10px;height:10px;border-radius:2px;background:#EF4444"></i>até 4 m: abate na hora</span>
-          <span class="linha" style="gap:6px;font-size:12px"><i style="width:10px;height:10px;border-radius:2px;background:#F59E0B"></i>4 a 8 m: 100 até 20 de dano</span>
-          <span class="dica" style="font-size:11px">Explode 3 s depois de jogar. Parede entre você e a granada protege. $ 300 cada, máx. 2.</span>
-        </div></div></div>`), 'armas');
-    t.prepend(topo('ARSENAL', telaInicio, abas, '<span class="dica">cabeça = corpo × 2,5 · de longe cai até 30%</span>'));
-    for (const b of $$('[data-aba]', t)) b.onclick = () => telaArmas(b.dataset.aba);
+  const skinsDe = (a) => SKINS_ARMA.filter((s) => s.arma === a.key);
+  const minhas = (a) => skinsDe(a).filter((s) => conta.temSkinArma(s));
+  const equipada = (a) => { const sk = conta.skinArma(a.key); return SKINS_ARMA.find((x) => x.arma === a.key && x.key === sk) || null; };
+  const imgArma = (a) => { const s = equipada(a); return `armas/${a.key}${s ? '_' + s.key : ''}.png`; };
+  const arma = ARMAS.find((a) => a.key === armaSel);
+  if (!arma) {
+    const t = mostrar(html(`<div class="tela" style="gap:10px"><div class="arsenal-grade" id="ar-grade"></div></div>`), 'armas');
+    t.prepend(topo('ARSENAL', telaInicio, '', '<span class="dica">toque numa arma para ver e equipar as skins</span>'));
+    $('#ar-grade', t).innerHTML = ARMAS.map((a) => {
+      const s = equipada(a), n = minhas(a).length, total = skinsDe(a).length;
+      return `<button class="arsenal-card ${s ? 'raro-' + s.raridade : ''}" data-arma="${a.key}">
+        <img src="${imgArma(a)}" alt="" onerror="this.src='armas/${a.key}.png'">
+        <span class="bebas nome">${esc(a.nome)}</span>
+        <span class="skin">${s ? esc(s.nome.replace(a.nome + ' ', '')) : 'Padrão'}</span>
+        <span class="conta-skins">${n} de ${total} skin${total === 1 ? '' : 's'}${a.luneta ? ' · luneta' : a.key === 'tt33' ? ' · pistola' : ''}</span></button>`;
+    }).join('');
+    for (const b of $$('[data-arma]', t)) b.onclick = () => telaArmas(b.dataset.arma);
     return;
   }
-  // Minhas skins: cada arma com a pintura padrão e as skins compradas; tocar equipa (vale no jogo e no online)
-  const minhas = (a) => SKINS_ARMA.filter((s) => s.arma === a.key && conta.temSkinArma(s));
-  const armas = ARMAS.filter((a) => SKINS_ARMA.some((s) => s.arma === a.key));
-  let atual = armas.find((a) => a.key === armaSel) || armas.find((a) => minhas(a).length) || armas[0];
   const t = mostrar(html(`<div class="tela" style="gap:10px">
     <div class="linha cresce" style="align-items:stretch;gap:14px;min-height:0">
-      <div class="coluna arsenal-armas" id="ar-armas"></div>
-      <div class="coluna cresce" style="gap:10px;min-width:0;min-height:0">
-        <div class="arsenal-equipada" id="ar-eq"></div>
-        <div class="grade-itens" id="ar-skins" style="grid-template-columns:repeat(4,minmax(0,1fr))"></div>
-      </div></div></div>`), 'armas');
-  t.prepend(topo('ARSENAL', telaInicio, abas, chipMoedas(false)));
-  for (const b of $$('[data-aba]', t)) b.onclick = () => telaArmas(b.dataset.aba);
+      <div class="arsenal-equipada coluna" id="ar-eq"></div>
+      <div class="grade-itens cresce" id="ar-skins" style="grid-template-columns:repeat(3,minmax(0,1fr))"></div>
+    </div></div>`), 'armas');
+  t.prepend(topo('ARSENAL · ' + arma.nome.toUpperCase(), () => telaArmas(), '', chipMoedas(false)));
   const desenhar = () => {
-    $('#ar-armas', t).innerHTML = armas.map((a) => {
-      const sk = conta.skinArma(a.key), s = SKINS_ARMA.find((x) => x.arma === a.key && x.key === sk);
-      return `<button class="arsenal-arma ${a === atual ? 'sel' : ''}" data-arma="${a.key}"><b>${esc(a.nome)}</b>
-        <span class="dica">${s ? esc(s.nome.replace(a.nome + ' ', '')) : 'padrão'} · ${minhas(a).length} skin${minhas(a).length === 1 ? '' : 's'}</span></button>`;
-    }).join('');
-    for (const b of $$('[data-arma]', t)) b.onclick = () => { atual = armas.find((a) => a.key === b.dataset.arma); desenhar(); };
-    const sk = conta.skinArma(atual.key), s = SKINS_ARMA.find((x) => x.arma === atual.key && x.key === sk);
+    const s = equipada(arma);
     const giro = s ? `${s.arma}_${s.key}` : '';
-    $('#ar-eq', t).innerHTML = `<div class="coluna" style="gap:2px;min-width:0"><span class="dica" style="font-size:11px;font-weight:800;letter-spacing:2px">EQUIPADA NA ${esc(atual.nome.toUpperCase())}</span>
-      <span class="bebas" style="font-size:30px">${esc(s ? s.nome : atual.nome + ' padrão')}</span>
-      ${s ? `<span class="etiqueta fundo-${s.raridade}" style="align-self:flex-start">${RARIDADES[s.raridade].toUpperCase()}</span>` : '<span class="dica">sem skin</span>'}</div>
-      ${s ? (GIRO[giro] ? `<button class="ver360" id="ar-360" aria-label="Ver em 360 graus"><img src="armas/${giro}.png" alt=""><span class="selo360">360°</span></button>` : `<img src="armas/${giro}.png" alt="">`) : ''}`;
+    $('#ar-eq', t).innerHTML = `<span class="dica" style="font-size:11px;font-weight:800;letter-spacing:2px">EQUIPADA</span>
+      <span class="bebas" style="font-size:28px;line-height:1">${esc(s ? s.nome : arma.nome + ' padrão')}</span>
+      ${s ? `<span class="etiqueta fundo-${s.raridade}" style="align-self:flex-start">${RARIDADES[s.raridade].toUpperCase()}</span>` : '<span class="dica">sem skin</span>'}
+      ${s && GIRO[giro] ? `<button class="ver360" id="ar-360" aria-label="Ver em 360 graus"><img src="armas/${giro}.png" alt=""><span class="selo360">360°</span></button>`
+        : `<img src="${imgArma(arma)}" alt="">`}
+      <span class="dica">${minhas(arma).length} de ${skinsDe(arma).length} skins desta arma são suas</span>`;
     const v = $('#ar-360', t);
     if (v) v.onclick = () => abrirArma360(giro, s.nome);
-    const lista = minhas(atual);
-    $('#ar-skins', t).innerHTML = `<button class="item ${!sk ? 'sel' : ''}" data-skin=""><span class="arsenal-padrao bebas">${esc(atual.nome)}</span><span class="n">Padrão</span>
+    const sk = conta.skinArma(arma.key);
+    $('#ar-skins', t).innerHTML = `<button class="item ${!sk ? 'sel' : ''}" data-skin=""><img src="armas/${arma.key}.png" alt=""><span class="n">Padrão</span>
         <span class="p ${!sk ? 'verde' : 'azul'}">${!sk ? 'EQUIPADA' : 'EQUIPAR'}</span></button>` +
-      lista.map((x) => `<button class="item ${x.key === sk ? 'sel' : ''}" data-skin="${x.key}"><img src="armas/${x.arma}_${x.key}.png" alt=""><span class="n">${esc(x.nome)}</span>
-        <span class="r raridade-${x.raridade}">${RARIDADES[x.raridade]}</span><span class="p ${x.key === sk ? 'verde' : 'azul'}">${x.key === sk ? 'EQUIPADA' : 'EQUIPAR'}</span></button>`).join('') +
-      `<button class="item" id="ar-loja"><span class="arsenal-padrao" style="font-size:28px">＋</span><span class="n">Mais skins</span><span class="p amarelo">MERCADO</span></button>`;
-    for (const b of $$('[data-skin]', t)) b.onclick = () => { conta.usarSkinArma(atual.key, b.dataset.skin); desenhar(); };
-    $('#ar-loja', t).onclick = () => telaMercado(atual.key);
+      skinsDe(arma).sort((a, b) => conta.temSkinArma(b) - conta.temSkinArma(a)).map((x) => {
+        const tem = conta.temSkinArma(x);
+        return `<button class="item ${x.key === sk ? 'sel' : ''} ${tem ? '' : 'travado'}" ${tem ? `data-skin="${x.key}"` : `data-loja="${x.key}"`}>
+          <img src="armas/${x.arma}_${x.key}.png" alt=""><span class="n">${esc(x.nome)}</span>
+          <span class="r raridade-${x.raridade}">${RARIDADES[x.raridade]}</span>
+          <span class="p ${x.key === sk ? 'verde' : tem ? 'azul' : 'amarelo'}">${x.key === sk ? 'EQUIPADA' : tem ? 'EQUIPAR' : `🔒 ${ICONE.moeda(11)} ${fmt(x.preco)}`}</span></button>`;
+      }).join('');
+    for (const b of $$('[data-skin]', t)) b.onclick = () => { conta.usarSkinArma(arma.key, b.dataset.skin); desenhar(); };
+    for (const b of $$('[data-loja]', t)) b.onclick = () => telaMercado(arma.key, `skin_arma:${arma.key}:${b.dataset.loja}`);
   };
   desenhar();
 }

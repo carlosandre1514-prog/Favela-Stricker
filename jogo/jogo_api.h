@@ -15,6 +15,8 @@ void        jogo_escolhas(Engine*, int time, int roupa, const char* principal, c
 void        jogo_modo(Engine*, int modo);                                   // 0 Polícia x Bandidos, 1 Ressurgência
 void        jogo_skin_arma(Engine*, const char* arma, const char* skin);   // skin da arma do jogador ("" = padrão)
 const char* jogo_aparencia_roupa(int time, int roupa);                      // aparência do boneco da roupa (JSON)
+void        jogo_aquecimento(Engine*, float segundos);   // antes do Play: aquecimento (0 = sem); na partida: encurta (0 = já vale)
+int         jogo_equipar(Engine*, const char* arma);     // no aquecimento: troca a arma principal (1 se trocou)
 
 // Na partida
 const char* jogo_hud(Engine*);                       // estado para o HUD (JSON)

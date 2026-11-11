@@ -9,5 +9,5 @@ window.CONFIG_JOGO = {
     "projectId": "navegador-f06a8"
   },
   "servidor": "",
-  "googleClientId": ""
+  "googleClientId": "55916264760-aiisdj12jfphvq35q3k8arhvl6o6ai1l.apps.googleusercontent.com"
 };

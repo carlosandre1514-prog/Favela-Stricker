@@ -58,6 +58,8 @@ EMSCRIPTEN_KEEPALIVE void web_camera(float tx, float ty, float tz, float yaw, fl
 EMSCRIPTEN_KEEPALIVE void web_olhar(float dx, float dy) { if (g) engine_look(g, dx, dy); }
 EMSCRIPTEN_KEEPALIVE void web_primeira_pessoa(int on) { if (g) engine_set_first_person(g, on); }
 EMSCRIPTEN_KEEPALIVE void web_modo(int m) { if (g) jogo_modo(g, m); }
+EMSCRIPTEN_KEEPALIVE void web_aquecimento(float s) { if (g) jogo_aquecimento(g, s); }
+EMSCRIPTEN_KEEPALIVE int web_equipar(const char* arma) { return g ? jogo_equipar(g, arma) : 0; }
 EMSCRIPTEN_KEEPALIVE void web_escolhas(int team, int skin, const char* primary, const char* secondary) { if (g) jogo_escolhas(g, team, skin, primary, secondary); }
 EMSCRIPTEN_KEEPALIVE void web_skin_arma(const char* gun, const char* skin) { if (g) jogo_skin_arma(g, gun, skin); }
 EMSCRIPTEN_KEEPALIVE const char* web_hud() { return g ? jogo_hud(g) : "{}"; }

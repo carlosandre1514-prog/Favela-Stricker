@@ -1271,6 +1271,50 @@ int main(int argc, char** argv) {
         return g_fail ? 1 : 0;
     }
     // Offline: inimigo abatido derruba munição; a vida volta fora do combate (SO_DROP=1)
+    // Aquecimento (SO_AQUECIMENTO=1): abate não conta, troca de arma funciona, no fim zera e começa a valer
+    if (std::getenv("SO_AQUECIMENTO")) {
+        using nlohmann::json;
+        eng::Engine* E = reinterpret_cast<eng::Engine*>(e);
+        for (int modo = 0; modo < 2; ++modo) {
+            abrirPartida();
+            jogo_modo(e, modo);
+            jogo_escolhas(e, 0, 0, "m4a1", "tt33");
+            jogo_aquecimento(e, 2.f);
+            engine_set_first_person(e, 1);
+            engine_set_play(e, 1);
+            frames(e, 10);
+            eng::TeamMatch& M = eng::matchOf(E);
+            auto hud = [&]() { return json::parse(std::string(jogo_hud(e))); };
+            const int pf = eng::playerFighter(E);
+            int en = -1;
+            for (size_t i = 0; i < M.f.size(); ++i) if (M.f[i].bot && M.f[i].team != M.f[pf].team && en < 0) en = int(i);
+            json h = hud();
+            std::printf("  [%s] aquecimento no HUD: %d s\n", modo ? "Ressurgência" : "PvB", h.value("aquecimento", 0));
+            if (h.value("aquecimento", 0) <= 0) { std::printf("  [ERRO] sem aquecimento\n"); ++g_fail; }
+            if (!jogo_equipar(e, "ak74_tatica") || M.f[pf].primary != "ak74_tatica") { std::printf("  [ERRO] não equipou\n"); ++g_fail; }
+            if (en >= 0) { M.attacker = pf; E->module->onDamage(E, E->scene.get(M.f[en].root), 500.f); M.attacker = -1; }
+            std::printf("  abate no aquecimento: abates %d · placar %d x %d · inimigo caiu %s\n", M.f[pf].kills, M.score[0], M.score[1], en >= 0 && M.f[en].dead ? "sim" : "não");
+            if (M.f[pf].kills != 0 || M.score[0] + M.score[1] != 0) { std::printf("  [ERRO] o abate contou no aquecimento\n"); ++g_fail; }
+            for (int q = 0; q < 200 && M.aquecimento > 0.f; ++q) { E->game.playerHp = E->game.playerMax; engine_frame(e, 1.f / 30.f); }
+            frames(e, 3);
+            h = hud();
+            int mortos = 0;
+            for (const auto& f : M.f) mortos += f.dead && !f.remote;
+            std::printf("  depois: aquecimento %d · tempo %d · placar %d x %d · mortos %d · arma %s · msg '%s'\n", h.value("aquecimento", 0), h.value("tempo", -1),
+                        M.score[0], M.score[1], mortos, M.f[pf].primary.c_str(), E->game.message.c_str());
+            if (h.value("aquecimento", 0) != 0 || mortos != 0 || M.f[pf].primary != "ak74_tatica") { std::printf("  [ERRO] o fim do aquecimento não zerou\n"); ++g_fail; }
+            if (jogo_equipar(e, "m4a1")) { std::printf("  [ERRO] equipou depois de valer\n"); ++g_fail; }
+            if (en >= 0) { M.attacker = pf; E->module->onDamage(E, E->scene.get(M.f[en].root), 500.f); M.attacker = -1; }
+            std::printf("  abate valendo: abates %d\n", M.f[pf].kills);
+            if (M.f[pf].kills != 1) { std::printf("  [ERRO] o abate não contou depois de valer\n"); ++g_fail; }
+            engine_set_play(e, 0);
+            jogo_aquecimento(e, 0.f);
+            jogo_modo(e, 0);
+        }
+        engine_destroy(e);
+        std::printf(g_fail ? "FALHOU\n" : "OK\n");
+        return g_fail ? 1 : 0;
+    }
     if (std::getenv("SO_DROP")) {
         eng::Engine* E = reinterpret_cast<eng::Engine*>(e);
         abrirPartida();
