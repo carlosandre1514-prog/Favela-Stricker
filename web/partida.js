@@ -236,6 +236,7 @@ function montarHud(online, br = false) {
     <div id="teclas" class="so-teclado">WASD andar · Shift correr · mouse olhar · clique atirar · botão direito mirar · Espaço pular · C agachar · R recarregar · Q trocar arma · G granada · E loja${online ? ' · V microfone (liga/desliga)' : ''} · Esc pausa</div>
   </div>`), 'hud');
   partida.hud = t;
+  aplicarOpacidadeHud();
   posicionarTodas(t);
   $('#pausar', t).onclick = pausar;
   $('#botao-loja', t).onclick = () => {
@@ -627,10 +628,11 @@ function pausar() {
   const c = html(`<div class="camada fixo"><div class="janela" style="width:400px">
     <span class="t">PAUSA</span>
     ${ajusteHtml('sens', 'Câmera', 0.2, 3, 0.05)}${ajusteHtml('sensMira', 'Mirando', 0.2, 2, 0.05)}${ajusteHtml('sensLuneta', 'Luneta', 0.1, 1.5, 0.05)}
+    ${ajusteHtml('opacidadeHud', 'Opacidade do HUD', 0.3, 1, 0.05, '', (v) => Math.round(v * 100) + '%')}
     <div class="linha" style="margin-top:4px"><button class="btn btn-fraco" id="p-sair">Sair da partida</button><span class="cresce"></span><button class="btn btn-ouro" id="p-voltar">Continuar</button></div>
   </div></div>`);
   palco.appendChild(c);
-  ligarAjustes(c);
+  ligarAjustes(c, { opacidadeHud: (v) => Math.round(v * 100) + '%' });
   $('#p-voltar', c).onclick = () => { c.remove(); if (!TOQUE) travarMouse(); };
   $('#p-sair', c).onclick = async () => {
     c.remove();
@@ -638,6 +640,16 @@ function pausar() {
       pararPartida(); sairDaSala(); telaInicio();
     }
   };
+}
+
+// Opacidade do HUD: um fator (0,3 a 1) por cima da transparência de cada peça (editor do HUD). Só o visual: o toque
+// continua igual (filter não muda a área dos botões). Não vale para a mira do centro, os avisos e a luneta.
+function aplicarOpacidadeHud() {
+  const v = Math.min(1, Math.max(0.3, Number(config.opacidadeHud) || 1));
+  const h = partida && partida.hud;
+  if (h) h.style.setProperty('--hud-op', v);
+  const ed = document.getElementById('editor-hud');
+  if (ed) ed.style.setProperty('--hud-op', v);
 }
 
 // controle deslizante de configuração (usado na pausa e nas configurações)
@@ -653,6 +665,7 @@ function ligarAjustes(raiz, fmtValores = {}) {
       v.textContent = (fmtValores[k] || ((x) => x.toFixed(2)))(config[k]);
       salvarConfig();
       if (k === 'volume') motor.volume(config.volume);
+      if (k === 'opacidadeHud') { aplicarOpacidadeHud(); salvarConta(); }
     };
   }
 }
@@ -824,7 +837,7 @@ function ligarAoVivo(s, time, br = false) {
   status('conectando ao servidor…', false);
   voz = new ChatDeVoz((pcm) => { if (ws && ws.readyState === 1 && ws.bufferedAmount < 32768) ws.send(PROTO.codificarVoz(pcm)); });
   const base = SERVIDOR.replace(/^http/, 'ws');
-  const url = `${base}/partida?sala=${encodeURIComponent(s.codigo)}&id=${encodeURIComponent(fb.uid)}&time=${time}&v=${PROTO.VERSAO}${br ? '&modo=br' : ''}`;
+  const url = `${base}/partida?sala=${encodeURIComponent(s.codigo)}&id=${encodeURIComponent(fb.uid)}&time=${time}&v=${PROTO.VERSAO}${br ? '&modo=br' : ''}&plat=${PLATAFORMA}`;
   let vagas = {};  // número da vaga no pacote -> id da pessoa (o servidor manda quando alguém entra ou sai)
   let tentativas = 0, abriuUmaVez = false;
   const inicio = Date.now();

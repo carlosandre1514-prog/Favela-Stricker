@@ -177,7 +177,9 @@ function atualizarChuva() {
     chuva = { ganho: a.createGain(), fonte: null, carregando: true };
     chuva.ganho.gain.value = 0;
     chuva.ganho.connect(a.destination);
-    fetch('sons/chuva.ogg').then((r) => (r.ok ? r.arrayBuffer() : Promise.reject())).then((d) => a.decodeAudioData(d))
+    // iPhone/iPad (Safari) antigos não tocam ogg: a mesma chuva em m4a
+    const ogg = document.createElement('audio').canPlayType('audio/ogg; codecs="vorbis"');
+    fetch(ogg ? 'sons/chuva.ogg' : 'sons/chuva.m4a').then((r) => (r.ok ? r.arrayBuffer() : Promise.reject())).then((d) => a.decodeAudioData(d))
       .then((buf) => {
         const src = a.createBufferSource();
         src.buffer = buf; src.loop = true;
@@ -239,7 +241,7 @@ async function iniciarMotor(aoProgresso) {
   M.aposQuadro = aposQuadroSite;
   aoProgresso && aoProgresso('Preparando o mapa…');
   await new Promise((r) => setTimeout(r, 30));
-  if (!M.ccall('web_iniciar', 'number', ['number'], [motor.nivel()])) throw new Error('Seu navegador não tem WebGL 2. Use o Chrome ou o Firefox atualizados.');
+  if (!M.ccall('web_iniciar', 'number', ['number'], [motor.nivel()])) throw new Error(PLATAFORMA === 'ios' ? 'Seu iPhone/iPad precisa do iOS 15 ou mais novo (WebGL 2). Atualize o sistema e abra pelo Safari.' : 'Seu navegador não tem WebGL 2. Use o Chrome ou o Firefox atualizados.');
   // o mapa fica guardado e só abre na primeira partida (barracas de roupa fora: roupa é no mercado)
   projetoPartida = await (await fetch('exemplos/5_policia_x_bandidos.json')).json();
   projetoPartida.objetos = (projetoPartida.objetos || []).filter((o) => !(o.tipo === 'loja' && o.loja === 'roupas'));

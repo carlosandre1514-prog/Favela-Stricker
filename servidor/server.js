@@ -48,7 +48,9 @@ const servidor = http.createServer(async (req, res) => {
   if (url.pathname === '/saude') { res.writeHead(200, { 'Content-Type': 'text/plain' }); res.end('ok'); return; }
   if (url.pathname === '/api/estado') {  // quantas pessoas jogando agora (para acompanhar a carga)
     res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' });
-    res.end(JSON.stringify({ conexoes: wss.clients.size, salas: salas.size, max_conexoes: MAX_CONEXOES }));
+    const porPlataforma = { android: 0, pc: 0, ios: 0 };
+    for (const s of salas.values()) for (const p of s.values()) porPlataforma[p.plat] = (porPlataforma[p.plat] || 0) + 1;
+    res.end(JSON.stringify({ conexoes: wss.clients.size, salas: salas.size, max_conexoes: MAX_CONEXOES, por_plataforma: porPlataforma }));
     return;
   }
   let arq = path.normalize(decodeURIComponent(url.pathname)).replace(/^([/\\])+/, '');
@@ -150,6 +152,7 @@ wss.on('connection', (ws, req) => {
   const codigo = (q.get('sala') || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8);
   const id = (q.get('id') || '').slice(0, 64);
   const time = q.get('time') === '1' ? 1 : 0;
+  const plat = ['android', 'pc', 'ios'].includes(q.get('plat')) ? q.get('plat') : 'android';  // só para contar (o jogo é igual)
   if (q.get('v') !== '2') { ws.close(4003, 'atualize o jogo'); return; }
   if (!codigo || !id) { ws.close(4000, 'sala e id obrigatórios'); return; }
   if (wss.clients.size > MAX_CONEXOES) { ws.close(4004, 'servidores cheios'); return; }
@@ -166,7 +169,7 @@ wss.on('connection', (ws, req) => {
   const usadas = new Set([...sala.values()].map((p) => p.vaga));
   let vaga = 0;
   while (usadas.has(vaga)) vaga++;
-  const eu = { ws, time, vaga, id, estado: null, novo: false };
+  const eu = { ws, time, vaga, id, estado: null, novo: false, plat };
   sala.set(id, eu);
   avisarVagas(sala);
   ws.vivo = true;

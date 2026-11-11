@@ -420,3 +420,6 @@ body.menu-fundo canvas#tela { visibility: hidden; }
 .item-presente { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 8px; border-radius: 10px; border: 1px solid rgba(255,255,255,.12); color: #fff; font-size: 12px; cursor: pointer; }
 .item-presente img { width: 100%; height: 44px; object-fit: contain; }
 .item-presente span { display: inline-flex; gap: 4px; align-items: center; color: #FCD34D; font-weight: 800; }
+
+/* opacidade do HUD (configurações): vale para os controles e as informações, não para a mira, avisos e luneta */
+#hud > :not(#luneta):not(#dano):not(#centro):not(#mira):not(#zona-andar):not(#zona-olhar):not(#fora-zona):not(.camada) { filter: opacity(var(--hud-op, 1)); }

@@ -139,6 +139,7 @@ const CONFIG_PADRAO = {
   volumeVoz: 1.0,     // chat de voz do time
   vibrar: true,
   medidor: true,      // FPS, tempo do quadro e ping na partida
+  opacidadeHud: 1,    // transparência dos controles e informações da partida (0,3 a 1); vai junto com a conta
 };
 const config = Object.assign({}, CONFIG_PADRAO, guardado.get('config', {}));
 function salvarConfig() { guardado.set('config', config); }
@@ -260,7 +261,7 @@ const novoFirebase = () => (CONFIG.firebase && CONFIG.firebase.apiKey ? new Fire
 function contaJson() {
   const itens = {};
   for (const i of conta.itens()) itens[i.replace(/:/g, '|')] = true;  // ':' não pode em chave do Firebase
-  return { nome: conta.nome(), moedas: conta.moedas, xp: conta.xp, itens, atualizado: { '.sv': 'timestamp' } };
+  return { nome: conta.nome(), moedas: conta.moedas, xp: conta.xp, itens, opacidadeHud: config.opacidadeHud, atualizado: { '.sv': 'timestamp' } };
 }
 let salvando = null;
 function salvarConta() {
@@ -285,6 +286,7 @@ async function carregarConta() {
     guardado.set('xp', Math.max(conta.xp, r.dado.xp | 0));  // XP só sobe (não perde o que foi feito sem internet)
     guardado.set('itens', Object.keys(r.dado.itens || {}).map((k) => k.replace(/\|/g, ':')));
     if (r.dado.nome) guardado.set('nome', r.dado.nome);
+    if (typeof r.dado.opacidadeHud === 'number') { config.opacidadeHud = Math.min(1, Math.max(0.3, r.dado.opacidadeHud)); salvarConfig(); }
   } catch (_) {}
 }
 

@@ -100,9 +100,21 @@ async function comecarLogin() {
 }
 
 // ---------------- tela inicial ----------------
+// Vitrine da tela inicial: novidades primeiro, depois raridade e preço (tendo ou não a skin). Roda a cada 3 horas
+// entre as 6 primeiras, com as novidades aparecendo mais vezes; nunca a mesma duas vezes seguidas no mesmo aparelho.
+const PESO_RARIDADE = { lendaria: 4, epica: 3, rara: 2, comum: 1 };
 function destaqueDoMercado() {
-  const naoTem = SKINS_ARMA.filter((s) => !conta.temSkinArma(s));
-  return naoTem.sort((a, b) => b.preco - a.preco)[0] || SKINS_ARMA[0];
+  const ultimaVersao = Math.max(...SKINS_ARMA.map((s) => s.desde || 0));
+  const ordem = SKINS_ARMA.slice().sort((a, b) => (b.desde || 0) - (a.desde || 0) || PESO_RARIDADE[b.raridade] - PESO_RARIDADE[a.raridade] || b.preco - a.preco);
+  const top = ordem.slice(0, 6);
+  const vitrine = [...top, ...top.filter((s) => (s.desde || 0) >= ultimaVersao)];  // as novidades passam duas vezes por volta
+  const vez = Math.floor(Date.now() / (3 * 3600 * 1000));
+  let d = vitrine[vez % vitrine.length];
+  const anterior = guardado.get('destaque_ultimo', {});
+  if (anterior.vez !== vez && anterior.key === d.arma + ':' + d.key) d = vitrine[(vez + 1) % vitrine.length];  // não repete
+  if (anterior.vez !== vez) guardado.set('destaque_ultimo', { vez, key: d.arma + ':' + d.key });
+  else d = SKINS_ARMA.find((s) => s.arma + ':' + s.key === anterior.key) || d;
+  return { ...d, novo: (d.desde || 0) >= ultimaVersao, tem: conta.temSkinArma(d) };
 }
 // Cartão da conta (tela inicial): insígnia da patente, nome, nível, patente e barra de XP
 function cartaoConta() {
@@ -188,7 +200,8 @@ function telaInicio() {
     ${bonecoInicio()}
     <span class="versao">Favela Strike ${esc(VERSAO)}</span>
     <button class="destaque" data-ir="mercado">
-      <div class="linha" style="gap:8px"><span class="etiqueta fundo-${d.raridade}">${RARIDADES[d.raridade].toUpperCase()}</span><span class="dica" style="color:#D1D5DB">Destaque do mercado</span></div>
+      <div class="linha" style="gap:8px"><span class="etiqueta fundo-${d.raridade}">${RARIDADES[d.raridade].toUpperCase()}</span>${d.novo ? '<span class="etiqueta" style="background:#DC2626;color:#fff">NOVO</span>' : ''}
+        <span class="dica" style="color:#D1D5DB">${d.tem ? 'Você já tem · destaque do mercado' : 'Destaque do mercado'}</span></div>
       <img src="armas/${d.arma}_${d.key}.png" alt="${esc(d.nome)}">
       <div class="linha" style="justify-content:space-between"><span class="bebas" style="font-size:21px">${esc(d.nome.toUpperCase().replace(' ', ' · '))}</span>
         <span class="linha" style="gap:6px;font-size:15px;font-weight:800;color:#FCD34D">${ICONE.moeda(14)} ${fmt(d.preco)}</span></div>
@@ -506,7 +519,9 @@ function telaConfig(aba = 'sens') {
   } else if (aba === 'hud') {
     c.innerHTML = `<div class="cartao coluna"><span class="bebas" style="font-size:26px">MONTE O SEU HUD</span>
       <span class="dica">Arraste cada botão para onde quiser, deixe maior ou menor e mais ou menos visível. Vale para todas as partidas.</span>
-      <div class="linha"><button class="btn btn-ouro" id="c-editar">Editar o HUD</button><button class="btn btn-fraco" id="c-hud-padrao">Voltar ao padrão</button></div></div>`;
+      <div class="linha"><button class="btn btn-ouro" id="c-editar">Editar o HUD</button><button class="btn btn-fraco" id="c-hud-padrao">Voltar ao padrão</button></div></div>
+      ${ajusteHtml('opacidadeHud', 'Opacidade do HUD', 0.3, 1, 0.05, 'botões, vida, munição, minimapa e placar durante a partida (salvo na sua conta)', (v) => Math.round(v * 100) + '%')}`;
+    ligarAjustes(c, { opacidadeHud: (v) => Math.round(v * 100) + '%' });
     $('#c-editar', c).onclick = () => abrirEditorHud(() => telaConfig('hud'));
     $('#c-hud-padrao', c).onclick = () => { guardado.del('hud_layout'); layout = carregarLayout(); aviso('HUD de volta ao padrão'); };
   } else if (aba === 'creditos') {
