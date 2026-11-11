@@ -423,3 +423,83 @@ body.menu-fundo canvas#tela { visibility: hidden; }
 
 /* opacidade do HUD (configurações): vale para os controles e as informações, não para a mira, avisos e luneta */
 #hud > :not(#luneta):not(#dano):not(#centro):not(#mira):not(#zona-andar):not(#zona-olhar):not(#fora-zona):not(.camada) { filter: opacity(var(--hud-op, 1)); }
+
+/* login: cartão de vidro (transparente) por cima do mapa */
+.tela-login { flex-direction: row; align-items: center; justify-content: space-between; padding: 22px 34px; gap: 24px; }
+.login-marca { gap: 6px; }
+.login-lema { font-size: 12px; color: #E5E7EB; letter-spacing: 3px; font-weight: 700; }
+.login-sub { font-size: 12px; color: #9CA3AF; }
+.cartao-login { width: 340px; gap: 9px; padding: 16px 18px; border-radius: 18px; background: rgba(11,15,23,.42); border: 1px solid rgba(255,255,255,.14);
+  backdrop-filter: blur(14px) saturate(1.2); -webkit-backdrop-filter: blur(14px) saturate(1.2); box-shadow: 0 18px 40px rgba(0,0,0,.35); }
+.cartao-login input { background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.16); }
+.login-abas { gap: 6px; }
+.login-abas .aba { flex: 1; justify-content: center; }
+.btn-google { display: flex; align-items: center; justify-content: center; gap: 10px; background: #fff; color: #1F2937; font-weight: 700; height: 42px; border-radius: 10px; }
+.login-google-site { display: flex; justify-content: center; min-height: 44px; }
+.login-ou { display: flex; align-items: center; gap: 10px; color: #9CA3AF; font-size: 11px; letter-spacing: 1px; text-transform: uppercase; }
+.login-ou::before, .login-ou::after { content: ""; flex: 1; height: 1px; background: rgba(255,255,255,.15); }
+.login-esqueci { align-self: flex-end; }
+
+[hidden] { display: none !important; }
+
+/* Jogar: abas ONLINE / OFFLINE e os cartões dos modos */
+.segmento { display: flex; align-self: flex-start; gap: 4px; padding: 4px; border-radius: 12px; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.1); }
+.segmento button { display: flex; align-items: center; gap: 8px; padding: 8px 22px; border-radius: 9px; font-family: 'Bebas Neue', Impact, sans-serif; font-size: 22px; letter-spacing: 1px; color: #9CA3AF; }
+.segmento button.sel { background: #FBBF24; color: #111827; }
+.modos { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 14px; flex: 1; min-height: 0; }
+.modo-cartao { display: flex; flex-direction: column; gap: 8px; text-align: left; padding: 14px 16px; border-radius: 16px; color: #F9FAFB;
+  background: linear-gradient(160deg, color-mix(in srgb, var(--cor) 32%, #0B0F17), #0B0F17 75%); border: 1px solid color-mix(in srgb, var(--cor) 55%, transparent);
+  transition: transform .12s, border-color .12s; }
+.modo-cartao:hover, .modo-cartao:focus-visible { transform: translateY(-2px); border-color: var(--cor); outline: none; }
+.modo-cartao .icone { width: 42px; height: 42px; border-radius: 12px; display: flex; align-items: center; justify-content: center; }
+.modo-cartao .nome { font-family: 'Bebas Neue', Impact, sans-serif; font-size: 28px; letter-spacing: 1px; line-height: 1; }
+.modo-cartao .sub { font-size: 10px; font-weight: 800; letter-spacing: 2px; color: color-mix(in srgb, var(--cor) 45%, #fff); }
+.modo-cartao .texto { font-size: 12px; line-height: 1.45; color: #E5E7EB; }
+.modo-cartao .tag { background: color-mix(in srgb, var(--cor) 25%, transparent); color: #F3F4F6; font-size: 10px; padding: 3px 8px; border-radius: 999px; }
+.modo-cartao .rodape { font-size: 11px; color: #D1D5DB; }
+.modo-cartao .entrar { background: var(--cor); color: #fff; font-weight: 800; font-size: 13px; padding: 7px 16px; border-radius: 9px; }
+
+/* escolher o personagem: o escolhido grande à esquerda; na Ressurgência, o lado em cima */
+.tela-roupa { --lado: #3B82F6; }
+.tela-roupa.lado-ban { --lado: #F59E0B; }
+.roupa-palco { position: relative; width: 230px; flex: none; border-radius: 18px; overflow: hidden; display: flex; align-items: flex-end; justify-content: center;
+  background: radial-gradient(ellipse at 50% 70%, color-mix(in srgb, var(--lado) 45%, transparent), transparent 70%), linear-gradient(180deg, rgba(255,255,255,.04), rgba(0,0,0,.35));
+  border: 1px solid color-mix(in srgb, var(--lado) 50%, transparent); }
+.roupa-palco img { position: absolute; inset: 8px 0 54px; width: 100%; height: calc(100% - 62px); object-fit: contain; filter: drop-shadow(0 10px 18px rgba(0,0,0,.55)); }
+.roupa-nome { position: relative; width: 100%; padding: 8px 12px 10px; background: linear-gradient(0deg, rgba(0,0,0,.75), transparent); display: flex; flex-direction: column; }
+.roupa-nome .bebas { font-size: 32px; line-height: 1; }
+.lado-tag { font-size: 10px; font-weight: 800; letter-spacing: 2px; color: color-mix(in srgb, var(--lado) 55%, #fff); }
+.lados-roupa { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.lados-roupa button { display: flex; align-items: baseline; justify-content: center; gap: 10px; padding: 8px; border-radius: 12px; border: 1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.04); color: #D1D5DB; }
+.lados-roupa button .bebas { font-size: 26px; }
+.lados-roupa button small { font-size: 11px; color: #9CA3AF; }
+.lados-roupa button[data-lado="0"].sel { background: rgba(59,130,246,.22); border-color: #3B82F6; color: #DBEAFE; }
+.lados-roupa button[data-lado="1"].sel { background: rgba(245,158,11,.2); border-color: #F59E0B; color: #FEF3C7; }
+.grade-roupas { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; flex: 1; min-height: 0; }
+.roupa-item { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 2px; padding: 6px 4px 7px; border-radius: 12px; min-height: 0;
+  background: linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.07)); border: 1px solid rgba(255,255,255,.1); color: #F3F4F6; overflow: hidden; }
+.roupa-item img { flex: 1 1 0; min-height: 0; height: 0; width: 100%; object-fit: contain; }
+.roupa-item .n { font-size: 13px; font-weight: 800; }
+.roupa-item .p { font-size: 10px; font-weight: 700; color: #86EFAC; }
+.roupa-item.sel { border-color: var(--lado); background: color-mix(in srgb, var(--lado) 22%, transparent); box-shadow: 0 0 0 1px var(--lado) inset; }
+.roupa-item.sel .p { color: #FCD34D; }
+.coluna-time { text-align: left; align-items: flex-start; cursor: pointer; transition: transform .12s, box-shadow .12s; }
+.coluna-time:hover, .coluna-time:focus-visible { transform: translateY(-2px); outline: none; }
+.coluna-time.meu { box-shadow: 0 0 0 2px currentColor inset; }
+
+/* mercado: presente; arsenal: armas à esquerda, a equipada em destaque e as minhas skins */
+.btn-presente { background: linear-gradient(135deg, #DB2777, #9333EA); color: #fff; font-weight: 800; padding: 0 14px; }
+.arsenal-armas { width: 190px; flex: none; gap: 6px; overflow: auto; }
+.arsenal-arma { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; padding: 8px 12px; border-radius: 10px; text-align: left;
+  background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.1); color: #F3F4F6; }
+.arsenal-arma b { font-size: 15px; }
+.arsenal-arma.sel { border-color: #FBBF24; background: rgba(251,191,36,.14); }
+.arsenal-equipada { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 14px; border-radius: 14px; min-height: 110px;
+  background: linear-gradient(120deg, rgba(251,191,36,.16), rgba(255,255,255,.02)); border: 1px solid rgba(251,191,36,.35); }
+.arsenal-equipada img, .arsenal-equipada .ver360 { max-width: 55%; max-height: 100px; object-fit: contain; }
+.arsenal-padrao { flex: 1; display: flex; align-items: center; justify-content: center; font-size: 22px; color: #6B7280; }
+
+.filtro-armas { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; flex: none; }
+.filtro-armas button { flex: none; white-space: nowrap; padding: 5px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; color: #D1D5DB; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.1); }
+.filtro-armas button.sel { background: #FBBF24; color: #111827; border-color: #FBBF24; }
+.abas .aba { white-space: nowrap; }

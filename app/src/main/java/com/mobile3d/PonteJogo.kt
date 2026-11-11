@@ -46,6 +46,8 @@ class PonteJogo(private val jogo: JogoActivity) {
         jogo.runOnUiThread { jogo.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))) }
     }
     @JavascriptInterface fun fase(texto: String) { jogo.diag.fase = texto }
+    // login com a conta Google do celular: a resposta chega na página em window.aoLoginGoogle(token, erro)
+    @JavascriptInterface fun loginGoogle() { jogo.runOnUiThread { jogo.loginGoogle() } }
     @JavascriptInterface fun pronto(): Boolean = pronto
     // o mapa só carrega quando a partida vai começar (a tela inicial fica leve); a página espera mapaPronto()
     @JavascriptInterface fun prepararPartida() {

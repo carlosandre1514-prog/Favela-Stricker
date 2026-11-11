@@ -27,6 +27,15 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.FrameLayout
 import android.widget.TextView
+import androidx.credentials.CredentialManager
+import androidx.credentials.CredentialManagerCallback
+import androidx.credentials.CustomCredential
+import androidx.credentials.GetCredentialRequest
+import androidx.credentials.GetCredentialResponse
+import androidx.credentials.exceptions.GetCredentialCancellationException
+import androidx.credentials.exceptions.GetCredentialException
+import com.google.android.libraries.identity.googleid.GetGoogleIdOption
+import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.ByteArrayInputStream
@@ -283,6 +292,30 @@ class JogoActivity : Activity() {
     fun versao(): String = try { packageManager.getPackageInfo(packageName, 0).versionName ?: "" } catch (_: Exception) { "" }
 
     fun configJogo(): String = try { assets.open("config_jogo.json").bufferedReader().readText() } catch (_: Exception) { "{}" }
+
+    // Login com Google: escolhe a conta do celular (Credential Manager) e devolve o token de identidade para a página,
+    // que entra no Firebase com ele (o mesmo login do site). googleClientId: o "ID do cliente da Web" do Firebase.
+    fun loginGoogle() {
+        val responder = { token: String, erro: String ->
+            web.evaluateJavascript("window.aoLoginGoogle && window.aoLoginGoogle(${JSONObject.quote(token)}, ${JSONObject.quote(erro)})", null)
+        }
+        val cliente = try { JSONObject(configJogo()).optString("googleClientId", "") } catch (_: Exception) { "" }
+        if (cliente.isEmpty()) { responder("", "nao_configurado"); return }
+        val opcao = GetGoogleIdOption.Builder().setServerClientId(cliente).setFilterByAuthorizedAccounts(false).setAutoSelectEnabled(false).build()
+        val pedido = GetCredentialRequest.Builder().addCredentialOption(opcao).build()
+        CredentialManager.create(this).getCredentialAsync(this, pedido, null, mainExecutor,
+            object : CredentialManagerCallback<GetCredentialResponse, GetCredentialException> {
+                override fun onResult(result: GetCredentialResponse) {
+                    val c = result.credential
+                    if (c is CustomCredential && c.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {
+                        try { responder(GoogleIdTokenCredential.createFrom(c.data).idToken, "") } catch (e: Exception) { responder("", "token_invalido") }
+                    } else responder("", "sem_conta_google")
+                }
+                override fun onError(e: GetCredentialException) {
+                    responder("", if (e is GetCredentialCancellationException) "cancelado" else (e.message ?: "erro"))
+                }
+            })
+    }
 
     // partida: o motor desenha sem parar; menu: parado (não gasta processador, vídeo nem bateria)
     fun desenhar(on: Boolean) = runOnUiThread {

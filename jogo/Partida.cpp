@@ -221,8 +221,8 @@ glm::vec3 chestOf(Engine* e, Fighter& f, float k = 0.7f) {
 int playerFighter(Engine* e);  // (mais abaixo, fora do namespace anônimo)
 namespace {
 
-// Caixa de munição no chão (offline): some em 40 s; o jogador pega passando por cima
-void dropAmmo(Engine* e, glm::vec3 p) {
+// Caixa de munição no chão: toda a munição de quem caiu (em pentes); some em 40 s; o jogador pega passando por cima
+void dropAmmo(Engine* e, glm::vec3 p, int pentes) {
     TeamMatch& M = matchOf(e);
     json spec = {{"tipo", "forma"}, {"forma", "cubo"}, {"fisica", false}, {"paleta", "ouro"}, {"escala", {0.34f, 0.2f, 0.24f}},
                  {"pos", {p.x, p.y + 0.25f, p.z}}, {"nome", "Munição"}};
@@ -232,20 +232,28 @@ void dropAmmo(Engine* e, glm::vec3 p) {
     TeamMatch::Drop d;
     if (GameObject* g = objectById(e, id)) { d.h = Scene::handleOf(*g); e->game.spawned.push_back(d.h); }
     d.pos = p;
+    d.pentes = std::max(1, pentes);
     M.drops.push_back(d);
 }
 
-// Pega a munição: um pente a mais da arma na mão e um da outra (até o dobro da reserva normal)
-void pickAmmo(Engine* e, Fighter& f) {
+// Pega a munição de quem caiu: os pentes vão primeiro para a arma na mão e o que sobrar para a outra (cada uma até
+// o triplo da reserva normal)
+void pickAmmo(Engine* e, Fighter& f, int pentes) {
     int ci = charIndexOfRoot(e, f.root);
     if (ci < 0) return;
     CharacterInfo& c = e->characters[ci];
-    for (int s = 0; s < 2; ++s) {
+    int resto = std::max(1, pentes);
+    for (int k = 0; k < 2 && resto > 0; ++k) {
+        const int s = k == 0 ? f.slot : 1 - f.slot;
         const std::string& key = s == 0 ? f.primary : f.secondary;
         if (key.empty()) continue;
         const GunDef& g = gunOf(key);
-        if (s == f.slot) { if (c.reserve >= 0) c.reserve = std::min(c.reserve + g.mag, g.reserve * 2); }
-        else f.reserve[s] = std::min(f.reserve[s] + g.mag, g.reserve * 2);
+        int& res = s == f.slot ? c.reserve : f.reserve[s];
+        if (res < 0) continue;
+        const int cabe = std::max(0, (g.reserve * 3 - res + g.mag - 1) / g.mag);
+        const int usa = std::min(cabe, resto);
+        res = std::min(res + usa * g.mag, g.reserve * 3);
+        resto -= usa;
     }
     playSound(e, "recarga", e->scene.get(f.root) ? e->scene.get(f.root)->transform.position : glm::vec3(0.f), 0.6f);
     e->game.message = "+ Munição";
@@ -261,7 +269,7 @@ void updateDrops(Engine* e, float dt) {
         GameObject* g = e->scene.get(d.h);
         bool pega = pg && glm::length(glm::vec2(pg->transform.position.x - d.pos.x, pg->transform.position.z - d.pos.z)) < 1.3f &&
                     std::abs(pg->transform.position.y - d.pos.y) < 1.6f;
-        if (pega) pickAmmo(e, M.f[pf]);
+        if (pega) pickAmmo(e, M.f[pf], d.pentes);
         if (pega || d.t > 40.f || !g) {
             if (g) deleteObject(e, d.h);
             M.drops.erase(M.drops.begin() + i);
@@ -308,9 +316,13 @@ void killFighter(Engine* e, int vi, int ai) {
     int ci = charIndexOfRoot(e, v.root);
     if (ci >= 0) playDeath(e->characters[ci]);
     if (GameObject* g = e->scene.get(v.root); g && g->rigidBody) e->physics.setEnabled(*g->rigidBody, false);
-    // offline: o inimigo abatido derruba uma caixa de munição onde caiu
-    if (!M.online && v.bot && ai >= 0 && ai < int(M.f.size()) && !M.f[ai].bot)
-        if (GameObject* g = e->scene.get(v.root)) dropAmmo(e, g->transform.position);
+    // quem eu abato (robô ou jogador de outro celular) derruba toda a munição dele onde caiu: pente + reserva da
+    // arma dele (online a reserva não vem pela rede: conta a de quem nasce com ela)
+    if (ai >= 0 && ai < int(M.f.size()) && ai != vi && !M.f[ai].bot && !M.f[ai].remote && M.f[ai].team != v.team)
+        if (GameObject* g = e->scene.get(v.root)) {
+            const GunDef& gv = gunOf(v.remote && !v.netWeapon.empty() ? v.netWeapon : v.weapon);
+            dropAmmo(e, g->transform.position, (gv.mag + gv.reserve + gv.mag - 1) / std::max(1, gv.mag));
+        }
     std::string msg;
     {
         TeamMatch::Feed fd;
@@ -1138,7 +1150,16 @@ void updateNades(Engine* e, float dt) {
         }
         (void)frac;
         if (!rest) n.pos = next;
-        if (GameObject* g = e->scene.get(n.h)) g->transform.setPosition(n.pos);
+        if (GameObject* g = e->scene.get(n.h)) {
+            g->transform.setPosition(n.pos);
+            // no voo a granada gira (em volta do eixo de lado do movimento); parada, fica deitada como caiu
+            const glm::vec2 hv(n.vel.x, n.vel.z);
+            if (!rest && glm::length(hv) > 0.2f) {
+                n.giro += glm::length(n.vel) * dt * 2.2f;
+                const glm::vec3 eixo = glm::normalize(glm::vec3(-hv.y, 0.f, hv.x));
+                g->transform.setRotation(glm::angleAxis(n.giro, eixo));
+            }
+        }
         if (n.t > 0.f) { ++i; continue; }
         // explosão
         spawnEffect(e, FX_Explosion, 0, n.pos + glm::vec3(0, 0.2f, 0));
@@ -1467,7 +1488,7 @@ bool teamThrowGrenade(Engine* e) {
     glm::vec3 hit; GameObject* obj = nullptr;
     if (GameObject* g = e->scene.get(f.root))
         if (e->physics.raycast(g->transform.position + glm::vec3(0, 1.4f, 0), from, hit, obj) && rootOf(e, obj) != g) from = hit - view * 0.15f;
-    json spec = {{"tipo", "forma"}, {"forma", "esfera"}, {"fisica", false}, {"paleta", "metal"}, {"escala", {0.085f, 0.11f, 0.085f}},
+    json spec = {{"tipo", "modelo"}, {"arquivo", "kit:armas/granada"},  // granada 3D (Meshy, shaders/kit/armas/granada.glb)
                  {"pos", {from.x, from.y, from.z}}, {"nome", "Granada"}};
     Scene::Handle selected = e->selected;
     int id = createFromSpecJson(e, spec.dump(), nullptr);
@@ -1723,7 +1744,7 @@ void netEvent(Engine* e, const std::string& evJson) {
         };
         TeamMatch::Nade n;
         n.pos = vec("p"); n.vel = vec("v"); n.owner = oi; n.visual = true;
-        json spec = {{"tipo", "forma"}, {"forma", "esfera"}, {"fisica", false}, {"paleta", "metal"}, {"escala", {0.085f, 0.11f, 0.085f}},
+        json spec = {{"tipo", "modelo"}, {"arquivo", "kit:armas/granada"},  // granada 3D (Meshy, shaders/kit/armas/granada.glb)
                      {"pos", {n.pos.x, n.pos.y, n.pos.z}}, {"nome", "Granada"}};
         Scene::Handle selected = e->selected;
         int id = createFromSpecJson(e, spec.dump(), nullptr);

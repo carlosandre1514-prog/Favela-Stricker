@@ -8,7 +8,7 @@ function topo(titulo, voltar, extra = '', direita = chipMoedas(false)) {
   return h;
 }
 function ligarAtalhos(t) {
-  for (const b of $$('[data-ir]', t)) b.onclick = () => ({ moedas: telaMoedas, mercado: () => telaMercado('todas'), armas: telaArmas, config: () => telaConfig('sens'), multi: telaMultiplayer, amigos: () => telaAmigos('amigos'), chat: telaChatGlobal })[b.dataset.ir]();
+  for (const b of $$('[data-ir]', t)) b.onclick = () => ({ moedas: telaMoedas, mercado: () => telaMercado('todas'), armas: () => telaArmas(), config: () => telaConfig('sens'), multi: () => telaModo('online'), amigos: () => telaAmigos('amigos'), chat: telaChatGlobal })[b.dataset.ir]();
 }
 const nomeNivel = () => NIVEIS[motor.nivel()]?.nome || 'Leve';
 
@@ -29,21 +29,23 @@ window.voltar = () => {
 function telaLogin() {
   motor.girarMenu(true);
   let criando = false;
-  const t = mostrar(html(`<div class="tela sobre-mapa" style="flex-direction:row;align-items:center;justify-content:space-between;padding:22px 30px">
-    <div class="coluna" style="gap:6px">
+  const t = mostrar(html(`<div class="tela sobre-mapa tela-login">
+    <div class="coluna login-marca">
       <div class="logo-fs"><svg class="coroa" viewBox="0 0 40 26" aria-hidden="true"><path d="M3 23 L6 6 L14 15 L20 3 L26 15 L34 6 L37 23 Z" fill="none" stroke="#FBBF24" stroke-width="3" stroke-linejoin="round"/></svg>
         <span class="bebas favela">FAVELA</span><span class="bebas strike">STRIKE</span></div>
-      <span style="font-size:12px;color:#D1D5DB;letter-spacing:2px;font-weight:600">POLÍCIA x BANDIDOS · 5 CONTRA 5 · PRIMEIRA PESSOA</span>
+      <span class="login-lema">RESSURGÊNCIA · POLÍCIA x BANDIDOS</span>
+      <span class="login-sub">Android, PC e iPhone na mesma partida</span>
     </div>
-    <div class="cartao coluna" style="width:360px;background:rgba(11,15,23,.85)">
-      <span class="bebas" id="l-titulo" style="font-size:30px">ENTRAR</span>
-      <input type="text" id="l-nome" placeholder="Seu nome no jogo" maxlength="16" style="display:none">
+    <div class="cartao-login coluna">
+      <div class="linha login-abas"><button class="aba sel" id="l-aba-entrar">ENTRAR</button><button class="aba" id="l-aba-criar">CRIAR CONTA</button></div>
+      <button class="btn btn-google" id="l-google"><svg viewBox="0 0 48 48" width="20" height="20" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg><span>Entrar com Google</span></button>
+      <div id="l-google-site" class="login-google-site" hidden></div>
+      <div class="login-ou"><span>ou com e-mail</span></div>
+      <input type="text" id="l-nome" placeholder="Seu nome no jogo" maxlength="16" hidden>
       <input type="email" id="l-email" placeholder="E-mail" autocomplete="email">
       <input type="password" id="l-senha" placeholder="Senha (6 ou mais)" autocomplete="current-password">
       <button class="btn btn-ouro" id="l-ir">ENTRAR</button>
-      <div class="linha" style="justify-content:space-between"><button class="dica" id="l-troca" style="color:#93C5FD;font-weight:700">Não tem conta? Criar conta</button>
-        <button class="dica" id="l-esqueci">Esqueci a senha</button></div>
-      <button class="btn btn-fraco" id="l-convidado">Jogar como convidado</button>
+      <button class="dica login-esqueci" id="l-esqueci">Esqueci a senha</button>
       <div class="status" id="l-status"></div>
     </div><span class="versao">Favela Strike ${esc(VERSAO)}</span></div>`), 'login');
   $('#l-nome', t).value = guardado.get('nome', '');
@@ -51,10 +53,11 @@ function telaLogin() {
   const st = $('#l-status', t);
   const modo = (c) => {
     criando = c;
-    $('#l-titulo', t).textContent = c ? 'CRIAR CONTA' : 'ENTRAR';
-    $('#l-nome', t).style.display = c ? '' : 'none';
+    $('#l-aba-entrar', t).classList.toggle('sel', !c);
+    $('#l-aba-criar', t).classList.toggle('sel', c);
+    $('#l-nome', t).hidden = !c;
     $('#l-ir', t).textContent = c ? 'CRIAR CONTA' : 'ENTRAR';
-    $('#l-troca', t).textContent = c ? 'Já tem conta? Entrar' : 'Não tem conta? Criar conta';
+    $('#l-esqueci', t).hidden = c;
   };
   const rodar = async (msg, trabalho) => {
     const f = novoFirebase();
@@ -67,6 +70,7 @@ function telaLogin() {
     fb = f;
     guardado.set('login_refresh', f.refresh || '');
     await carregarConta();
+    if (f.nomeGoogle && conta.nome() === 'Jogador') guardado.set('nome', f.nomeGoogle.slice(0, 16));  // conta nova pelo Google: o primeiro nome
     garantirIdentidade().then(() => { if (typeof lojaAoEntrar === 'function') lojaAoEntrar(); });  // loja do site: com o ID de 9 dígitos
     telaInicio();
   };
@@ -81,14 +85,45 @@ function telaLogin() {
     } else rodar('Entrando…', (f) => f.entrar(em, pw));
   };
   $('#l-senha', t).onkeydown = (e) => { if (e.key === 'Enter') $('#l-ir', t).click(); };
-  $('#l-troca', t).onclick = () => modo(!criando);
+  $('#l-aba-entrar', t).onclick = () => modo(false);
+  $('#l-aba-criar', t).onclick = () => modo(true);
   $('#l-esqueci', t).onclick = async () => {
     const em = $('#l-email', t).value.trim();
     if (!em) { st.textContent = 'Digite o e-mail primeiro'; return; }
     const f = novoFirebase();
     if (f) st.textContent = (await f.recuperar(em)) || 'Enviamos um e-mail para trocar a senha';
   };
-  $('#l-convidado', t).onclick = () => rodar('Entrando como convidado…', (f) => f.convidado());
+  // Google: no APK, a conta do celular (Nativo.loginGoogle); no site, o botão oficial do Google
+  const comToken = (token) => rodar('Entrando com Google…', (f) => f.google(token));
+  const semGoogle = 'O login com Google ainda não foi ligado no jogo (falta o ID do cliente do Google na configuração).';
+  window.aoLoginGoogle = (token, erro) => {
+    if (token) { comToken(token); return; }
+    st.textContent = erro === 'cancelado' ? '' : erro === 'nao_configurado' ? semGoogle : erro === 'sem_conta_google' ? 'Nenhuma conta Google no celular' : 'Não deu para entrar com Google: ' + erro;
+  };
+  $('#l-google', t).onclick = () => {
+    if (ANDROID) { st.textContent = 'Escolha a sua conta Google…'; try { Nativo.loginGoogle(); } catch (_) { st.textContent = 'Atualize o jogo para entrar com Google'; } return; }
+    if (!CONFIG.googleClientId) { st.textContent = semGoogle; return; }
+    st.textContent = 'Abrindo o Google…';
+    carregarGoogleSite().then(() => {
+      google.accounts.id.initialize({ client_id: CONFIG.googleClientId, callback: (r) => comToken(r.credential), ux_mode: 'popup' });
+      const caixa = $('#l-google-site', t);
+      caixa.hidden = false;
+      $('#l-google', t).hidden = true;
+      google.accounts.id.renderButton(caixa, { theme: 'filled_black', size: 'large', shape: 'pill', text: 'continue_with', width: 300, locale: 'pt-BR' });
+      google.accounts.id.prompt();
+      st.textContent = '';
+    }).catch(() => { st.textContent = 'Não consegui abrir o Google (sem internet?)'; });
+  };
+}
+// biblioteca de login do Google (só no site; carrega na hora de usar)
+function carregarGoogleSite() {
+  if (window.google && google.accounts && google.accounts.id) return Promise.resolve();
+  return new Promise((ok, falha) => {
+    const s = document.createElement('script');
+    s.src = 'https://accounts.google.com/gsi/client';
+    s.async = true; s.onload = ok; s.onerror = falha;
+    document.head.appendChild(s);
+  });
 }
 
 async function comecarLogin() {
@@ -210,38 +245,90 @@ function telaInicio() {
   ligarAtalhos(t);
   ligarGiroBoneco(t);
   atualizarBadgeAmigos();
-  $('#i-jogar', t).onclick = telaModo;
+  $('#i-jogar', t).onclick = () => telaModo();
   $('#i-conta', t).onclick = () => telaConfig('conta');
 }
 
 // ---------------- escolha do lado ----------------
 // ---------------- escolha do modo ----------------
-function telaModo() {
+// Jogar: os modos separados em ONLINE (gente de verdade) e OFFLINE (contra robôs), e as salas com código
+function telaModo(categoria) {
+  motor.girarMenu(true);
+  const cat = categoria || guardado.get('categoria_modo', 'online');
+  guardado.set('categoria_modo', cat);
+  const cartao = (id, cor, icone, nome, sub, texto, tags, rodape, botao) => `<button class="modo-cartao" data-id="${id}" style="--cor:${cor}">
+      <div class="linha" style="gap:12px"><div class="icone" style="background:${cor}">${icone}</div>
+        <div class="coluna" style="gap:0"><span class="nome">${nome}</span><span class="sub">${sub}</span></div></div>
+      <span class="texto">${texto}</span><span class="cresce"></span>
+      <div class="linha" style="gap:6px;flex-wrap:wrap">${tags.map((x) => `<span class="tag">${x}</span>`).join('')}</div>
+      <div class="linha" style="justify-content:space-between;align-items:center"><span class="rodape">${rodape}</span><span class="entrar">${botao}</span></div></button>`;
+  const online = cat === 'online';
+  const cartoes = online ? [
+    cartao('br', '#DC2626', ICONE.grupo, 'RESSURGÊNCIA', 'BATTLE ROYALE ONLINE', 'Até 40 pessoas em times de 1 a 4 caem do céu na favela. Caiu? Volta em 10 s perto do time. A zona fecha: o último time de pé vence.',
+      ['solo · duo · trio · squad', 'voz do time', 'com amigos'], '~8 min · só gente de verdade', 'JOGAR'),
+    cartao('pvb', '#3B82F6', ICONE.escudo, 'POLÍCIA x BANDIDOS', '5 CONTRA 5 ONLINE', 'Sala com código para jogar com os amigos: cada um escolhe o lado. Até 50 abates ou 20 min, loja de armas na base.',
+      ['até 10 pessoas', 'voz do time'], 'crie a sala e mande o código', 'JOGAR'),
+    cartao('sala', '#F59E0B', ICONE.play, 'CRIAR SALA', 'OU ENTRAR COM CÓDIGO', 'Monte a sua sala de Polícia x Bandidos ou de Ressurgência e chame os amigos pelo código (ou entre na sala de alguém).',
+      ['código de 6 letras', 'convite de amigos'], 'você começa quando quiser', 'ABRIR'),
+  ] : [
+    cartao('off-pvb', '#3B82F6', ICONE.escudo, 'POLÍCIA x BANDIDOS', 'CONTRA ROBÔS', 'Você e 4 robôs contra 5 robôs. Treine as armas, a mira e o mapa sem internet.',
+      ['sem internet', 'loja na base'], 'até 50 abates ou 20 min', 'JOGAR'),
+    cartao('off-br', '#DC2626', ICONE.grupo, 'RESSURGÊNCIA', 'TREINO CONTRA ROBÔS', '10 times de 4 robôs (o seu time com você) caem na favela, com a zona fechando. Treine o battle royale.',
+      ['sem internet', '40 na partida'], '~8 min', 'JOGAR'),
+  ];
+  const t = mostrar(html(`<div class="tela" style="gap:12px">
+    <div class="segmento" role="tablist">
+      <button role="tab" class="${online ? 'sel' : ''}" data-cat="online" aria-selected="${online}"><span class="ponto-on on"></span> ONLINE</button>
+      <button role="tab" class="${online ? '' : 'sel'}" data-cat="offline" aria-selected="${!online}">OFFLINE</button>
+    </div>
+    <div class="modos">${cartoes.join('')}</div></div>`), 'modo');
+  t.prepend(topo('JOGAR', telaInicio, '', `<span class="dica">${online ? 'partidas com gente de verdade · Android, PC e iPhone juntos' : 'contra robôs · funciona sem internet'}</span>`));
+  for (const b of $$('[data-cat]', t)) b.onclick = () => telaModo(b.dataset.cat);
+  const ultimoLado = () => { const u = guardado.get('ultimo', null); return u && (u.time === 0 || u.time === 1) ? u.time : guardado.get('lado', 0); };
+  const acoes = {
+    br: () => telaRoupa(ultimoLado(), null, 1),
+    pvb: () => telaMultiplayer(),
+    sala: () => telaCriarSala(),
+    'off-pvb': () => telaLado(),
+    'off-br': () => { const lado = ultimoLado(); telaRoupa(lado, () => { const l = guardado.get('lado', lado); iniciarPartida(l, conta.roupa(l), null, null, 1); }, 1); },
+  };
+  for (const b of $$('[data-id]', t)) b.onclick = () => acoes[b.dataset.id]();
+}
+// Criar sala: Polícia x Bandidos (até 10) ou Ressurgência (até 40), ou entrar com o código de alguém
+function telaCriarSala() {
+  acordarServidor();
   motor.girarMenu(true);
   const t = mostrar(html(`<div class="tela">
-    <div class="lados">
-      <button class="lado modo-br" data-modo="1">
-        <div class="linha" style="gap:12px"><div class="icone" style="background:#DC2626">${ICONE.grupo}</div>
-          <div class="coluna" style="gap:0"><span class="nome" style="color:#FCA5A5">RESSURGÊNCIA</span><span style="font-size:11px;font-weight:800;letter-spacing:2px;color:#FECACA">BATTLE ROYALE</span></div></div>
-        <span class="texto" style="color:#FEE2E2">10 times de 4 caem do céu na favela. Caiu? Volta em 10 s perto do seu time, enquanto alguém do time estiver de pé. A zona fecha: o último time de pé vence.</span>
-        <span class="cresce"></span>
-        <div class="linha" style="gap:6px;flex-wrap:wrap"><span class="tag" style="background:rgba(220,38,38,.22);color:#FEE2E2">40 jogadores</span>
-          <span class="tag" style="background:rgba(220,38,38,.22);color:#FEE2E2">zona em 6 fases</span><span class="tag" style="background:rgba(220,38,38,.22);color:#FEE2E2">voz do time</span></div>
-        <div class="linha" style="justify-content:space-between"><span style="font-size:12px;color:#FECACA">~8 min · online, só gente de verdade</span><span class="entrar" style="background:#DC2626">JOGAR</span></div>
-      </button>
-      <button class="lado pol" data-modo="0">
-        <div class="linha" style="gap:12px"><div class="icone" style="background:#3B82F6">${ICONE.escudo}</div>
-          <div class="coluna" style="gap:0"><span class="nome" style="color:#93C5FD">POLÍCIA x BANDIDOS</span><span style="font-size:11px;font-weight:800;letter-spacing:2px;color:#BFDBFE">5 CONTRA 5</span></div></div>
-        <span class="texto" style="color:#DBEAFE">Escolha o lado e tome o morro. Renasce na base, compra armas com o $ dos abates. Até 50 abates ou 20 min.</span>
-        <span class="cresce"></span>
-        <div class="linha" style="gap:6px;flex-wrap:wrap"><span class="tag" style="background:rgba(59,130,246,.22);color:#DBEAFE">10 jogadores</span>
-          <span class="tag" style="background:rgba(59,130,246,.22);color:#DBEAFE">loja na base</span></div>
-        <div class="linha" style="justify-content:space-between"><span style="font-size:12px;color:#BFDBFE">também no multiplayer</span><span class="entrar" style="background:#3B82F6">JOGAR</span></div>
-      </button>
-    </div></div>`), 'modo');
-  t.prepend(topo('ESCOLHA O MODO', telaInicio, '', ''));
-  $('[data-modo="1"]', t).onclick = () => { const u = guardado.get('ultimo', null); telaRoupa(u && u.time === 1 ? 1 : guardado.get('lado', 0), null, 1); };
-  $('[data-modo="0"]', t).onclick = telaLado;
+    <div class="linha cresce" style="align-items:stretch;gap:14px">
+      <div class="cartao coluna cresce" style="border-color:rgba(59,130,246,.45)"><span class="bebas azul" style="font-size:30px">SALA · POLÍCIA x BANDIDOS</span>
+        <span class="dica">Até 10 pessoas. Na sala, cada um toca no lado em que quer jogar.</span><span class="cresce"></span>
+        <button class="btn btn-azul" id="cs-pvb">CRIAR SALA</button></div>
+      <div class="cartao coluna cresce" style="border-color:rgba(220,38,38,.5)"><span class="bebas" style="font-size:30px;color:#FCA5A5">SALA · RESSURGÊNCIA</span>
+        <span class="dica">Até 40 pessoas. Quem entra junto (grupo) cai no mesmo time.</span><span class="cresce"></span>
+        <button class="btn" id="cs-br" style="background:#DC2626;color:#fff">CRIAR SALA</button></div>
+      <div class="cartao coluna cresce" style="border-color:rgba(251,191,36,.45)"><span class="bebas ouro" style="font-size:30px">ENTRAR COM CÓDIGO</span>
+        <input type="text" id="cs-codigo" maxlength="6" placeholder="CÓDIGO" style="font-size:22px;text-transform:uppercase;letter-spacing:.2em">
+        <span class="cresce"></span><button class="btn btn-ouro" id="cs-entrar">ENTRAR</button></div>
+    </div><div class="status" id="cs-status"></div></div>`), 'criarsala');
+  t.prepend(topo('CRIAR SALA', () => telaModo('online')));
+  const st = $('#cs-status', t);
+  const conectar = async (acao) => {
+    if (!fb || !fb.token) { st.textContent = 'Entre na sua conta para jogar online'; return; }
+    st.textContent = 'Conectando…';
+    try {
+      const [s, erro] = await acao();
+      if (!s) { st.textContent = erro; return; }
+      sala = s; ligarSala(s); telaSala();
+    } catch (e) { st.textContent = 'sem conexão: ' + e.message; }
+  };
+  const eu = () => ({ ...minhaEntrada(guardado.get('lado', 0)), grupo: social.grupo ? social.grupo.lider : '' });
+  $('#cs-pvb', t).onclick = () => conectar(() => Sala.criar(minhaEntrada(guardado.get('lado', 0))));
+  $('#cs-br', t).onclick = () => conectar(() => Sala.criar(eu(), 'br', false, guardado.get('formato_br', 'squad')));
+  $('#cs-entrar', t).onclick = () => {
+    const c = $('#cs-codigo', t).value.trim().toUpperCase();
+    if (c.length !== 6) { st.textContent = 'O código tem 6 letras/números'; return; }
+    conectar(() => Sala.entrar(c, eu()));
+  };
 }
 
 function telaLado() {
@@ -265,7 +352,7 @@ function telaLado() {
         <div class="linha" style="justify-content:space-between"><span style="font-size:12px;color:#FDE68A">4 robôs + você</span><span class="entrar" style="background:#F59E0B;color:#111827">ENTRAR</span></div>
       </button>
     </div></div>`), 'lado');
-  t.prepend(topo('ESCOLHA SEU LADO', telaModo, '', '<span class="dica">Partida até 50 abates · 20 min</span>'));
+  t.prepend(topo('ESCOLHA SEU LADO', () => telaModo('offline'), '', '<span class="dica">Partida até 50 abates · 20 min</span>'));
   for (const b of $$('[data-time]', t)) b.onclick = () => telaRoupa(Number(b.dataset.time));
 }
 
@@ -273,41 +360,49 @@ function telaLado() {
 function telaRoupa(time, pronto, modo = 0) {
   motor.girarMenu(true);
   const br = modo === 1;
-  const minhas = br ? ROUPAS : ROUPAS.filter((r) => r.time === time);
-  let sel = conta.roupa(time);
-  const t = mostrar(html(`<div class="tela">
-    <div class="linha cresce" style="align-items:stretch;gap:14px">
-      <div class="grade-itens cresce" id="r-grade" style="grid-template-columns:repeat(${br ? 6 : minhas.length},minmax(0,1fr));grid-auto-rows:1fr;align-content:stretch;overflow:hidden"></div>
-    </div>
-    <div class="linha" style="gap:8px;flex-wrap:wrap"><span class="dica">Arma inicial:</span><span id="r-armas" class="linha" style="gap:6px;flex-wrap:wrap"></span>
-      <span class="dica cresce">${br ? '+ TT-33 · você cai com ela (e a skin dela) e pega munição de quem abater' : '+ TT-33 · qualquer arma serve nos dois lados; as outras compra na base com o $ dos abates'}</span>
-      <button class="btn btn-ouro btn-grande" id="r-ir" style="height:48px;font-size:24px;width:200px">${pronto ? 'PRONTO' : br ? `${ICONE.play} CONTINUAR` : `${ICONE.play} COMEÇAR`}</button></div>
-  </div>`), 'roupa');
-  t.prepend(topo(br ? 'SUA ROUPA · RESSURGÊNCIA' : time ? 'SUA ROUPA · BANDIDOS' : 'SUA FARDA · POLÍCIA', () => (pronto ? telaSala() : br ? telaModo() : telaLado())));
+  let lado = time === 1 ? 1 : 0;           // na Ressurgência o lado é escolhido aqui (toque em Polícia ou Bandidos)
+  let sel = conta.roupa(lado);
+  const t = mostrar(html(`<div class="tela tela-roupa"><div class="linha cresce" style="gap:16px;align-items:stretch;min-height:0">
+    <div class="roupa-palco" id="r-palco"></div>
+    <div class="coluna cresce" style="gap:10px;min-width:0">
+      ${br ? `<div class="lados-roupa"><button data-lado="0"><span class="bebas">POLÍCIA</span><small>5 fardas</small></button>
+        <button data-lado="1"><span class="bebas">BANDIDOS</span><small>4 roupas com colete</small></button></div>` : ''}
+      <div class="grade-roupas" id="r-grade"></div>
+      <div class="linha" style="gap:8px;flex-wrap:wrap;align-items:center"><span class="dica">Arma inicial:</span><span id="r-armas" class="linha" style="gap:6px;flex-wrap:wrap"></span></div>
+      <div class="linha" style="gap:10px;align-items:center"><span class="dica cresce">${br ? '+ TT-33 · você cai com ela e pega munição de quem abater' : '+ TT-33 · as outras armas compra na base com o $ dos abates'}</span>
+        <button class="btn btn-ouro btn-grande" id="r-ir" style="height:48px;font-size:24px;min-width:200px">${pronto ? 'PRONTO' : br ? `${ICONE.play} CONTINUAR` : `${ICONE.play} COMEÇAR`}</button></div>
+    </div></div></div>`), 'roupa');
+  t.prepend(topo(br ? 'SEU PERSONAGEM · RESSURGÊNCIA' : lado ? 'SEU PERSONAGEM · BANDIDOS' : 'SEU PERSONAGEM · POLÍCIA',
+    () => (pronto && sala ? telaSala() : br ? telaModo() : telaLado())));
   const desenhar = () => {
+    const minhas = ROUPAS.filter((r) => r.time === lado);
+    if (!sel || sel.time !== lado) sel = conta.roupa(lado);
+    t.classList.toggle('lado-ban', lado === 1);
+    for (const b of $$('[data-lado]', t)) b.classList.toggle('sel', Number(b.dataset.lado) === lado);
+    $('#r-palco', t).innerHTML = `<img src="retratos/${sel.key}.png" alt="${esc(sel.nome)}">
+      <div class="roupa-nome"><span class="lado-tag">${lado ? 'BANDIDOS' : 'POLÍCIA'}</span><span class="bebas">${esc(sel.nome)}</span></div>`;
     $('#r-grade', t).innerHTML = minhas.map((r) => {
       const tem = conta.temRoupa(r);
-      return `<button class="item ${r === sel ? 'sel' : ''} ${tem ? '' : 'travado'}" data-k="${r.key}" style="justify-content:flex-end">
-        <img src="retratos/${r.key}.png" alt="" style="flex:1 1 0;min-height:0;height:0">
-        <span class="n" style="font-size:13px">${esc(r.nome)}${br ? `<span class="dica" style="display:block;font-size:10px;font-weight:700">${r.time ? 'bandido' : 'polícia'}</span>` : ''}</span>
-        <span class="p ${tem ? 'verde' : 'amarelo'}">${tem ? (r === sel ? 'equipada' : 'grátis') : `${ICONE.moeda(12)} ${fmt(r.preco)}`}</span></button>`;
+      return `<button class="roupa-item ${r === sel ? 'sel' : ''} ${tem ? '' : 'travado'}" data-k="${r.key}">
+        <img src="retratos/${r.key}.png" alt=""><span class="n">${esc(r.nome)}</span>
+        <span class="p">${r === sel ? 'equipada' : tem ? 'grátis' : `${ICONE.moeda(12)} ${fmt(r.preco)}`}</span></button>`;
     }).join('');
-    for (const d of $$('.item', t)) d.onclick = async () => {
+    for (const d of $$('.roupa-item', t)) d.onclick = async () => {
       const r = minhas.find((x) => x.key === d.dataset.k);
       if (conta.temRoupa(r)) { sel = r; desenhar(); return; }
       if (await comprarComMoedas(r.nome, r.preco, 'skin:' + r.key)) { sel = r; desenhar(); }
     };
   };
+  for (const b of $$('[data-lado]', t)) b.onclick = () => { lado = Number(b.dataset.lado); sel = conta.roupa(lado); desenhar(); };
   desenhar();
   const desenharArmas = () => {
-    const atual = armaInicial(time);
+    const atual = armaInicial(lado);
     $('#r-armas', t).innerHTML = opcoesArmaInicial().map((a) => `<button class="chip ${a.key === atual ? 'sel' : ''}" data-arma="${a.key}"
       style="${a.key === atual ? 'background:#FCD34D;color:#111827;font-weight:800' : ''}">${esc(a.nome)}${conta.skinArma(a.key) ? ' ★' : ''}</button>`).join('');
     for (const b of $$('[data-arma]', t)) b.onclick = () => { guardado.set('arma_inicial', b.dataset.arma); desenharArmas(); };
   };
   desenharArmas();
   $('#r-ir', t).onclick = () => {
-    const lado = br ? sel.time : time;
     conta.usarRoupa(lado, sel.key);
     guardado.set('lado', lado);
     if (pronto) pronto(); else if (br) telaRessurgencia(); else iniciarPartida(lado, sel, null, null);
@@ -375,62 +470,45 @@ function abrirArma360(nome, titulo) {
 
 // ---------------- mercado de skins (moedas) ----------------
 // categorias: todas, armas (skins de arma) e personagem (roupas da polícia e dos bandidos)
-function itensMercado(aba) {
-  const armas = aba === 'personagem' ? [] : SKINS_ARMA.map((s) => ({
-    id: `skin_arma:${s.arma}:${s.key}`, nome: s.nome, raridade: s.raridade, preco: s.preco, img: `armas/${s.arma}_${s.key}.png`, giro: `${s.arma}_${s.key}`,
-    tem: conta.temSkinArma(s), usando: conta.skinArma(s.arma) === s.key, arma: s.arma, key: s.key,
-    desc: s.arma === 'tt33' ? 'Skin de pistola' : s.modelo ? 'Arma com modelo próprio · vale nos dois lados' : 'Skin de arma · vale nos dois lados',
-  }));
-  const roupas = aba === 'armas' ? [] : ROUPAS.map((r) => ({
-    id: 'skin:' + r.key, nome: r.nome, raridade: r.raridade, preco: r.preco, img: `retratos/${r.key}.png`, tem: conta.temRoupa(r),
-    usando: conta.roupa(r.time) === r, roupa: r, desc: r.time ? 'Personagem · bandidos' : 'Personagem · polícia',
-  }));
-  const ordem = { lendaria: 0, epica: 1, rara: 2, comum: 3 };
-  return [...armas, ...roupas].sort((a, b) => ordem[a.raridade] - ordem[b.raridade] || b.preco - a.preco);
-}
 function telaMercado(aba = 'todas', selId = null) {
   motor.girarMenu(true);
-  const itens = itensMercado(aba);
-  let sel = itens.find((i) => i.id === selId) || itens[0];
-  const t = mostrar(html(`<div class="tela" style="gap:10px">
-    <div class="linha cresce" style="align-items:stretch;gap:14px">
+  // só skins de arma; aba = 'todas' ou a arma
+  const armasComSkin = ARMAS.filter((a) => SKINS_ARMA.some((s) => s.arma === a.key));
+  if (aba !== 'todas' && !armasComSkin.some((a) => a.key === aba)) aba = 'todas';
+  const itens = SKINS_ARMA.filter((s) => aba === 'todas' || s.arma === aba).map((s) => ({ ...s, id: `skin_arma:${s.arma}:${s.key}`, tem: conta.temSkinArma(s) }));
+  let sel = itens.find((x) => x.id === selId) || itens[0];
+  const t = mostrar(html(`<div class="tela" style="gap:8px">
+    <div class="filtro-armas">${[['todas', 'Todas'], ...armasComSkin.map((a) => [a.key, a.nome])].map(([k, n]) => `<button class="${k === aba ? 'sel' : ''}" data-aba="${k}">${esc(n)}</button>`).join('')}</div>
+    <div class="linha cresce" style="align-items:stretch;gap:14px;min-height:0">
       <div class="grade-itens cresce" id="m-grade"></div>
       <div class="detalhe" id="m-det" style="width:340px;border-color:rgba(252,211,77,.45)"></div>
     </div></div>`), 'mercado');
-  const abas = `<div class="abas">${[['todas', 'Todas'], ['armas', 'Armas'], ['personagem', 'Personagem']].map(([k, n]) => `<button class="aba ${k === aba ? 'sel' : ''}" data-aba="${k}">${n}</button>`).join('')}</div>`;
-  const tp = topo('MERCADO DE SKINS', telaInicio, abas, chipMoedas());
+  const tp = topo('MERCADO DE SKINS', telaInicio, '<span class="dica">só visual · equipe no Arsenal · 🎁 mande para amigos</span>', chipMoedas());
   t.prepend(tp);
   ligarAtalhos(tp);
   for (const b of $$('[data-aba]', t)) b.onclick = () => telaMercado(b.dataset.aba);
   const desenhar = () => {
     $('#m-grade', t).innerHTML = itens.map((it) => `<button class="item ${it === sel ? 'sel' : ''}" data-id="${it.id}">
-      <img src="${it.img}" alt=""><span class="n">${esc(it.nome)}</span><span class="r raridade-${it.raridade}">${RARIDADES[it.raridade]}</span>
-      <span class="p ${it.tem ? 'azul' : 'amarelo'}">${it.usando ? 'usando' : it.tem ? (it.preco ? '✓ sua' : 'grátis') : `${ICONE.moeda(12)} ${fmt(it.preco)}`}</span></button>`).join('');
-    for (const d of $$('.item', t)) d.onclick = () => { sel = itens.find((i) => i.id === d.dataset.id); desenhar(); };
+      <img src="armas/${it.arma}_${it.key}.png" alt=""><span class="n">${esc(it.nome)}</span><span class="r raridade-${it.raridade}">${RARIDADES[it.raridade]}</span>
+      <span class="p ${it.tem ? 'verde' : 'amarelo'}">${it.tem ? '✓ COMPRADO' : `${ICONE.moeda(12)} ${fmt(it.preco)}`}</span></button>`).join('');
+    for (const d of $$('.item', t)) d.onclick = () => { sel = itens.find((x) => x.id === d.dataset.id); desenhar(); };
     const det = $('#m-det', t);
-    let botao;
-    if (!sel.tem) botao = `<button class="btn btn-ouro" id="m-acao" style="font-size:15px;letter-spacing:1px">COMPRAR POR ${ICONE.moeda(14).replace('#FCD34D', '#111827')} ${fmt(sel.preco)}</button>`;
-    else if (sel.arma) botao = sel.usando ? '<button class="btn btn-fraco" id="m-acao">USANDO · tocar para tirar</button>' : '<button class="btn btn-azul" id="m-acao">USAR NA ' + esc(armaPorKey(sel.arma).nome) + '</button>';
-    else botao = sel.usando ? '<button class="btn btn-fraco" disabled>USANDO</button>' : '<button class="btn btn-azul" id="m-acao">USAR</button>';
-    det.innerHTML = `<div class="linha" style="gap:8px"><span class="etiqueta fundo-${sel.raridade}">${RARIDADES[sel.raridade].toUpperCase()}</span><span class="dica">${esc(sel.desc)}</span></div>
+    const giro = `${sel.arma}_${sel.key}`;
+    det.innerHTML = `<div class="linha" style="gap:8px"><span class="etiqueta fundo-${sel.raridade}">${RARIDADES[sel.raridade].toUpperCase()}</span><span class="dica">${sel.modelo ? 'Arma com modelo próprio' : 'Pintura da arma'} · ${esc(armaPorKey(sel.arma).nome)}</span></div>
       <span class="bebas" style="font-size:30px">${esc(sel.nome.toUpperCase())}</span>
-      <div class="previa">${sel.giro && GIRO[sel.giro] ? `<button class="ver360" id="m-360" aria-label="Ver ${esc(sel.nome)} em 360 graus"><img src="${sel.img}" alt=""><span class="selo360">360°</span></button>` : `<img src="${sel.img}" alt="${esc(sel.nome)}">`}</div>
-      <span class="dica" style="font-size:11px">${sel.arma ? 'Só visual, não muda o dano · a skin é da sua arma: no online os outros veem ela na sua mão e nas suas costas' : (sel.roupa.time ? 'Usada quando você joga de bandido' : 'Usada quando você joga de polícia') + ' · quantos quiserem podem usar a mesma'}</span>${botao}`;
+      <div class="previa">${GIRO[giro] ? `<button class="ver360" id="m-360" aria-label="Ver ${esc(sel.nome)} em 360 graus"><img src="armas/${giro}.png" alt=""><span class="selo360">360°</span></button>` : `<img src="armas/${giro}.png" alt="${esc(sel.nome)}">`}</div>
+      <span class="dica" style="font-size:11px">Só visual, não muda o dano. Depois de comprar, equipe no Arsenal.</span>
+      <div class="linha" style="gap:8px">
+        ${sel.tem ? '<button class="btn btn-fraco cresce" disabled>✓ COMPRADO</button>' : `<button class="btn btn-ouro cresce" id="m-comprar" style="font-size:15px;letter-spacing:1px">COMPRAR ${ICONE.moeda(14).replace('#FCD34D', '#111827')} ${fmt(sel.preco)}</button>`}
+        <button class="btn btn-presente" id="m-enviar" aria-label="Mandar de presente para um amigo">🎁 ENVIAR</button></div>
+      ${sel.tem ? '<button class="btn btn-azul" id="m-arsenal">EQUIPAR NO ARSENAL</button>' : ''}`;
     const b360 = $('#m-360', det);
-    if (b360) b360.onclick = () => abrirArma360(sel.giro, sel.nome);
-    const acao = $('#m-acao', det);
-    if (!acao) return;
-    acao.onclick = async () => {
-      if (!sel.tem) {
-        if (!(await comprarComMoedas(sel.nome, sel.preco, sel.id))) return;
-        if (sel.arma) conta.usarSkinArma(sel.arma, sel.key);
-        telaMercado(aba, sel.id);
-        return;
-      }
-      if (sel.arma) conta.usarSkinArma(sel.arma, sel.usando ? '' : sel.key);
-      else { conta.usarRoupa(sel.roupa.time, sel.roupa.key); guardado.set('lado', sel.roupa.time); }
-      telaMercado(aba, sel.id);
-    };
+    if (b360) b360.onclick = () => abrirArma360(giro, sel.nome);
+    const comprar = $('#m-comprar', det);
+    if (comprar) comprar.onclick = async () => { if (await comprarComMoedas(sel.nome, sel.preco, sel.id)) telaMercado(aba, sel.id); };
+    const ars = $('#m-arsenal', det);
+    if (ars) ars.onclick = () => telaArmas('skins', sel.arma);
+    $('#m-enviar', det).onclick = () => escolherAmigoParaPresente(sel);
   };
   desenhar();
 }
@@ -455,27 +533,70 @@ function telaMoedas() {
 }
 
 // ---------------- armas e dano ----------------
-function telaArmas() {
+function telaArmas(aba = 'skins', armaSel = null) {
   motor.girarMenu(true);
+  const abas = `<div class="abas">${[['skins', 'Minhas skins'], ['numeros', 'Dano das armas']].map(([k, n]) => `<button class="aba ${k === aba ? 'sel' : ''}" data-aba="${k}">${n}</button>`).join('')}</div>`;
+  if (aba === 'numeros') {
   const linhas = ARMAS.map((a) => `<tr><td><b>${esc(a.nome)}</b>${a.luneta ? ' <span class="dica">luneta</span>' : ''}</td><td>${a.dano}</td><td class="cab">${Math.round(a.dano * 2.5)}</td>
-    <td><b>${Math.ceil(100 / a.dano)}</b></td><td>${String(a.cadencia).replace('.', ',')}</td><td>${a.pente}</td><td>${a.cai} m</td></tr>`).join('');
-  const t = mostrar(html(`<div class="tela">
-    <div class="linha cresce" style="align-items:stretch;gap:14px">
-      <div class="cartao cresce" style="padding:6px 10px;overflow:auto"><table class="tabela">
-        <tr><th>ARMA</th><th>CORPO</th><th>CABEÇA</th><th>TIROS P/<br>ABATER</th><th>TIROS/S</th><th>PENTE</th><th>CAI APÓS</th></tr>${linhas}</table></div>
-      <div class="cartao coluna" style="width:250px;gap:6px">
-        <span class="bebas ouro" style="font-size:28px">GRANADA</span>
-        <svg width="118" height="118" viewBox="0 0 160 160" style="align-self:center">
-          <circle cx="80" cy="80" r="74" fill="rgba(245,158,11,.25)" stroke="#F59E0B" stroke-width="2" stroke-dasharray="6 5"/>
-          <circle cx="80" cy="80" r="37" fill="rgba(239,68,68,.5)" stroke="#EF4444" stroke-width="2"/>
-          <circle cx="80" cy="80" r="6" fill="#FBBF24"/>
-          <text x="80" y="18" text-anchor="middle" font-size="11" font-weight="800" fill="#FDE68A">8 m</text>
-          <text x="80" y="55" text-anchor="middle" font-size="11" font-weight="800" fill="#fff">4 m</text></svg>
-        <span class="linha" style="gap:6px;font-size:12px"><i style="width:10px;height:10px;border-radius:2px;background:#EF4444"></i>até 4 m: abate na hora</span>
-        <span class="linha" style="gap:6px;font-size:12px"><i style="width:10px;height:10px;border-radius:2px;background:#F59E0B"></i>4 a 8 m: 100 até 20 de dano</span>
-        <span class="dica" style="font-size:11px">Explode 3 s depois de jogar. Parede entre você e a granada protege. $ 300 cada, máx. 2.</span>
+      <td><b>${Math.ceil(100 / a.dano)}</b></td><td>${String(a.cadencia).replace('.', ',')}</td><td>${a.pente}</td><td>${a.cai} m</td></tr>`).join('');
+    const t = mostrar(html(`<div class="tela">
+      <div class="linha cresce" style="align-items:stretch;gap:14px">
+        <div class="cartao cresce" style="padding:6px 10px;overflow:auto"><table class="tabela">
+          <tr><th>ARMA</th><th>CORPO</th><th>CABEÇA</th><th>TIROS P/<br>ABATER</th><th>TIROS/S</th><th>PENTE</th><th>CAI APÓS</th></tr>${linhas}</table></div>
+        <div class="cartao coluna" style="width:250px;gap:6px">
+          <span class="bebas ouro" style="font-size:28px">GRANADA</span>
+          <svg width="118" height="118" viewBox="0 0 160 160" style="align-self:center">
+            <circle cx="80" cy="80" r="74" fill="rgba(245,158,11,.25)" stroke="#F59E0B" stroke-width="2" stroke-dasharray="6 5"/>
+            <circle cx="80" cy="80" r="37" fill="rgba(239,68,68,.5)" stroke="#EF4444" stroke-width="2"/>
+            <circle cx="80" cy="80" r="6" fill="#FBBF24"/>
+            <text x="80" y="18" text-anchor="middle" font-size="11" font-weight="800" fill="#FDE68A">8 m</text>
+            <text x="80" y="55" text-anchor="middle" font-size="11" font-weight="800" fill="#fff">4 m</text></svg>
+          <span class="linha" style="gap:6px;font-size:12px"><i style="width:10px;height:10px;border-radius:2px;background:#EF4444"></i>até 4 m: abate na hora</span>
+          <span class="linha" style="gap:6px;font-size:12px"><i style="width:10px;height:10px;border-radius:2px;background:#F59E0B"></i>4 a 8 m: 100 até 20 de dano</span>
+          <span class="dica" style="font-size:11px">Explode 3 s depois de jogar. Parede entre você e a granada protege. $ 300 cada, máx. 2.</span>
+        </div></div></div>`), 'armas');
+    t.prepend(topo('ARSENAL', telaInicio, abas, '<span class="dica">cabeça = corpo × 2,5 · de longe cai até 30%</span>'));
+    for (const b of $$('[data-aba]', t)) b.onclick = () => telaArmas(b.dataset.aba);
+    return;
+  }
+  // Minhas skins: cada arma com a pintura padrão e as skins compradas; tocar equipa (vale no jogo e no online)
+  const minhas = (a) => SKINS_ARMA.filter((s) => s.arma === a.key && conta.temSkinArma(s));
+  const armas = ARMAS.filter((a) => SKINS_ARMA.some((s) => s.arma === a.key));
+  let atual = armas.find((a) => a.key === armaSel) || armas.find((a) => minhas(a).length) || armas[0];
+  const t = mostrar(html(`<div class="tela" style="gap:10px">
+    <div class="linha cresce" style="align-items:stretch;gap:14px;min-height:0">
+      <div class="coluna arsenal-armas" id="ar-armas"></div>
+      <div class="coluna cresce" style="gap:10px;min-width:0;min-height:0">
+        <div class="arsenal-equipada" id="ar-eq"></div>
+        <div class="grade-itens" id="ar-skins" style="grid-template-columns:repeat(4,minmax(0,1fr))"></div>
       </div></div></div>`), 'armas');
-  t.prepend(topo('ARSENAL', telaInicio, '<span class="dica">vida 100 · cabeça = corpo × 2,5 · de longe o dano cai até 30%</span>', ''));
+  t.prepend(topo('ARSENAL', telaInicio, abas, chipMoedas(false)));
+  for (const b of $$('[data-aba]', t)) b.onclick = () => telaArmas(b.dataset.aba);
+  const desenhar = () => {
+    $('#ar-armas', t).innerHTML = armas.map((a) => {
+      const sk = conta.skinArma(a.key), s = SKINS_ARMA.find((x) => x.arma === a.key && x.key === sk);
+      return `<button class="arsenal-arma ${a === atual ? 'sel' : ''}" data-arma="${a.key}"><b>${esc(a.nome)}</b>
+        <span class="dica">${s ? esc(s.nome.replace(a.nome + ' ', '')) : 'padrão'} · ${minhas(a).length} skin${minhas(a).length === 1 ? '' : 's'}</span></button>`;
+    }).join('');
+    for (const b of $$('[data-arma]', t)) b.onclick = () => { atual = armas.find((a) => a.key === b.dataset.arma); desenhar(); };
+    const sk = conta.skinArma(atual.key), s = SKINS_ARMA.find((x) => x.arma === atual.key && x.key === sk);
+    const giro = s ? `${s.arma}_${s.key}` : '';
+    $('#ar-eq', t).innerHTML = `<div class="coluna" style="gap:2px;min-width:0"><span class="dica" style="font-size:11px;font-weight:800;letter-spacing:2px">EQUIPADA NA ${esc(atual.nome.toUpperCase())}</span>
+      <span class="bebas" style="font-size:30px">${esc(s ? s.nome : atual.nome + ' padrão')}</span>
+      ${s ? `<span class="etiqueta fundo-${s.raridade}" style="align-self:flex-start">${RARIDADES[s.raridade].toUpperCase()}</span>` : '<span class="dica">sem skin</span>'}</div>
+      ${s ? (GIRO[giro] ? `<button class="ver360" id="ar-360" aria-label="Ver em 360 graus"><img src="armas/${giro}.png" alt=""><span class="selo360">360°</span></button>` : `<img src="armas/${giro}.png" alt="">`) : ''}`;
+    const v = $('#ar-360', t);
+    if (v) v.onclick = () => abrirArma360(giro, s.nome);
+    const lista = minhas(atual);
+    $('#ar-skins', t).innerHTML = `<button class="item ${!sk ? 'sel' : ''}" data-skin=""><span class="arsenal-padrao bebas">${esc(atual.nome)}</span><span class="n">Padrão</span>
+        <span class="p ${!sk ? 'verde' : 'azul'}">${!sk ? 'EQUIPADA' : 'EQUIPAR'}</span></button>` +
+      lista.map((x) => `<button class="item ${x.key === sk ? 'sel' : ''}" data-skin="${x.key}"><img src="armas/${x.arma}_${x.key}.png" alt=""><span class="n">${esc(x.nome)}</span>
+        <span class="r raridade-${x.raridade}">${RARIDADES[x.raridade]}</span><span class="p ${x.key === sk ? 'verde' : 'azul'}">${x.key === sk ? 'EQUIPADA' : 'EQUIPAR'}</span></button>`).join('') +
+      `<button class="item" id="ar-loja"><span class="arsenal-padrao" style="font-size:28px">＋</span><span class="n">Mais skins</span><span class="p amarelo">MERCADO</span></button>`;
+    for (const b of $$('[data-skin]', t)) b.onclick = () => { conta.usarSkinArma(atual.key, b.dataset.skin); desenhar(); };
+    $('#ar-loja', t).onclick = () => telaMercado(atual.key);
+  };
+  desenhar();
 }
 
 // ---------------- configurações ----------------
@@ -593,7 +714,7 @@ function telaMultiplayer() {
         <input type="text" id="mp-codigo" maxlength="6" placeholder="CÓDIGO" style="font-size:22px;text-transform:uppercase;letter-spacing:.2em">
         <span class="cresce"></span><button class="btn btn-azul" id="mp-entrar">ENTRAR</button></div>
     </div><div class="status" id="mp-status"></div></div>`), 'multiplayer');
-  t.prepend(topo('MULTIPLAYER', telaInicio));
+  t.prepend(topo('POLÍCIA x BANDIDOS ONLINE', () => telaModo('online')));
   $('#mp-nome', t).value = conta.nome();
   const st = $('#mp-status', t);
   const conectar = async (acao) => {
@@ -871,21 +992,29 @@ function telaSala() {
   const meuTime = eu ? eu.time | 0 : guardado.get('lado', 0);
   const coluna = (time) => {
     const doTime = lista.filter((p) => (p.time | 0) === time);
-    return `<div class="cartao coluna cresce" style="background:${time ? '#2A1C08' : '#0F1D36'};border-color:${time ? '#F59E0B' : '#3B82F6'}">
-      <span style="font-size:12px;font-weight:800;letter-spacing:1px;color:${time ? '#FCD34D' : '#93C5FD'}">${time ? 'BANDIDOS' : 'POLÍCIA'} · ${doTime.length}</span>
-      ${doTime.map((p) => `<span style="font-size:14px;${p.id === fb.uid ? 'font-weight:800' : ''}">${p.id === fb.uid ? '▶ ' : ''}${esc(p.nome || 'Jogador')}${p.id === fb.uid ? ' (você)' : ''}</span>`).join('') || '<span class="dica">ninguém ainda</span>'}</div>`;
+    const meu = time === meuTime;
+    return `<button class="cartao coluna cresce coluna-time ${meu ? 'meu' : ''}" data-time="${time}" style="background:${time ? '#2A1C08' : '#0F1D36'};border-color:${time ? '#F59E0B' : '#3B82F6'}"
+      aria-label="${meu ? 'Seu time' : 'Jogar neste time'}">
+      <span class="linha" style="justify-content:space-between;width:100%"><span style="font-size:12px;font-weight:800;letter-spacing:1px;color:${time ? '#FCD34D' : '#93C5FD'}">${time ? 'BANDIDOS' : 'POLÍCIA'} · ${doTime.length}</span>
+        <span class="dica" style="font-size:11px;font-weight:700">${meu ? '✓ seu time' : 'toque para jogar aqui'}</span></span>
+      ${doTime.map((p) => `<span style="font-size:14px;${p.id === fb.uid ? 'font-weight:800' : ''}">${p.id === fb.uid ? '▶ ' : ''}${esc(p.nome || 'Jogador')}${p.id === fb.uid ? ' (você)' : ''}</span>`).join('') || '<span class="dica">ninguém ainda</span>'}</button>`;
   };
   const t = mostrar(html(`<div class="tela">
     <div class="topo"><button class="voltar" id="s-sair" aria-label="Sair da sala">${ICONE.voltar}</button>
       <div class="coluna" style="gap:0"><span class="dica" style="font-size:11px;font-weight:800;letter-spacing:2px">CÓDIGO DA SALA</span><span class="bebas ouro" style="font-size:40px;letter-spacing:6px">${s.codigo}</span></div>
       <span class="dica cresce">Mande o código para os amigos · ${lista.length}/10 na sala</span></div>
     <div class="linha cresce" style="align-items:stretch;gap:12px">${coluna(0)}${coluna(1)}</div>
-    <div class="linha"><button class="btn btn-fraco" id="s-time">${meuTime ? 'Ir para a Polícia' : 'Ir para os Bandidos'}</button><button class="btn btn-fraco" id="s-roupa">Roupa</button><span class="cresce"></span>
+    <div class="linha"><button class="btn btn-fraco" id="s-roupa">Personagem</button><span class="cresce"></span>
       ${s.host ? `<button class="btn btn-ouro btn-grande" id="s-iniciar" style="height:48px;font-size:24px">INICIAR ${ICONE.play}</button>` : '<span class="dica">Esperando quem criou a sala iniciar…</span>'}</div></div>`), 'sala');
   $('#s-sair', t).onclick = async () => {
     if (await confirmar('Sair da sala?', s.host ? 'Você criou a sala: ela fecha para todos.' : '', 'Sair')) { sairDaSala(); telaInicio(); }
   };
-  $('#s-time', t).onclick = () => { const outro = 1 - meuTime; guardado.set('lado', outro); s.atualizar(minhaEntrada(outro)); };
+  for (const c of $$('[data-time]', t)) c.onclick = () => {
+    const lado = Number(c.dataset.time);
+    if (lado === meuTime) return;
+    guardado.set('lado', lado);
+    s.atualizar(minhaEntrada(lado));
+  };
   $('#s-roupa', t).onclick = () => telaRoupa(meuTime, () => { s.atualizar(minhaEntrada(meuTime)); telaSala(); });
   if (s.host) $('#s-iniciar', t).onclick = async () => { if (!(await s.comecar())) aviso('Não consegui iniciar (sem conexão?)'); };
 }

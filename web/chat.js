@@ -196,24 +196,46 @@ async function escolherPresente(p) {
   palco.appendChild(el);
   $('#pr-fechar', el).onclick = () => el.remove();
   for (const b of $$('[data-item]', el)) b.onclick = async () => {
-    const item = b.dataset.item, s = presenteavel(item);
-    if (!s) return;
-    if (conta.moedas < s.preco) { aviso(`Moedas insuficientes: precisa de ${fmt(s.preco)}`); return; }
-    const sim = await confirmar('Mandar presente?', `${s.nome} (${RARIDADES[s.raridade]}) para ${p.nome} por ${fmt(s.preco)} moedas.`, 'Mandar');
-    if (!sim) return;
     b.disabled = true;
-    const chave = (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2)).slice(0, 36);
-    let r = await socialApi('POST', 'presente', { para: p.uid, item, chave });
-    if (r.status === 0) r = await socialApi('POST', 'presente', { para: p.uid, item, chave });  // caiu a internet: a mesma chave não cobra duas vezes
+    if (await enviarPresente(p, b.dataset.item)) el.remove();
     b.disabled = false;
-    if (r.ok) {
-      if (typeof r.moedas === 'number') conta.moedas = r.moedas;  // o saldo que o servidor deixou
-      el.remove();
-      janela('Presente enviado!', `${p.nome} recebeu ${s.nome}. Ele vai ver o aviso ao abrir o jogo.`);
-    } else {
-      if (typeof r.moedas === 'number') conta.moedas = r.moedas;
-      aviso(r.erro || 'Não consegui mandar o presente');
-    }
+  };
+}
+// confirma e manda (o servidor cobra e entrega); true se foi
+async function enviarPresente(p, item) {
+  const s = presenteavel(item);
+  if (!s) return false;
+  if (conta.moedas < s.preco) { aviso(`Moedas insuficientes: precisa de ${fmt(s.preco)}`); return false; }
+  const sim = await confirmar('Mandar presente?', `${s.nome} (${RARIDADES[s.raridade]}) para ${p.nome} por ${fmt(s.preco)} moedas.`, 'Mandar');
+  if (!sim) return false;
+  const chave = (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2)).slice(0, 36);
+  let r = await socialApi('POST', 'presente', { para: p.uid, item, chave });
+  if (r.status === 0) r = await socialApi('POST', 'presente', { para: p.uid, item, chave });  // caiu a internet: a mesma chave não cobra duas vezes
+  if (typeof r.moedas === 'number') conta.moedas = r.moedas;  // o saldo que o servidor deixou
+  if (!r.ok) { aviso(r.erro || 'Não consegui mandar o presente'); return false; }
+  janela('Presente enviado!', `${p.nome} recebeu ${s.nome}. Ele vai ver o aviso ao abrir o jogo.`);
+  return true;
+}
+// mercado → ENVIAR: escolher o amigo que vai ganhar a skin
+async function escolherAmigoParaPresente(skin) {
+  if (!fb || !fb.token || fb.anonimo) { janela('Entre na sua conta', 'Para mandar presentes, entre com a sua conta.'); return; }
+  if (chat.presentesLigados === null) { const e = await socialApi('GET', 'estado'); chat.presentesLigados = !!e.presentes; }
+  if (!chat.presentesLigados) { janela('Presentes', 'Os presentes ainda estão sendo ligados no servidor do jogo. Tente de novo mais tarde.'); return; }
+  const amigos = social.pronto ? await meusAmigos() : [];
+  if (!amigos.length) { janela('Mandar presente', 'Você ainda não tem amigos. Adicione pela tela Amigos (pelo ID ou pelo nick).'); return; }
+  const item = `skin_arma:${skin.arma}:${skin.key}`;
+  const el = html(`<div class="camada fixo"><div class="janela" style="min-width:340px;max-height:86%">
+    <div class="linha"><span class="t cresce">🎁 ${esc(skin.nome)}</span><button class="btn btn-fraco" id="pa-fechar" aria-label="Fechar">✕</button></div>
+    <span class="dica">Para qual amigo? Você paga ${fmt(skin.preco)} moedas.</span>
+    <div class="coluna" style="gap:6px;overflow:auto">${amigos.map((p) => `<button class="btn btn-fraco" data-uid="${esc(p.uid)}" style="display:flex;justify-content:space-between">
+      <span>${esc(p.nome)}</span><span class="dica">NV ${p.nivel || 1}</span></button>`).join('')}</div></div></div>`);
+  palco.appendChild(el);
+  $('#pa-fechar', el).onclick = () => el.remove();
+  for (const b of $$('[data-uid]', el)) b.onclick = async () => {
+    const p = amigos.find((x) => x.uid === b.dataset.uid);
+    b.disabled = true;
+    if (await enviarPresente(p, item)) el.remove();
+    b.disabled = false;
   };
 }
 // abrir um presente recebido: a skin entra no inventário (e marca como recebido)

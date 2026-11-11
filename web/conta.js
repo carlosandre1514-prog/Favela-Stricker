@@ -201,6 +201,20 @@ class Firebase {
   criar(email, senha) { this.anonimo = false; return this.auth('signUp', { email, password: senha, returnSecureToken: true }); }
   entrar(email, senha) { this.anonimo = false; return this.auth('signInWithPassword', { email, password: senha, returnSecureToken: true }); }
   async convidado() { const e = await this.auth('signUp', { returnSecureToken: true }); this.anonimo = !e; return e; }
+  // login com Google: o token de identidade (do botão do Google no site ou da conta do celular no APK) entra no
+  // Firebase do jogo; a mesma conta em qualquer aparelho. Devolve null ou o erro.
+  async google(idToken) {
+    this.anonimo = false;
+    try {
+      const r = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithIdp?key=${this.key}`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ postBody: 'id_token=' + encodeURIComponent(idToken) + '&providerId=google.com', requestUri: location.origin.startsWith('http') ? location.origin : 'http://localhost', returnSecureToken: true }) });
+      const j = await r.json();
+      if (!r.ok) return /OPERATION_NOT_ALLOWED/.test((j.error && j.error.message) || '') ? 'O login com Google está desligado no Firebase (Authentication → Sign-in method → Google)' : Firebase.erro(j.error && j.error.message);
+      this.pegar(j);
+      this.nomeGoogle = j.firstName || (j.displayName || '').split(' ')[0] || '';
+      return null;
+    } catch (e) { return 'Sem internet (' + e.message + ')'; }
+  }
   recuperar(email) { return this.auth('sendOobCode', { requestType: 'PASSWORD_RESET', email }); }
   async restaurar(refresh) {
     try {
