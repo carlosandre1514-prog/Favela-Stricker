@@ -51,31 +51,6 @@ const armaInicial = (time) => {
   return comSkin ? comSkin.key : armaPadrao(time);
 };
 
-// ---------------- acessórios das armas ----------------
-// Encaixados em cada arma pelo motor (shaders/kit/armas/montagem.json). Um por espaço: mira, boca, pente, coronha.
-// bit: o mesmo do motor (Engine.h: ACC_*)
-const ACESSORIOS = [
-  { key: 'holografica', slot: 'mira', bit: 32, nome: 'Mira holográfica', efeito: 'ponto vermelho na mira · -10% de tranco' },
-  { key: 'luneta', slot: 'mira', bit: 64, nome: 'Luneta 4x', efeito: 'zoom de 4x mirando' },
-  { key: 'silenciador', slot: 'boca', bit: 8, nome: 'Silenciador', efeito: 'tiro baixo, sem clarão e sem aparecer no mapa' },
-  { key: 'freio', slot: 'boca', bit: 16, nome: 'Freio de boca', efeito: '+10% de dano · -12% de tranco' },
-  { key: 'pente', slot: 'pente', bit: 128, nome: 'Pente alongado', efeito: '+50% de balas no pente' },
-  { key: 'coronha', slot: 'coronha', bit: 256, nome: 'Coronha tática', efeito: '-25% de tranco' },
-];
-const ESPACOS = [['mira', 'Mira'], ['boca', 'Boca do cano'], ['pente', 'Pente'], ['coronha', 'Coronha']];
-// o que encaixa em cada arma (a M4 Colt já tem luneta; a Doze não tem pente nem silenciador; a pistola é pequena)
-const ACESSORIOS_DA_ARMA = {
-  m4a1: ['holografica', 'luneta', 'silenciador', 'freio', 'pente', 'coronha'],
-  m4colt: ['silenciador', 'freio', 'pente', 'coronha'],
-  ak47: ['holografica', 'luneta', 'silenciador', 'freio', 'pente', 'coronha'],
-  ak74: ['holografica', 'luneta', 'silenciador', 'freio', 'pente', 'coronha'],
-  ak74_tatica: ['holografica', 'luneta', 'silenciador', 'freio', 'pente', 'coronha'],
-  smg: ['holografica', 'silenciador', 'freio', 'pente', 'coronha'],
-  doze: ['holografica', 'freio', 'coronha'],
-  tt33: ['silenciador', 'pente'],
-};
-const acessorioPorKey = (k) => ACESSORIOS.find((a) => a.key === k);
-
 // Skins de arma: web/catalogo.js (o mesmo arquivo no servidor, que confere os preços dos presentes)
 
 // Armas giratórias da loja (tools/recortar_giro.py: giro/<arma>_<skin>.webp, quadros lado a lado): tamanho de cada
@@ -223,19 +198,6 @@ const conta = {
     return minhas.find((r) => r.key === guardado.get('roupa_' + time, '') && this.temRoupa(r)) || minhas.find((r) => this.temRoupa(r));
   },
   usarRoupa(time, key) { guardado.set('roupa_' + time, key); },
-  // acessórios escolhidos de uma arma: { mira, boca, pente, coronha } (chave do acessório ou '')
-  acessorios(arma) { return { ...(guardado.get('acessorios', {})[arma] || {}) }; },
-  usarAcessorio(arma, espaco, key) {
-    const todos = guardado.get('acessorios', {});
-    todos[arma] = { ...(todos[arma] || {}), [espaco]: key || '' };
-    guardado.set('acessorios', todos);
-    salvarConta();
-  },
-  // bits para o motor (só os que encaixam nessa arma)
-  bitsAcessorios(arma) {
-    const ok = ACESSORIOS_DA_ARMA[arma] || [];
-    return Object.values(this.acessorios(arma)).reduce((b, k) => (ok.includes(k) ? b | acessorioPorKey(k).bit : b), 0);
-  },
   carreira() {
     let c = guardado.get('carreira', null);
     if (!c) {  // primeira vez: começa pelo histórico de partidas que já existe no aparelho
@@ -366,7 +328,7 @@ function contaJson() {
   const itens = {};
   for (const i of conta.itens()) itens[i.replace(/:/g, '|')] = true;  // ':' não pode em chave do Firebase
   return { nome: conta.nome(), moedas: conta.moedas, xp: conta.xp, itens, opacidadeHud: config.opacidadeHud,
-    carreira: conta.carreira(), titulo: guardado.get('titulo', 'novato'), acessorios: guardado.get('acessorios', {}), corCartao: guardado.get('cor_cartao', 'noite'), atualizado: { '.sv': 'timestamp' } };
+    carreira: conta.carreira(), titulo: guardado.get('titulo', 'novato'), corCartao: guardado.get('cor_cartao', 'noite'), atualizado: { '.sv': 'timestamp' } };
 }
 let salvando = null;
 function salvarConta() {
@@ -400,7 +362,6 @@ async function carregarConta() {
       guardado.set('carreira', c);
     }
     if (typeof r.dado.titulo === 'string') guardado.set('titulo', r.dado.titulo);
-    if (r.dado.acessorios && typeof r.dado.acessorios === 'object') guardado.set('acessorios', r.dado.acessorios);
     if (typeof r.dado.corCartao === 'string') guardado.set('cor_cartao', r.dado.corCartao);
     if (typeof r.dado.opacidadeHud === 'number') { config.opacidadeHud = Math.min(1, Math.max(0.3, r.dado.opacidadeHud)); salvarConfig(); }
   } catch (_) {}
@@ -494,7 +455,7 @@ class Sala {
   // o que o motor precisa de cada pessoa: lado, roupa, as duas armas e as skins das armas dela (os outros veem)
   roster() {
     return JSON.stringify(this.lista().map((p) => ({ id: p.id, nome: p.nome || 'Jogador', time: p.time | 0, skin: p.skin | 0,
-      arma: p.arma || '', arma2: p.arma2 || 'tt33', skins: p.skins || {}, acc: p.acc || {} })));
+      arma: p.arma || '', arma2: p.arma2 || 'tt33', skins: p.skins || {} })));
   }
   atualizar(eu) { return fb.patch(`salas/${this.codigo}/jogadores/${fb.uid}`, eu); }
   // Ressurgência: quem criou a sala monta os times do formato (solo 1, duo 2, trio 3, squad 4): cada grupo de amigos
@@ -543,7 +504,7 @@ class Sala {
     const d = (g.ok && g.dado) || {};
     const times = d.times || {};
     const jogadores = Object.entries(d.jogadores || this.jogadores).map(([id, p]) => ({ id, nome: p.nome || 'Jogador', time: times[id] | 0,
-      lado: p.time | 0, skin: p.skin | 0, arma: p.arma || '', arma2: p.arma2 || 'tt33', skins: p.skins || {}, acc: p.acc || {} }));
+      lado: p.time | 0, skin: p.skin | 0, arma: p.arma || '', arma2: p.arma2 || 'tt33', skins: p.skins || {} }));
     return { semente: d.semente | 0 || 1, tamanho: d.tamanho | 0 || 4, jogadores, meuTime: times[fb.uid] | 0 };
   }
   async comecar() {
@@ -595,7 +556,5 @@ function minhaEntrada(time) {
   const r = conta.roupa(time);
   const skins = {};
   for (const a of ARMAS) { const sk = conta.skinArma(a.key); if (sk) skins[a.key] = sk; }
-  const acc = {};  // acessórios de cada arma (os outros celulares montam iguais)
-  for (const a of ARMAS) { const b = conta.bitsAcessorios(a.key); if (b) acc[a.key] = b; }
-  return { nome: conta.nome(), time, skin: r.i, arma: armaInicial(time), arma2: 'tt33', skins, acc };
+  return { nome: conta.nome(), time, skin: r.i, arma: armaInicial(time), arma2: 'tt33', skins };
 }

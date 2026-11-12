@@ -152,7 +152,6 @@ async function iniciarPartida(time, roupa, sala, armaPrincipal, modo = 0) {
   const rosterBR = br && sala ? sala.rosterBRpronto : null;
   motor.redeSala(sala ? sala.host : false, sala ? fb.uid : '', sala ? (rosterBR ? JSON.stringify(rosterBR) : sala.roster()) : '');
   for (const a of ARMAS) motor.skinArma(a.key, conta.skinArma(a.key));
-  if (motor.acessorios) for (const a of ARMAS) motor.acessorios(a.key, conta.bitsAcessorios(a.key));
   const arma = armaPrincipal || armaInicial(time);
   if (motor.modo) motor.modo(br ? 1 : 0);
   motor.escolhas(time, roupa.i, arma, 'tt33');
@@ -1068,7 +1067,6 @@ function abrirEquipamento() {
       <span class="dica cresce" id="eq-tempo"></span><button class="voltar" id="eq-fechar" aria-label="Fechar">${ICONE.fechar}</button></div>
     <span class="dica" style="font-size:11px;font-weight:800;letter-spacing:2px">ARMA PRINCIPAL</span>
     <div class="equip-grade" id="eq-armas"></div>
-    <div class="equip-acc" id="eq-acc"></div>
     <div class="linha equip-fixos"><span>+ TT-33 (pistola)</span><span>+ 2 granadas</span><span class="cresce"></span>
       <button class="btn btn-ouro" id="eq-ok">PRONTO</button></div>
   </div></div>`);
@@ -1081,22 +1079,6 @@ function abrirEquipamento() {
         <img src="armas/${a.key}${sk ? '_' + sk : ''}.png" alt="" onerror="this.src='armas/${a.key}.png'">
         <b>${esc(a.nome)}</b><span>${a.key === atual ? '✓ equipada' : sk ? '★ com a sua skin' : a.luneta ? 'com luneta' : a.tipo ? a.tipo : 'pente ' + a.pente}</span></button>`;
     }).join('');
-    // acessórios da arma escolhida (trocar aqui já monta na mão)
-    const ok = ACESSORIOS_DA_ARMA[atual] || [];
-    const meus = conta.acessorios(atual);
-    $('#eq-acc', c).innerHTML = ok.length ? `<span class="dica" style="font-size:11px;font-weight:800;letter-spacing:2px">ACESSÓRIOS · ${esc(armaPorKey(atual).nome.toUpperCase())}</span>
-      <div class="linha" style="gap:6px;flex-wrap:wrap">${ESPACOS.map(([esp, nomeEsp]) => {
-        const opc = ACESSORIOS.filter((x) => x.slot === esp && ok.includes(x.key));
-        if (!opc.length) return '';
-        return `<div class="eq-esp"><small>${nomeEsp}</small>${[{ key: '', nome: 'Nenhum' }, ...opc].map((x) =>
-          `<button class="${(meus[esp] || '') === x.key ? 'sel' : ''}" data-esp="${esp}" data-acc="${x.key}">${esc(x.nome)}</button>`).join('')}</div>`;
-      }).join('')}</div>` : '';
-    for (const b of $$('[data-acc]', c)) b.onclick = () => {
-      conta.usarAcessorio(atual, b.dataset.esp, b.dataset.acc);
-      if (motor.acessorios) motor.acessorios(atual, conta.bitsAcessorios(atual));
-      motor.equipar(atual);  // monta de novo na mão (só no aquecimento)
-      desenhar();
-    };
     for (const b of $$('[data-arma]', c)) b.onclick = () => {
       const k = b.dataset.arma;
       motor.equipar(k);

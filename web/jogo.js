@@ -531,16 +531,7 @@ function telaMoedas() {
 // ---------------- armas e dano ----------------
 // Arsenal: todas as armas do jogo. Tocar numa arma abre as skins dela: as compradas equipam na hora (vale no jogo e no
 // online); as que ainda não são suas aparecem com cadeado e levam ao mercado.
-// desenho de cada acessório (traço simples, como os outros ícones)
-const ICONE_ACC = {
-  holografica: '<svg viewBox="0 0 32 24" width="40" height="30"><rect x="6" y="5" width="20" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="16" cy="12" r="2.2" fill="#F87171"/><rect x="5" y="19" width="22" height="3" rx="1" fill="currentColor"/></svg>',
-  luneta: '<svg viewBox="0 0 40 24" width="46" height="28"><rect x="8" y="7" width="22" height="8" rx="3" fill="currentColor"/><path d="M30 6l7-2v14l-7-2z" fill="currentColor"/><path d="M3 8h5v6H3z" fill="currentColor"/><rect x="12" y="15" width="3" height="5" fill="currentColor"/><rect x="23" y="15" width="3" height="5" fill="currentColor"/><rect x="17" y="3" width="4" height="4" fill="currentColor"/></svg>',
-  silenciador: '<svg viewBox="0 0 40 24" width="46" height="28"><rect x="3" y="8" width="34" height="8" rx="4" fill="currentColor"/><rect x="3" y="7" width="5" height="10" rx="1" fill="currentColor" opacity=".7"/></svg>',
-  freio: '<svg viewBox="0 0 32 24" width="40" height="30"><rect x="6" y="7" width="20" height="10" rx="2" fill="currentColor"/><rect x="10" y="9" width="3" height="6" fill="#0B0F17"/><rect x="15" y="9" width="3" height="6" fill="#0B0F17"/><rect x="20" y="9" width="3" height="6" fill="#0B0F17"/></svg>',
-  pente: '<svg viewBox="0 0 24 32" width="26" height="34"><path d="M7 2h10v12l-1 16H8L7 14z" fill="currentColor"/><rect x="6" y="27" width="12" height="3" rx="1" fill="#FCD34D"/></svg>',
-  coronha: '<svg viewBox="0 0 40 24" width="46" height="28"><path d="M3 9h16l15-5v16l-15-5H3z" fill="currentColor"/><rect x="33" y="3" width="4" height="18" rx="1" fill="#FCD34D"/></svg>',
-};
-function telaArmas(armaSel = null, aba = 'skins') {
+function telaArmas(armaSel = null) {
   motor.girarMenu(true);
   const skinsDe = (a) => SKINS_ARMA.filter((s) => s.arma === a.key);
   const minhas = (a) => skinsDe(a).filter((s) => conta.temSkinArma(s));
@@ -561,20 +552,12 @@ function telaArmas(armaSel = null, aba = 'skins') {
     for (const b of $$('[data-arma]', t)) b.onclick = () => telaArmas(b.dataset.arma);
     return;
   }
-  const temAcc = (ACESSORIOS_DA_ARMA[arma.key] || []).length > 0;
-  if (!temAcc) aba = 'skins';
   const t = mostrar(html(`<div class="tela" style="gap:10px">
     <div class="linha cresce" style="align-items:stretch;gap:14px;min-height:0">
       <div class="arsenal-equipada coluna" id="ar-eq"></div>
-      <div class="coluna cresce" style="gap:8px;min-width:0;min-height:0">
-        ${temAcc ? `<div class="segmento" role="tablist"><button role="tab" data-aba="skins" class="${aba === 'skins' ? 'sel' : ''}">SKINS</button>
-          <button role="tab" data-aba="acessorios" class="${aba === 'acessorios' ? 'sel' : ''}">ACESSÓRIOS</button></div>` : ''}
-        <div class="grade-itens cresce" id="ar-skins" style="grid-template-columns:repeat(3,minmax(0,1fr))" ${aba === 'skins' ? '' : 'hidden'}></div>
-        <div class="acc-espacos cresce" id="ar-acc" ${aba === 'acessorios' ? '' : 'hidden'}></div>
-      </div>
+      <div class="grade-itens cresce" id="ar-skins" style="grid-template-columns:repeat(3,minmax(0,1fr))"></div>
     </div></div>`), 'armas');
   t.prepend(topo('ARSENAL · ' + arma.nome.toUpperCase(), () => telaArmas(), '', chipMoedas(false)));
-  for (const b of $$('[data-aba]', t)) b.onclick = () => telaArmas(arma.key, b.dataset.aba);
   const desenhar = () => {
     const s = equipada(arma);
     const giro = s ? `${s.arma}_${s.key}` : '';
@@ -598,23 +581,6 @@ function telaArmas(armaSel = null, aba = 'skins') {
       }).join('');
     for (const b of $$('[data-skin]', t)) b.onclick = () => { conta.usarSkinArma(arma.key, b.dataset.skin); desenhar(); };
     for (const b of $$('[data-loja]', t)) b.onclick = () => telaMercado(arma.key, `skin_arma:${arma.key}:${b.dataset.loja}`);
-    // acessórios: um por espaço (mira, boca, pente, coronha); só os que encaixam nesta arma
-    const ok = ACESSORIOS_DA_ARMA[arma.key] || [];
-    const meus = conta.acessorios(arma.key);
-    $('#ar-acc', t).innerHTML = ESPACOS.filter(([esp]) => ACESSORIOS.some((x) => x.slot === esp && ok.includes(x.key))).map(([esp, nomeEsp]) => {
-      const opcoes = ACESSORIOS.filter((x) => x.slot === esp && ok.includes(x.key));
-      const atual = meus[esp] || '';
-      return `<div class="acc-linha"><span class="acc-espaco">${nomeEsp}</span><div class="acc-opcoes">
-        <button class="acc-op ${!atual ? 'sel' : ''}" data-esp="${esp}" data-acc=""><span class="acc-ic">—</span><b>Nenhum</b><span>sem acessório</span></button>
-        ${opcoes.map((x) => `<button class="acc-op ${atual === x.key ? 'sel' : ''}" data-esp="${esp}" data-acc="${x.key}"><span class="acc-ic">${ICONE_ACC[x.key]}</span>
-          <b>${esc(x.nome)}</b><span>${esc(x.efeito)}</span></button>`).join('')}</div></div>`;
-    }).join('');
-    for (const b of $$('[data-acc]', t)) b.onclick = () => { conta.usarAcessorio(arma.key, b.dataset.esp, b.dataset.acc); desenhar(); };
-    const chips = Object.values(meus).filter((k) => ok.includes(k)).map((k) => `<span class="acc-chip">${esc(acessorioPorKey(k).nome)}</span>`).join('');
-    const eq = $('#ar-eq', t);
-    let lista = $('.acc-chips', eq);
-    if (!lista) { lista = document.createElement('div'); lista.className = 'acc-chips'; eq.appendChild(lista); }
-    lista.innerHTML = chips || '<span class="dica">sem acessórios</span>';
   };
   desenhar();
 }

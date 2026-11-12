@@ -55,13 +55,6 @@ constexpr int kGunCount = int(sizeof(kGuns) / sizeof(kGuns[0]));
 const char* kTeamName[2] = {"Polícia", "Bandidos"};
 const char* kTeamIcon[2] = {"🚓", "🔫"};
 
-// acessórios de uma arma de um lutador (o jogador deste aparelho e os de outro celular; robô não tem)
-uint32_t accDe(const Fighter& f, const std::string& gun) {
-    const auto it = f.gunAcc.find(gun);
-    return it == f.gunAcc.end() ? 0u : it->second;
-}
-// pente da arma com o acessório: pente alongado = +50%
-int penteDe(int mag, uint32_t acc) { return acc & ACC_Pente ? (mag * 3 + 1) / 2 : mag; }
 // tipo da arma no motor (pose, tamanho, som): pistola, escopeta ou fuzil (a Sub 9mm é um fuzil menor)
 int gunKind(const std::string& key) { return key == "tt33" ? WK_Pistol : key == "doze" ? WK_Shotgun : WK_Rifle; }
 float gunSize(const std::string& key) { return key == "smg" ? 0.66f : 1.f; }
@@ -116,8 +109,6 @@ void equipGun(Engine* e, Fighter& f) {
     // (spawnWeaponModel: kLowDist), então o visual das armas não muda e as dos outros longe custam pouco
     look.file = arqMao;
     look.size = gunSize(gunOf(k).key);
-    const uint32_t acc = accDe(f, gunOf(k).key);
-    look.accessories = acc;
     int w = createWeapon(e, kind, ci, look);
     // pintura da skin; a de modelo próprio tem a dela (o UV de cada modelo é outro): armas/skins/<modelo>.jpg
     auto pintar = [&](GameObject& wg, const std::string& gun, const std::string& arquivo) {
@@ -140,7 +131,6 @@ void equipGun(Engine* e, Fighter& f) {
         const std::string arqGuardada = gunModelFile(e, gunOf(outra).key, skinDe(gunOf(outra).key));
         guardada.file = arqGuardada;  // (de longe, a versão reduzida do motor)
         guardada.size = gunSize(outra);
-        guardada.accessories = accDe(f, outra);
         int hw = holsterWeapon(e, ci, gunKind(outra), guardada);
         if (GameObject* hg = objectById(e, hw)) pintar(*hg, gunOf(outra).key, arqGuardada);
     } else {
@@ -150,10 +140,7 @@ void equipGun(Engine* e, Fighter& f) {
     CharacterInfo& c = e->characters[ci];
     const GunDef& g = gunOf(k);
     c.gunDmg = g.dmg; c.gunInterval = g.interval; c.gunSpread = g.spread; c.gunPellets = g.pellets;
-    c.gunFalloff = g.falloff; c.magSize = penteDe(g.mag, acc); c.reloadTimer = 0.f;
-    // acessórios: freio de boca +10% de dano; coronha, freio e mira holográfica seguram o tranco (menos dispersão)
-    if (acc & ACC_Freio) c.gunDmg *= 1.1f;
-    c.gunSpread *= (acc & ACC_Coronha ? 0.75f : 1.f) * (acc & ACC_Freio ? 0.88f : 1.f) * (acc & ACC_Holo ? 0.9f : 1.f);
+    c.gunFalloff = g.falloff; c.magSize = g.mag; c.reloadTimer = 0.f;
     if (f.bot) { c.ammo = g.mag; c.reserve = -1; }
     else { c.ammo = f.mag[f.slot]; c.reserve = f.reserve[f.slot]; }
 }
@@ -164,7 +151,7 @@ void fillAmmo(Fighter& f) {
     f.weapon = f.slot ? f.secondary : f.primary;
     for (int s = 0; s < 2; ++s) {
         const GunDef& g = gunOf(s ? f.secondary : f.primary);
-        f.mag[s] = penteDe(g.mag, accDe(f, g.key)); f.reserve[s] = g.reserve;
+        f.mag[s] = g.mag; f.reserve[s] = g.reserve;
     }
     f.grenades = 2;
 }
@@ -626,15 +613,10 @@ void brStart(Engine* e) {
             if (eu) {
                 if (knownGun(M.playerPrimary) && M.playerPrimary != "tt33") f.weapon = f.primary = M.playerPrimary;
                 f.slot = 0;
-                f.gunAcc = M.gunAcc;
                 fillAmmo(f);
             } else if (auto sk = j.find("skins"); sk != j.end() && sk->is_object())
                 for (auto it = sk->begin(); it != sk->end(); ++it)
                     if (it->is_string() && knownGun(it.key())) f.gunSkins[it.key()] = it->get<std::string>();
-            if (!eu)  // acessórios de quem é de outro celular
-                if (auto ac = j.find("acc"); ac != j.end() && ac->is_object())
-                    for (auto it = ac->begin(); it != ac->end(); ++it)
-                        if (it->is_number_integer() && knownGun(it.key())) f.gunAcc[it.key()] = it->get<uint32_t>();
             f.netWeapon = f.weapon;
             const int k = noTime[f.team]++;
             const float a = 6.2831853f * k / std::max(1, M.tamanhoTime) + 0.3f;
@@ -664,7 +646,6 @@ void brStart(Engine* e) {
                 f.primary = f.weapon;
                 f.secondary = knownGun(M.playerSecondary) ? M.playerSecondary : "";
                 f.slot = 0;
-                f.gunAcc = M.gunAcc;
                 fillAmmo(f);
             }
             const float a = 6.2831853f * k / kPorTimeBR + e->fxRng.range(0.f, 0.6f);
@@ -989,7 +970,6 @@ void teamStart(Engine* e) {
     int chosen = M.playerTeam, skin = M.playerSkin;
     std::string primary = M.playerPrimary, secondary = M.playerSecondary;
     auto gunSkins = M.gunSkins;
-    auto gunAcc = M.gunAcc;
     const float aquecimentoDur = M.aquecimentoDur;
     bool online = M.online, host = M.host;
     std::string localId = M.localId, roster = M.roster;
@@ -997,7 +977,6 @@ void teamStart(Engine* e) {
     M = TeamMatch{};
     M.playerTeam = chosen; M.playerSkin = skin; M.playerPrimary = primary; M.playerSecondary = secondary;
     M.gunSkins = gunSkins;
-    M.gunAcc = gunAcc;
     M.aquecimentoDur = aquecimentoDur;
     M.online = online; M.host = host; M.localId = localId; M.roster = roster;
     M.modo = modo;
@@ -1094,7 +1073,6 @@ void teamStart(Engine* e) {
             f.primary = f.weapon;
             f.secondary = knownGun(M.playerSecondary) ? gunForTeam(M.playerSecondary, f.team) : "";
             f.slot = 0;
-            f.gunAcc = M.gunAcc;  // acessórios escolhidos no Arsenal
             fillAmmo(f);
         }
         if (M.online) {
@@ -1112,9 +1090,6 @@ void teamStart(Engine* e) {
                 if (auto sk = h.find("skins"); sk != h.end() && sk->is_object())
                     for (auto it = sk->begin(); it != sk->end(); ++it)
                         if (it->is_string() && knownGun(it.key())) f.gunSkins[it.key()] = it->get<std::string>();
-                if (auto ac = h.find("acc"); ac != h.end() && ac->is_object())  // acessórios dela
-                    for (auto it = ac->begin(); it != ac->end(); ++it)
-                        if (it->is_number_integer() && knownGun(it.key())) f.gunAcc[it.key()] = it->get<uint32_t>();
             } else {
                 f.netId = "b" + std::to_string(f.team) + "_" + std::to_string(slotBot[k]);
                 f.remote = !M.host;  // os robôs são de quem criou a sala
@@ -1218,7 +1193,7 @@ void remoteUpdate(Engine* e, Fighter& f, float dt) {
     c.airborne = f.netAir;
     animateCharacter(c, g->transform.rotation, v, !f.netAir, f.netAir);
     if (f.netShots > c.shots) {
-        if (!(accDe(f, f.weapon) & ACC_Silenciador)) f.shotAgo = 0.f;  // atirou: aparece no minimapa (com silenciador, não)
+        f.shotAgo = 0.f;  // atirou: aparece no minimapa dos adversários
         int n = std::min(3, f.netShots - c.shots);
         c.shots = f.netShots;
         for (int k = 0; k < n; ++k) remoteShotFx(e, f, c, *g);
@@ -1368,7 +1343,6 @@ void teamStop(Engine* e) {
     int chosen = M.playerTeam, skin = M.playerSkin;
     std::string primary = M.playerPrimary, secondary = M.playerSecondary;
     auto gunSkins = M.gunSkins;
-    auto gunAcc = M.gunAcc;
     const float aquecimentoDur = M.aquecimentoDur;
     bool online = M.online, host = M.host;
     std::string localId = M.localId, roster = M.roster;
@@ -1376,7 +1350,6 @@ void teamStop(Engine* e) {
     M = TeamMatch{};
     M.playerTeam = chosen; M.playerSkin = skin; M.playerPrimary = primary; M.playerSecondary = secondary;
     M.gunSkins = gunSkins;
-    M.gunAcc = gunAcc;
     M.aquecimentoDur = aquecimentoDur;
     M.online = online; M.host = host; M.localId = localId; M.roster = roster;
     M.modo = modo;
@@ -1549,7 +1522,7 @@ std::string shopBuy(Engine* e, int item) {
         (slot ? f.secondary : f.primary) = g.key;
         f.slot = slot;
         f.weapon = g.key;
-        f.mag[slot] = penteDe(g.mag, accDe(f, g.key)); f.reserve[slot] = g.reserve;
+        f.mag[slot] = g.mag; f.reserve[slot] = g.reserve;
         equipGun(e, f);
     }
     return (has ? "Usando: " : "Comprou: ") + name + "  (💰 $" + std::to_string(f.money) + ")";
@@ -1571,12 +1544,6 @@ std::string teamSkinLook(int team, int skin) {
 }
 
 void teamGunSkin(Engine* e, const std::string& gun, const std::string& skin) { matchOf(e).gunSkins[gun] = skin; }
-void teamGunAcc(Engine* e, const std::string& gun, uint32_t bits) {
-    TeamMatch& M = matchOf(e);
-    M.gunAcc[gun] = bits;
-    const int pf = playerFighter(e);
-    if (M.active && pf >= 0) M.f[pf].gunAcc[gun] = bits;
-}
 
 void teamWarmup(Engine* e, float segundos) {
     TeamMatch& M = matchOf(e);
@@ -1595,7 +1562,7 @@ bool teamEquip(Engine* e, const std::string& gun) {
     f.slot = 0;
     f.weapon = gun;
     const GunDef& g = gunOf(gun);
-    f.mag[0] = penteDe(g.mag, accDe(f, gun)); f.reserve[0] = g.reserve;
+    f.mag[0] = g.mag; f.reserve[0] = g.reserve;
     if (f.secondary == gun) f.secondary = "tt33";
     equipGun(e, f);
     e->game.message = std::string("Equipado: ") + g.name;
@@ -1684,7 +1651,7 @@ std::string hudJson(Engine* e) {
             const GunDef& g = gunOf(s ? f.secondary : f.primary);
             int mag = f.mag[s], res = f.reserve[s];
             if (s == f.slot && ci >= 0) { mag = e->characters[ci].ammo; res = e->characters[ci].reserve; }
-            slots.push_back({{"arma", g.key}, {"nome", g.name}, {"balas", mag}, {"reserva", res}, {"pente", penteDe(g.mag, accDe(f, g.key))}});
+            slots.push_back({{"arma", g.key}, {"nome", g.name}, {"balas", mag}, {"reserva", res}, {"pente", g.mag}});
         }
         j["armas"] = slots;
         if (ci >= 0) {

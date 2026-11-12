@@ -17,7 +17,6 @@ void        jogo_skin_arma(Engine*, const char* arma, const char* skin);   // sk
 const char* jogo_aparencia_roupa(int time, int roupa);                      // aparência do boneco da roupa (JSON)
 void        jogo_aquecimento(Engine*, float segundos);   // antes do Play: aquecimento (0 = sem); na partida: encurta (0 = já vale)
 int         jogo_equipar(Engine*, const char* arma);     // no aquecimento: troca a arma principal (1 se trocou)
-void        jogo_acessorios(Engine*, const char* arma, int bits);  // acessórios de uma arma (bits: 8 silenciador, 16 freio, 32 holográfica, 64 luneta, 128 pente, 256 coronha)
 
 // Na partida
 const char* jogo_hud(Engine*);                       // estado para o HUD (JSON)

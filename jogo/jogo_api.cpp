@@ -25,7 +25,6 @@ void jogo_escolhas(Engine* e, int time, int roupa, const char* principal, const 
 void jogo_modo(Engine* e, int modo) { if (e) eng::teamMode(e, modo); }
 void jogo_aquecimento(Engine* e, float s) { if (e) eng::teamWarmup(e, s); }
 int jogo_equipar(Engine* e, const char* arma) { return e && arma && eng::teamEquip(e, arma) ? 1 : 0; }
-void jogo_acessorios(Engine* e, const char* arma, int bits) { if (e && arma) eng::teamGunAcc(e, arma, uint32_t(bits)); }
 void jogo_skin_arma(Engine* e, const char* arma, const char* skin) { if (e && arma) eng::teamGunSkin(e, arma, skin ? skin : ""); }
 const char* jogo_aparencia_roupa(int time, int roupa) { return texto(eng::teamSkinLook(time, roupa)); }
 

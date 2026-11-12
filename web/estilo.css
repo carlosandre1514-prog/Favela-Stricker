@@ -626,24 +626,3 @@ body.menu-fundo canvas#tela { visibility: hidden; }
 .perfil-tit.travado, .perfil-cor.travado { opacity: .55; }
 .perfil-cor i { width: 100%; height: 34px; border-radius: 8px; background: linear-gradient(120deg, var(--a), var(--b)); border: 1px solid rgba(255,255,255,.15); }
 @media (max-width: 720px) { .perfil-cartao { width: 240px; } }
-
-/* acessórios (Arsenal e Equipamento) */
-.acc-espacos { display: flex; flex-direction: column; gap: 8px; overflow-y: auto; min-height: 0; }
-.acc-espacos[hidden], #ar-skins[hidden] { display: none !important; }
-.acc-linha { display: flex; flex-direction: column; gap: 4px; }
-.acc-espaco { font-size: 11px; font-weight: 800; letter-spacing: 2px; color: #9CA3AF; text-transform: uppercase; }
-.acc-opcoes { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
-.acc-op { display: grid; grid-template-columns: 48px 1fr; grid-template-rows: auto auto; column-gap: 8px; align-items: center; text-align: left; padding: 6px 10px;
-  border-radius: 10px; color: #F3F4F6; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.1); }
-.acc-op .acc-ic { grid-row: 1 / 3; display: flex; align-items: center; justify-content: center; color: #D1D5DB; font-size: 20px; }
-.acc-op b { font-size: 12px; }
-.acc-op span:last-child { font-size: 10px; color: #9CA3AF; line-height: 1.2; }
-.acc-op.sel { border-color: #FBBF24; background: rgba(251,191,36,.14); }
-.acc-op.sel .acc-ic { color: #FCD34D; }
-.acc-chips { display: flex; flex-wrap: wrap; gap: 4px; }
-.acc-chip { font-size: 10px; font-weight: 800; color: #111827; background: #FCD34D; border-radius: 6px; padding: 2px 6px; }
-.equip-acc { display: flex; flex-direction: column; gap: 4px; }
-.eq-esp { display: flex; align-items: center; gap: 4px; padding: 3px 6px; border-radius: 8px; background: rgba(255,255,255,.04); }
-.eq-esp small { font-size: 10px; color: #9CA3AF; font-weight: 800; margin-right: 2px; }
-.eq-esp button { font-size: 11px; padding: 3px 8px; border-radius: 6px; color: #D1D5DB; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.1); }
-.eq-esp button.sel { background: #FBBF24; color: #111827; border-color: #FBBF24; font-weight: 800; }
