@@ -169,7 +169,7 @@ function cartaoConta() {
 // Personagem da tela inicial: o da última partida (lado, roupa e arma com a skin equipada), que gira 360 graus
 // arrastando o dedo. Duas camadas do mesmo tamanho (tools/recortar_lobby.py), cada uma uma tira com os ângulos
 // lado a lado: o personagem na pose de segurar e a arma por cima.
-const LOBBY = { quadros: 24, largura: 390, altura: 480 };
+const LOBBY = { quadros: 24, largura: 409, altura: 480 };
 let anguloBoneco = 0;  // quadro mostrado (fica onde a pessoa deixou enquanto o app está aberto)
 function bonecoInicio() {
   const u = guardado.get('ultimo', null) || { time: guardado.get('lado', 0) };
@@ -343,7 +343,7 @@ function telaLado() {
         <div class="linha" style="gap:12px"><div class="icone" style="background:#3B82F6">${ICONE.escudo}</div><span class="nome" style="color:#93C5FD">POLÍCIA</span></div>
         <span class="texto" style="color:#DBEAFE">Nasce fora da favela, na rua dos prédios. Sobe as escadarias para tomar o morro.</span>
         <span class="cresce"></span>
-        <div class="linha" style="gap:6px;flex-wrap:wrap"><span class="tag" style="background:rgba(59,130,246,.22);color:#DBEAFE">M4A1 · M4 Colt com luneta</span>
+        <div class="linha" style="gap:6px;flex-wrap:wrap"><span class="tag" style="background:rgba(59,130,246,.22);color:#DBEAFE">M4A1 · Sub 9mm · Doze</span>
           <span class="tag" style="background:rgba(59,130,246,.22);color:#DBEAFE">5 fardas grátis: Soldado, PM, BOPE, Selva, Choque</span></div>
         <div class="linha" style="justify-content:space-between"><span style="font-size:12px;color:#BFDBFE">4 robôs + você</span><span class="entrar" style="background:#3B82F6">ENTRAR</span></div>
       </button>
@@ -351,7 +351,7 @@ function telaLado() {
         <div class="linha" style="gap:12px"><div class="icone" style="background:#F59E0B">${ICONE.morro}</div><span class="nome" style="color:#FCD34D">BANDIDOS</span></div>
         <span class="texto" style="color:#FEF3C7">Nasce na quadra, dentro da favela. Com polícia na quadra, nasce num canto do morro sem policial.</span>
         <span class="cresce"></span>
-        <div class="linha" style="gap:6px;flex-wrap:wrap"><span class="tag" style="background:rgba(245,158,11,.22);color:#FEF3C7">AK-47 · AK-74 · AK-74 tática</span>
+        <div class="linha" style="gap:6px;flex-wrap:wrap"><span class="tag" style="background:rgba(245,158,11,.22);color:#FEF3C7">AK-47 · Sub 9mm · Doze</span>
           <span class="tag" style="background:rgba(245,158,11,.22);color:#FEF3C7">4 roupas grátis com colete: Malandro, Vapor, Olheiro, Frente</span></div>
         <div class="linha" style="justify-content:space-between"><span style="font-size:12px;color:#FDE68A">4 robôs + você</span><span class="entrar" style="background:#F59E0B;color:#111827">ENTRAR</span></div>
       </button>
@@ -662,7 +662,7 @@ function telaConfig(aba = 'sens') {
   if (aba === 'sens') {
     c.innerHTML = ajusteHtml('sens', 'Câmera', 0.2, 3, 0.05, 'arrastar a tela / mouse') +
       ajusteHtml('sensMira', 'Mirando', 0.2, 2, 0.05, 'segurando MIRA (fração da câmera)') +
-      ajusteHtml('sensLuneta', 'Luneta', 0.1, 1.5, 0.05, 'olhando pela luneta da M4 Colt') +
+      ajusteHtml('sensLuneta', 'Luneta', 0.1, 1.5, 0.05, 'olhando pela luneta') +
       `<div class="ajuste"><span class="nome">Inverter o eixo vertical<small>arrastar para cima olha para baixo</small></span><span class="cresce"></span><button class="chave ${config.inverterY ? 'ligada' : ''}" id="c-inv"></button></div>
        <div class="ajuste"><span class="nome">Vibrar ao levar tiro</span><span class="cresce"></span><button class="chave ${config.vibrar ? 'ligada' : ''}" id="c-vib"></button></div>
        <div class="ajuste"><span class="nome">Medidor (FPS, ms e ping)</span><span class="cresce"></span><button class="chave ${config.medidor ? 'ligada' : ''}" id="c-med"></button></div>

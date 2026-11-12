@@ -41,11 +41,7 @@ json fighterLook(int team, int skin, const std::string& name) {
 struct GunDef { const char* key; const char* name; int price; int team; float dmg, interval, spread; int burst, pellets, mag, reserve; float falloff; };
 const GunDef kGuns[] = {  // só as armas realistas (modelos do kit)
     {"m4a1", "M4A1", 1200, 0, 24.f, 0.1f, 0.035f, 4, 1, 30, 90, 40.f},
-    {"m4colt", "M4 Colt", 1500, 0, 26.f, 1.f / 9.f, 0.03f, 4, 1, 30, 90, 45.f},
     {"ak47", "AK-47", 1200, 1, 30.f, 0.125f, 0.045f, 3, 1, 30, 90, 35.f},
-    {"ak74", "AK-74", 1400, 1, 27.f, 1.f / 9.f, 0.035f, 4, 1, 30, 90, 40.f},
-    {"ak74_tatica", "AK-74 tática", 1800, 1, 28.f, 1.f / 9.5f, 0.03f, 4, 1, 30, 90, 45.f},
-    {"tt33", "TT-33", 0, -1, 25.f, 1.f / 3.f, 0.03f, 2, 1, 8, 32, 20.f},  // pistola (dos dois lados)
     // Doze (calibre 12, de bomba): 8 bagos de 14 (de perto derruba com 1 tiro bem dado), cai rápido de longe
     {"doze", "Doze", 1600, -1, 14.f, 0.85f, 0.085f, 1, 8, 6, 24, 12.f},
     // Sub 9mm: rápida (14 tiros/s), dano baixo, pente de 30
@@ -588,7 +584,7 @@ void brStart(Engine* e) {
         pousos.push_back(cand[best]);
     }
     M.pousos = pousos;
-    static const char* armas[] = {"m4a1", "m4colt", "ak47", "ak74", "ak74_tatica", "smg", "doze"};
+    static const char* armas[] = {"m4a1", "ak47", "smg", "doze"};
     int nome = e->fxRng.irange(0, int(std::size(kNomesBR)) - 1);
     if (online) {
         std::vector<int> noTime(kMaxTimesBR, 0);
@@ -608,7 +604,7 @@ void brStart(Engine* e) {
             const std::string arma = j.value("arma", "");
             f.weapon = knownGun(arma) && arma != "tt33" ? arma : "m4a1";
             f.primary = f.weapon;
-            const std::string arma2 = j.value("arma2", "tt33");
+            const std::string arma2 = j.value("arma2", "");
             f.secondary = knownGun(arma2) ? arma2 : "";
             if (eu) {
                 if (knownGun(M.playerPrimary) && M.playerPrimary != "tt33") f.weapon = f.primary = M.playerPrimary;
@@ -640,7 +636,7 @@ void brStart(Engine* e) {
             if (f.bot) {
                 f.weapon = armas[e->fxRng.irange(0, int(std::size(armas)) - 1)];
                 f.primary = f.weapon;
-                f.secondary = "tt33";
+                f.secondary = "";  // (a TT-33 saiu do jogo: só a arma principal)
             } else {  // começa com a arma escolhida (e a skin dela)
                 f.weapon = knownGun(M.playerPrimary) ? M.playerPrimary : "m4a1";
                 f.primary = f.weapon;
@@ -1062,11 +1058,11 @@ void teamStart(Engine* e) {
         f.name = f.bot ? std::string(g->name) : "Você";
         f.skin = clampSkin(f.team, r.value("roupa", 0));
         // robôs: a arma do projeto se for do lado (pistola, escopeta e sniper saíram: viram o fuzil do lado)
-        static const char* botGuns[2][5] = {{"m4a1", "m4colt", "smg", "doze", "m4a1"}, {"ak47", "ak74", "smg", "doze", "ak74_tatica"}};
+        static const char* botGuns[2][5] = {{"m4a1", "smg", "doze", "m4a1", "smg"}, {"ak47", "smg", "doze", "ak47", "smg"}};
         std::string arma = r.value("arma", "");
         f.weapon = knownGun(arma) ? gunForTeam(arma, f.team) : botGuns[f.team][M.f.size() % 5];
         f.primary = f.weapon;
-        f.secondary = "tt33";  // robôs também levam a pistola na coxa
+        f.secondary = "";  // (a TT-33 saiu do jogo)
         if (!f.bot) {  // escolhas do jogo: roupa, arma principal e a segunda (troca rápida; "" = só uma)
             if (M.playerSkin >= 0) f.skin = clampSkin(f.team, M.playerSkin);
             if (!M.playerPrimary.empty()) f.weapon = gunForTeam(M.playerPrimary, f.team);
@@ -1563,7 +1559,7 @@ bool teamEquip(Engine* e, const std::string& gun) {
     f.weapon = gun;
     const GunDef& g = gunOf(gun);
     f.mag[0] = g.mag; f.reserve[0] = g.reserve;
-    if (f.secondary == gun) f.secondary = "tt33";
+    if (f.secondary == gun) f.secondary = "";
     equipGun(e, f);
     e->game.message = std::string("Equipado: ") + g.name;
     return true;

@@ -91,7 +91,6 @@ const DICAS = [
   '<b>Porta:</b> um tiro abre a porta para o lado da bala.',
   '<b>Vida:</b> 5 s sem levar tiro nem atirar e a vida volta sozinha.',
   '<b>Munição:</b> quem você abate derruba uma caixa de munição. Passe por cima para pegar.',
-  '<b>Luneta:</b> a M4 Colt tem luneta. Mire para dar zoom.',
   '<b>Granada:</b> jogue para tirar alguém de trás da parede.',
   '<b>Skins:</b> a skin da sua arma aparece na mão, nas costas e no abate.',
 ];
@@ -154,7 +153,7 @@ async function iniciarPartida(time, roupa, sala, armaPrincipal, modo = 0) {
   for (const a of ARMAS) motor.skinArma(a.key, conta.skinArma(a.key));
   const arma = armaPrincipal || armaInicial(time);
   if (motor.modo) motor.modo(br ? 1 : 0);
-  motor.escolhas(time, roupa.i, arma, 'tt33');
+  motor.escolhas(time, roupa.i, arma, '');  // (só a arma principal)
   // aquecimento: antes de valer todo mundo troca tiro e escolhe o equipamento (online 30 s, contra robôs 20 s)
   if (motor.aquecimento) motor.aquecimento(sala ? 30 : 20);
   partida.equipAberto = false;
@@ -357,7 +356,6 @@ const corTime = (t) => (partida && partida.modo === 1 ? (t === (ultimoHud.time |
 // Skins com abate próprio: frase e visual próprios no quadro de abates (chave "arma:skin")
 const ABATES_SKIN = {
   'ak47:dragao_azul': { classe: 'dragao', frase: 'devorou', arma: 'AK-47 Dragão Azul' },
-  'm4colt:carmesim': { classe: 'carmesim', frase: 'destronou', arma: 'M4 Colt Vermelho Carmesim' },
   'ak47:cosmica': { classe: 'cosmica', frase: 'desintegrou', arma: 'AK-47 Energia Cósmica' },
   'm4a1:dragao_raio': { classe: 'dragao', frase: 'eletrocutou', arma: 'M4A1 Dragão Relâmpago' },
   'm4a1:mitica': { classe: 'carmesim', frase: 'coroou', arma: 'M4A1 Mítica' },
@@ -778,7 +776,7 @@ function abrirEditorHud(aoSair) {
   const copia = JSON.parse(JSON.stringify(layout));
   desenharMira($('#mira', ed), false, false, false);
   desenharMinimapa($('#minimapa', ed), [[-8, 10, 0], [12, -6, 0], [4, 26, 1]], 0);
-  $$('.slot', ed).forEach((sl, i) => { sl.querySelector('img').src = i ? 'armas/tt33.png' : 'armas/m4a1.png'; sl.querySelector('span').textContent = i ? '8 / 32' : '30 / 90'; });
+  $$('.slot', ed).forEach((sl, i) => { sl.querySelector('img').src = i ? 'armas/ak47.png' : 'armas/m4a1.png'; sl.querySelector('span').textContent = '30 / 90'; });
   let sel = null;
   const pecas = $$('.peca[data-peca]', ed);
   for (const p of pecas) {
@@ -1067,7 +1065,7 @@ function abrirEquipamento() {
       <span class="dica cresce" id="eq-tempo"></span><button class="voltar" id="eq-fechar" aria-label="Fechar">${ICONE.fechar}</button></div>
     <span class="dica" style="font-size:11px;font-weight:800;letter-spacing:2px">ARMA PRINCIPAL</span>
     <div class="equip-grade" id="eq-armas"></div>
-    <div class="linha equip-fixos"><span>+ TT-33 (pistola)</span><span>+ 2 granadas</span><span class="cresce"></span>
+    <div class="linha equip-fixos"><span>+ 2 granadas</span><span class="cresce"></span>
       <button class="btn btn-ouro" id="eq-ok">PRONTO</button></div>
   </div></div>`);
   palco.appendChild(c);

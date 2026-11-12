@@ -7,13 +7,10 @@ M4A1 (arma realista)
   Uso comercial permitido, com crédito ao autor.
   Alterações: só uma das armas da cena, deitada para o jogo, texturas reduzidas para 1024 px.
 
-AK-47, M4 Colt e AK-74 (madeira e tática)
-  Modelos baixados do CGTrader pelo dono do projeto (autores e licenças a confirmar e completar aqui).
+AK-47
+  Modelo baixado do CGTrader pelo dono do projeto (autor e licença a confirmar e completar aqui).
   Alterações: só as malhas de uma arma montada, texturas reduzidas para 1024 px (tools/fbx_para_glb).
-
-Pistola TT-33 (kit/armas/tt33.glb) e as skins Crimson Forge, Nebula Shadow e Gold Relic (kit/armas/skins)
-  Enviadas pelo dono do projeto (autor e licença do modelo a confirmar e completar aqui).
-  Alterações: sem a bala solta que vinha no arquivo, texturas reduzidas para 1024 px (tools/fbx_para_glb).
+  (vai ser trocada por uma AK-47 feita no Meshy; a M4 Colt, as AK-74 e a TT-33 já saíram do jogo)
 
 Acessórios de arma (mira red dot, trilho, coronha tática, empunhadura frontal) — arquivo "Low.fbx"
   Autor: a confirmar (pacote gratuito enviado pelo dono do projeto).

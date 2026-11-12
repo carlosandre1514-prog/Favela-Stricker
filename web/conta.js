@@ -28,12 +28,8 @@ const ROUPAS = [
 // Armas (compradas na partida com o $ dos abates). Os números são os do motor (Partida.cpp kGuns).
 // Todas valem para os dois lados: policial pode usar AK e bandido pode usar M4.
 const ARMAS = [
-  { key: 'tt33', nome: 'TT-33', dano: 25, cadencia: 3, pente: 8, cai: 20, inicial: true },
   { key: 'm4a1', nome: 'M4A1', dano: 24, cadencia: 10, pente: 30, cai: 40, inicial: true },
-  { key: 'm4colt', nome: 'M4 Colt', dano: 26, cadencia: 9, pente: 30, cai: 45, luneta: true },
   { key: 'ak47', nome: 'AK-47', dano: 30, cadencia: 8, pente: 30, cai: 35, inicial: true },
-  { key: 'ak74', nome: 'AK-74', dano: 27, cadencia: 9, pente: 30, cai: 40 },
-  { key: 'ak74_tatica', nome: 'AK-74 tática', dano: 28, cadencia: 9.5, pente: 30, cai: 45 },
   { key: 'doze', nome: 'Doze', dano: 14, bagos: 8, cadencia: 1.2, pente: 6, cai: 12, tipo: 'escopeta' },
   { key: 'smg', nome: 'Sub 9mm', dano: 19, cadencia: 14, pente: 30, cai: 25, tipo: 'submetralhadora' },
 ];
@@ -55,7 +51,7 @@ const armaInicial = (time) => {
 
 // Armas giratórias da loja (tools/recortar_giro.py: giro/<arma>_<skin>.webp, quadros lado a lado): tamanho de cada
 // quadro. A skin sem tira usa a foto parada (armas/<arma>_<skin>.png).
-const GIRO = {"ak47_cosmica":{"altura":138,"largura":400,"quadros":24},"ak47_deserto":{"altura":132,"largura":400,"quadros":24},"ak47_dourada":{"altura":132,"largura":400,"quadros":24},"ak47_dragao":{"altura":132,"largura":400,"quadros":24},"ak47_dragao_azul":{"altura":132,"largura":400,"quadros":24},"ak74_favela":{"altura":115,"largura":400,"quadros":24},"ak74_tatica_selva":{"altura":118,"largura":400,"quadros":24},"m4a1_dragao_raio":{"altura":150,"largura":400,"quadros":24},"m4a1_mitica":{"altura":153,"largura":400,"quadros":24},"m4a1_neon":{"altura":143,"largura":400,"quadros":24},"m4a1_urbana":{"altura":143,"largura":400,"quadros":24},"m4colt_carmesim":{"altura":160,"largura":374,"quadros":24},"m4colt_dourada":{"altura":160,"largura":374,"quadros":24},"tt33_crimson_forge":{"altura":160,"largura":217,"quadros":24},"tt33_gold_relic":{"altura":160,"largura":217,"quadros":24},"tt33_nebula_shadow":{"altura":160,"largura":217,"quadros":24}};
+const GIRO = {"ak47_cosmica":{"altura":138,"largura":400,"quadros":24},"ak47_deserto":{"altura":132,"largura":400,"quadros":24},"ak47_dourada":{"altura":132,"largura":400,"quadros":24},"ak47_dragao":{"altura":132,"largura":400,"quadros":24},"ak47_dragao_azul":{"altura":132,"largura":400,"quadros":24},"m4a1_dragao_raio":{"altura":150,"largura":400,"quadros":24},"m4a1_mitica":{"altura":153,"largura":400,"quadros":24},"m4a1_neon":{"altura":143,"largura":400,"quadros":24},"m4a1_urbana":{"altura":143,"largura":400,"quadros":24}};
 
 const PACOTES = [
   { moedas: 100, bonus: 0, preco: 'R$ 4,99' },
@@ -455,7 +451,7 @@ class Sala {
   // o que o motor precisa de cada pessoa: lado, roupa, as duas armas e as skins das armas dela (os outros veem)
   roster() {
     return JSON.stringify(this.lista().map((p) => ({ id: p.id, nome: p.nome || 'Jogador', time: p.time | 0, skin: p.skin | 0,
-      arma: p.arma || '', arma2: p.arma2 || 'tt33', skins: p.skins || {} })));
+      arma: p.arma || '', arma2: p.arma2 || '', skins: p.skins || {} })));
   }
   atualizar(eu) { return fb.patch(`salas/${this.codigo}/jogadores/${fb.uid}`, eu); }
   // Ressurgência: quem criou a sala monta os times do formato (solo 1, duo 2, trio 3, squad 4): cada grupo de amigos
@@ -504,7 +500,7 @@ class Sala {
     const d = (g.ok && g.dado) || {};
     const times = d.times || {};
     const jogadores = Object.entries(d.jogadores || this.jogadores).map(([id, p]) => ({ id, nome: p.nome || 'Jogador', time: times[id] | 0,
-      lado: p.time | 0, skin: p.skin | 0, arma: p.arma || '', arma2: p.arma2 || 'tt33', skins: p.skins || {} }));
+      lado: p.time | 0, skin: p.skin | 0, arma: p.arma || '', arma2: p.arma2 || '', skins: p.skins || {} }));
     return { semente: d.semente | 0 || 1, tamanho: d.tamanho | 0 || 4, jogadores, meuTime: times[fb.uid] | 0 };
   }
   async comecar() {
@@ -556,5 +552,5 @@ function minhaEntrada(time) {
   const r = conta.roupa(time);
   const skins = {};
   for (const a of ARMAS) { const sk = conta.skinArma(a.key); if (sk) skins[a.key] = sk; }
-  return { nome: conta.nome(), time, skin: r.i, arma: armaInicial(time), arma2: 'tt33', skins };
+  return { nome: conta.nome(), time, skin: r.i, arma: armaInicial(time), arma2: '', skins };
 }

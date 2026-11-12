@@ -89,14 +89,8 @@ std::string realWeaponFile(const std::string& s) {
     n.erase(std::remove(n.begin(), n.end(), '_'), n.end());
     if (n.find("doze") != std::string::npos || n.find("calibre12") != std::string::npos) return "kit:armas/doze";  // escopeta de bomba
     if (n == "smg" || n.find("sub9") != std::string::npos || n.find("submetralhadora") != std::string::npos) return "kit:armas/smg";
-    if (n.find("ak74tat") != std::string::npos) return "kit:armas/ak74_tatica";
-    if (n.find("ak74") != std::string::npos) return "kit:armas/ak74";
     if (n.find("ak47") != std::string::npos || n == "ak") return "kit:armas/ak47";
-    if (n.find("m4colt") != std::string::npos || n.find("colt") != std::string::npos) return "kit:armas/m4colt";
     if (n.find("m4") != std::string::npos) return "kit:armas/m4a1";
-    if (n.find("tt33") != std::string::npos || n.find("tokarev") != std::string::npos || n.find("pistol") != std::string::npos ||
-        n.find("revolver") != std::string::npos)
-        return "kit:armas/tt33";
     return {};
 }
 

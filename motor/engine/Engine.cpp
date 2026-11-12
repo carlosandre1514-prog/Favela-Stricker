@@ -706,8 +706,8 @@ int createWeapon(Engine* e, int kind, int ch, const WeaponLook& look) {
     if (look.file.empty()) {
         if (kind == WK_Knife || kind == WK_Bat) { e->lastError = "faca e taco foram retirados (só armas realistas)"; return -1; }
         WeaponLook real = look;
-        real.file = kind == WK_Pistol ? "kit:armas/tt33" : "kit:armas/m4a1";
-        return createWeapon(e, kind == WK_Pistol ? WK_Pistol : WK_Rifle, ch, real);
+        real.file = "kit:armas/m4a1";  // (a TT-33 saiu do jogo: sem arquivo, vira a M4A1)
+        return createWeapon(e, WK_Rifle, ch, real);
     }
     glm::vec3 muzzle;
     AABB wb;
