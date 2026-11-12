@@ -435,27 +435,73 @@ FxLight fxAuraArma(ParticleSystem& ps, Rng& r, const glm::mat4& world, glm::vec3
     return {mundo((a + b) * 0.5f), cor, 2.2f, 2.8f};
 }
 
-FxLight fxMuzzleFlash(ParticleSystem& ps, Rng& r, glm::vec3 pos, glm::vec3 dir) {
-    ParticleSpawn f;
-    f.pos = pos + dir * 0.05f; f.life = 0.05f; f.size0 = 0.22f; f.size1 = 0.12f;
-    f.color0 = glm::vec4(1.f, 0.85f, 0.5f, 1.f) * 2.f; f.color1 = glm::vec4(1.f, 0.5f, 0.1f, 0.f);
-    f.shape = PS_Star; f.rot = r.range(0.f, 6.28f);
-    f.presa = true;
+// Fogo do disparo desenhado no MiniBlender (efeito "Disparo" montado lá, com os mesmos números e cores):
+// clarão redondo + estrela no miolo, labaredas esticadas para a frente que freiam rápido, nos fuzis os 3 jatinhos
+// laterais do quebra-chama, faíscas e um pouco de fumaça. Cores do "Fogo" do MiniBlender (#ffc266 -> #ff3a08).
+FxLight fxMuzzleFlash(ParticleSystem& ps, Rng& r, glm::vec3 pos, glm::vec3 dir, int estilo) {
+    struct Estilo { float vida, clarao, estrela; int labaredas; float jato, abre, lab; int faiscas, fumaca; float luz; };
+    static const Estilo kE[3] = {
+        {0.06f, 0.10f, 0.20f, 7, 3.2f, 0.16f, 0.045f, 6, 2, 14.f},   // fuzil (AK-47, M4A1)
+        {0.05f, 0.08f, 0.15f, 4, 2.4f, 0.14f, 0.035f, 3, 1, 10.f},   // submetralhadora: menor e mais rápido
+        {0.07f, 0.15f, 0.28f, 14, 3.8f, 0.30f, 0.06f, 14, 4, 22.f},  // Doze: bola de fogo aberta, muitas faíscas
+    };
+    const Estilo& k = kE[std::clamp(estilo, 0, 2)];
+    const glm::vec4 fogo0(1.f, 0.76f, 0.40f, 1.f), fogo1(1.f, 0.23f, 0.03f, 0.f);
+    // um lado qualquer perpendicular ao cano (para os jatos laterais e o giro da estrela)
+    glm::vec3 lado = glm::cross(dir, glm::vec3(0.f, 1.f, 0.f));
+    if (glm::dot(lado, lado) < 1e-4f) lado = glm::vec3(1.f, 0.f, 0.f);
+    lado = glm::normalize(lado);
+    const glm::vec3 cima = glm::normalize(glm::cross(lado, dir));
+    ParticleSpawn g;  // clarão do miolo
+    g.pos = pos + dir * 0.03f; g.life = k.vida; g.size0 = k.clarao; g.size1 = k.clarao * 0.5f;
+    g.color0 = glm::vec4(1.f, 0.82f, 0.5f, 1.f) * 1.5f; g.color1 = glm::vec4(1.f, 0.45f, 0.1f, 0.f);  // (de perto não estoura a tela)
+    g.shape = PS_Glow; g.presa = true;
+    ps.emit(g);
+    ParticleSpawn f;  // estrela (as pontas do clarão), girada ao acaso a cada tiro
+    f.pos = pos + dir * 0.05f; f.life = k.vida; f.size0 = k.estrela; f.size1 = k.estrela * 0.6f;
+    f.color0 = glm::vec4(1.f, 0.85f, 0.55f, 1.f) * 1.7f; f.color1 = glm::vec4(1.f, 0.45f, 0.08f, 0.f);
+    f.shape = PS_Star; f.rot = r.range(0.f, 6.28f); f.presa = true;
     ps.emit(f);
-    for (int i = 0; i < 6; ++i) {
+    for (int i = 0; i < k.labaredas; ++i) {  // labaredas para a frente
         ParticleSpawn p;
-        p.pos = pos; p.vel = glm::normalize(dir + randDir(r) * 0.3f) * r.range(6.f, 12.f);
-        p.life = r.range(0.06f, 0.14f); p.size0 = p.size1 = 0.02f;
-        p.color0 = glm::vec4(1.f, 0.85f, 0.4f, 1.f) * 2.f; p.color1 = glm::vec4(1.f, 0.4f, 0.1f, 0.f);
-        p.shape = PS_Spark; p.stretch = 0.02f;
+        p.pos = pos + dir * r.range(0.f, 0.04f);
+        p.vel = glm::normalize(dir + (lado * r.range(-1.f, 1.f) + cima * r.range(-1.f, 1.f)) * k.abre) * k.jato * r.range(0.6f, 1.1f);
+        p.life = k.vida * r.range(1.2f, 1.8f); p.size0 = k.lab; p.size1 = k.lab * 1.7f;
+        p.color0 = fogo0 * 1.6f; p.color0.a = 1.f; p.color1 = fogo1;
+        p.shape = PS_Flame; p.stretch = 0.035f; p.drag = 9.f; p.gravity = -0.5f; p.rot = r.range(0.f, 6.28f); p.occlusion = 0.2f;
         p.presa = true;
         ps.emit(p);
     }
-    ParticleSpawn s;
-    s.pos = pos + dir * 0.1f; s.vel = dir * 0.6f + glm::vec3(0, 0.3f, 0); s.life = 0.7f; s.size0 = 0.08f; s.size1 = 0.35f;
-    s.color0 = glm::vec4(0.6f, 0.6f, 0.6f, 0.25f); s.color1 = glm::vec4(0.6f, 0.6f, 0.6f, 0.f); s.shape = PS_Smoke; s.additive = false; s.drag = 1.f;
-    ps.emit(s);
-    return {pos, {1.f, 0.7f, 0.35f}, 14.f, 6.f};
+    if (estilo == 0)  // fuzis: os 3 jatinhos laterais do quebra-chama
+        for (int i = 0; i < 3; ++i) {
+            const float a = r.range(0.f, 6.28f) + i * 2.094f;
+            ParticleSpawn p;
+            p.pos = pos + dir * 0.02f;
+            p.vel = (lado * std::cos(a) + cima * std::sin(a)) * 1.6f + dir * 0.6f;
+            p.life = k.vida; p.size0 = k.lab * 0.7f; p.size1 = k.lab;
+            p.color0 = fogo0 * 1.5f; p.color0.a = 0.9f; p.color1 = fogo1;
+            p.shape = PS_Flame; p.stretch = 0.02f; p.drag = 10.f; p.presa = true;
+            ps.emit(p);
+        }
+    for (int i = 0; i < k.faiscas; ++i) {
+        ParticleSpawn p;
+        p.pos = pos;
+        p.vel = glm::normalize(dir + randDir(r) * k.abre * 1.6f) * r.range(5.f, 9.f);
+        p.life = r.range(0.1f, 0.2f); p.size0 = 0.012f; p.size1 = 0.005f;
+        p.color0 = glm::vec4(1.f, 0.95f, 0.75f, 1.f) * 2.f; p.color1 = glm::vec4(1.f, 0.42f, 0.f, 0.f);
+        p.shape = PS_Spark; p.stretch = 0.03f; p.drag = 1.5f; p.gravity = 2.f;
+        p.presa = true;
+        ps.emit(p);
+    }
+    for (int i = 0; i < k.fumaca; ++i) {  // fumaça (não presa: fica no ar onde saiu)
+        ParticleSpawn s;
+        s.pos = pos + dir * r.range(0.05f, 0.15f); s.vel = dir * r.range(0.4f, 0.9f) + glm::vec3(0, 0.3f, 0) + randDir(r) * 0.15f;
+        s.life = r.range(0.6f, 0.9f); s.size0 = k.lab * 1.2f; s.size1 = k.lab * 4.f + 0.15f;
+        s.color0 = glm::vec4(0.54f, 0.52f, 0.5f, 0.28f); s.color1 = glm::vec4(0.29f, 0.27f, 0.25f, 0.f);
+        s.shape = PS_Smoke; s.additive = false; s.drag = 1.2f; s.gravity = -0.4f; s.rot = r.range(0.f, 6.28f);
+        ps.emit(s);
+    }
+    return {pos, {1.f, 0.7f, 0.35f}, k.luz, estilo == 2 ? 8.f : 6.f};
 }
 
 void fxBullet(ParticleSystem& ps, glm::vec3 from, glm::vec3 to, const glm::vec3* cor) {

@@ -476,7 +476,10 @@ void botShoot(Engine* e, int fi, int ti) {
         glm::vec3 hit; GameObject* obj = nullptr; float frac;
         bool any = e->physics.raycastIgnoring(from, from + dir * (dist + 25.f), self, hit, obj, frac);
         glm::vec3 end = any ? hit : from + dir * (dist + 25.f);
-        if (p == 0) muzzleFx(e, c.weapon, muzzle, glm::normalize(end - muzzle));
+        if (p == 0) {
+            muzzleFx(e, c.weapon, muzzle, glm::normalize(end - muzzle), c.capsula);
+            if (c.weaponKind != WK_Shotgun) ejetarCapsula(e, c);  // (a Doze solta o cartucho ao bombear)
+        }
         bulletFx(e, c.weapon, muzzle, end);
         if (any) {
             impactFx(e, c.weapon, hit, dir);
@@ -1147,7 +1150,8 @@ void remoteShotFx(Engine* e, Fighter& f, CharacterInfo& c, GameObject& g) {
     btRigidBody* self = g.rigidBody ? g.rigidBody->body : nullptr;
     bool any = e->physics.raycastIgnoring(from, from + dir * 200.f, self, hit, obj, frac);
     glm::vec3 end = any ? hit : from + dir * 200.f;
-    muzzleFx(e, c.weapon, muzzle, glm::normalize(end - muzzle));
+    muzzleFx(e, c.weapon, muzzle, glm::normalize(end - muzzle), c.capsula);
+    if (c.weaponKind != WK_Shotgun) ejetarCapsula(e, c);  // (a Doze de outro celular solta o cartucho ao bombear)
     bulletFx(e, c.weapon, muzzle, end);
     if (any) impactFx(e, c.weapon, hit, dir);
     playSound(e, c.shotSound.empty() ? "tiro_m4" : c.shotSound.c_str(), muzzle, 1.f);

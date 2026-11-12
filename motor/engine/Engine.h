@@ -68,6 +68,8 @@ struct CharacterInfo {
     std::vector<Scene::Handle> bombaObjs;
     std::vector<glm::vec3> bombaBase;
     float bombaT = 0.f, bombaOff = 0.f;  // tempo restante do movimento / quanto está para trás agora (m)
+    uint8_t capsula = 0;       // cápsula que a arma solta: 0 fuzil, 1 9 mm (Sub), 2 cartucho 12 (Doze, ao bombear)
+    glm::vec3 ejetor{0.f};     // janela de ejeção no espaço da arma (de onde a cápsula sai)
     bool bombaSom = false;               // o som da bomba já tocou neste movimento
     bool cartucho = false;               // recarregando cartucho por cartucho
     bool precisaBombear = false;         // esvaziou: depois do último cartucho, bombeia
@@ -228,6 +230,9 @@ struct Engine {
 
     std::vector<std::unique_ptr<LoadedModel>> models;  // glTF e personagens procedurais
     std::unordered_map<std::string, std::pair<std::vector<ProtoPart>, AABB>> weaponParts;  // peças de cada arma já carregada
+    // cápsulas soltas pelos tiros (modelos feitos no MiniBlender): caem, quicam e somem; os objetos são reaproveitados
+    struct Capsula { Scene::Handle h; int tipo = 0; glm::vec3 pos{0.f}, vel{0.f}, giro{0.f}; glm::quat rot{1.f, 0.f, 0.f, 0.f}; float chao = 0.f, vida = 0.f; bool parada = false; };
+    std::vector<Capsula> capsulas;
     std::vector<Scene::Handle> objects;                // id público -> handle
     std::vector<Animator*> animators;
     std::vector<CharacterInfo> characters;
@@ -375,6 +380,8 @@ struct WeaponLook {
 int createWeapon(Engine* e, int kind, int character, const WeaponLook& look = {});
 void comecarBomba(CharacterInfo& c);         // Doze: bombeia (depois do tiro)
 void atualizarBombas(Engine* e, float dt);   // a bomba de cada Doze deslizando
+void ejetarCapsula(Engine* e, CharacterInfo& c);  // a cápsula sai pela janela da arma (tiro; Doze: ao bombear)
+void atualizarCapsulas(Engine* e, float dt);      // cápsulas caindo, quicando e sumindo
 int holsterWeapon(Engine* e, int ch, int kind, const WeaponLook& look);  // guarda a arma no corpo (-1 tira)
 int attachGearMesh(Engine* e, int ch, int charJoint, Geo& g, const char* name);  // peça montada no espaço do personagem, presa ao osso
 std::string accessoriesList(uint32_t accessories);  // ["mira","coronha",...] em JSON   // character < 0: solto no chão
@@ -453,7 +460,7 @@ int loadModelFile(Engine* e, const char* path); // .glb/.gltf/.fbx -> id da raiz
 bool attachGear(Engine* e, int character, const std::string& name);
 std::string gameStatusText(Engine* e);
 // Efeitos do tiro de uma arma: o da skin dela (se tiver "disparo") ou o padrão. Chame no lugar de fxMuzzleFlash/fxBullet.
-void muzzleFx(Engine* e, Scene::Handle weapon, glm::vec3 muzzle, glm::vec3 dir);
+void muzzleFx(Engine* e, Scene::Handle weapon, glm::vec3 muzzle, glm::vec3 dir, int estilo = 0);  // estilo: 0 fuzil, 1 sub, 2 Doze
 void atualizarAncoras(Engine* e, float dt);
 void atualizarEnergia(Engine* e, float dt);  // skin de energia (depois da arma posicionada: núcleo e cristais colados nela)
 bool tiroNasPortas(Engine* e, glm::vec3 de, glm::vec3 ate);  // bala que passa por uma porta: ela abre para o lado do tiro  // depois de posicionar as armas, antes de desenhar

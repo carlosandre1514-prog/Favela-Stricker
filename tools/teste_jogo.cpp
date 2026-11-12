@@ -1279,17 +1279,52 @@ int main(int argc, char** argv) {
         std::string l = lista;
         for (size_t a = 0; a < l.size();) {
             size_t b = l.find(',', a); if (b == std::string::npos) b = l.size();
-            const std::string arma = l.substr(a, b - a); a = b + 1;
+            std::string arma = l.substr(a, b - a); a = b + 1;
+            std::string skin;  // "arma:skin" (ex.: ak47:cosmica) testa a arma com a skin
+            if (const size_t dp = arma.find(':'); dp != std::string::npos) { skin = arma.substr(dp + 1); arma = arma.substr(0, dp); }
+            jogo_skin_arma(e, arma.c_str(), skin.c_str());
             jogo_escolhas(e, 1, 0, arma.c_str(), "");
             engine_set_first_person(e, 1);
             engine_set_play(e, 1);
             frames(e, 40);
             save(out, ("fp_" + arma + ".png").c_str());
+            // o clarão do tiro tem que aparecer também num celular lento (20 quadros por segundo: cada quadro vale
+            // 0,05 s, o tempo todo de vida do clarão antigo): conta os pixels muito claros antes e no quadro do tiro
+            auto claros = [&]() {
+                std::vector<unsigned char> px(size_t(W) * H * 4);
+                glBindFramebuffer(GL_FRAMEBUFFER, g_fbo);
+                glReadPixels(0, 0, W, H, GL_RGBA, GL_UNSIGNED_BYTE, px.data());
+                int n = 0;
+                for (size_t k = 0; k < px.size(); k += 4) n += px[k] > 235 && px[k + 1] > 170;  // (amarelo a branco quente)
+                return n;
+            };
+            for (const int qps : {20, 5}) {
+                frames(e, 70);  // (o tiro anterior acabou e a arma pode atirar de novo: a Doze espera 0,85 s)
+                engine_frame(e, 1.f / qps);
+                glFinish();
+                const int antesTiro = claros();
+                engine_player_fire(e);
+                engine_frame(e, 1.f / qps);
+                glFinish();
+                const int noTiro = claros();
+                save(out, ("fp_tiro" + std::to_string(qps) + "_" + arma + (skin.empty() ? "" : "_" + skin) + ".png").c_str());
+                std::printf("  %s: clarão a %d quadros/s: %d pixels claros (antes %d)\n", arma.c_str(), qps, noTiro, antesTiro);
+                if (noTiro - antesTiro < 150) { std::printf("  [ERRO] %s: o clarão do tiro quase não apareceu a %d quadros por segundo\n", arma.c_str(), qps); ++g_fail; }
+            }
+            frames(e, 70);
             engine_player_fire(e);
             frames(e, 2);
-            save(out, ("fp_tiro_" + arma + ".png").c_str());
-            frames(e, 20);  // (Doze: a bomba para trás, ~0,33 s depois do tiro)
+            save(out, ("fp_tiro_" + arma + (skin.empty() ? "" : "_" + skin) + ".png").c_str());
+            frames(e, 6);  // a cápsula voando para a direita (Doze: ainda não bombeou)
+            save(out, ("fp_capsula_" + arma + (skin.empty() ? "" : "_" + skin) + ".png").c_str());
+            frames(e, 14);  // (Doze: a bomba para trás, ~0,33 s depois do tiro)
             save(out, ("fp_bomba_" + arma + ".png").c_str());
+            {
+                int voando = 0;
+                for (const auto& k : E->capsulas) voando += k.vida > 0.f;
+                std::printf("  %s: cápsulas no ar ou no chão %d\n", arma.c_str(), voando);
+                if (voando == 0) { std::printf("  [ERRO] %s: a arma não soltou cápsula\n", arma.c_str()); ++g_fail; }
+            }
             {
                 eng::CharacterInfo& cc = E->characters[E->player];
                 std::printf("  %s: peças da bomba %zu · bomba para trás %.3f m\n", arma.c_str(), cc.bombaObjs.size(), cc.bombaOff);
@@ -1315,6 +1350,9 @@ int main(int argc, char** argv) {
             engine_set_camera(e, p[0], p[1] + 1.2f, p[2], E->editorCam.yaw + 2.4f, 0.12f, 2.2f);
             frames(e, 4);
             save(out, ("tp_" + arma + ".png").c_str());
+            engine_player_fire(e);  // de fora, no tiro: o fogo na boca do cano e a bala saindo
+            frames(e, 2);
+            save(out, ("tp_tiro_" + arma + ".png").c_str());
             const int pf = eng::playerFighter(E);
             std::printf("  %s: na mão %s · tipo %d\n", arma.c_str(), pf >= 0 ? eng::matchOf(E).f[pf].weapon.c_str() : "?", E->player >= 0 ? E->characters[E->player].weaponKind : -1);
             if (pf < 0 || eng::matchOf(E).f[pf].weapon != arma) { std::printf("  [ERRO] a arma não entrou na mão\n"); ++g_fail; }

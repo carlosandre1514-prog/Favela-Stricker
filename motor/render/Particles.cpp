@@ -43,6 +43,7 @@ void ParticleSystem::emit(const ParticleSpawn& s) {
     p.seed = s.seed >= 0.f ? s.seed : (seed_ >> 8) / float(1 << 24);
     p.shape = s.shape; p.additive = s.additive; p.occlusion = s.occlusion;
     p.ancora = s.presa && ancoraAtual >= 0 && ancoraAtual < kAncoras ? int8_t(ancoraAtual) : int8_t(-1);
+    p.novo = true;
 }
 
 void ParticleSystem::moverAncora(int a, glm::vec3 delta) {
@@ -57,6 +58,10 @@ void ParticleSystem::soltarAncora(int a) {
 void ParticleSystem::update(float dt) {
     for (int i = 0; i < count_;) {
         P& p = parts_[i];
+        // a que nasceu neste quadro não envelhece antes do 1º desenho: num celular lento (20 ou 5 quadros por
+        // segundo, um quadro de 0,05 a 0,1 s) o clarão do tiro (0,05 s) e o rastro de um tiro de perto sumiam
+        // antes de aparecer. Assim todo efeito aparece pelo menos uma vez, inteiro
+        if (p.novo) { p.novo = false; ++i; continue; }
         p.age += dt;
         if (p.age >= p.life) { parts_[i] = parts_[--count_]; continue; }  // remove trocando com o último
         p.vel *= 1.f / (1.f + p.drag * dt);
@@ -77,7 +82,8 @@ int ParticleSystem::draw(const Camera& cam) {
             if (p.additive != (pass == 1)) continue;
             float t = p.age / p.life;
             glm::vec4 c = glm::mix(p.c0, p.c1, t);
-            float fadeIn = std::min(1.f, p.age / (p.life * 0.08f + 1e-4f));
+            // entrada suave só para o que dura (fumaça); clarão, faísca e bala aparecem já no 1º quadro
+            float fadeIn = p.life < 0.3f ? 1.f : std::min(1.f, p.age / (p.life * 0.08f + 1e-4f));
             float a = std::clamp(c.a * fadeIn, 0.f, 1.f);
             GpuInstance& g = gpu_[n++];
             g.posSize = glm::vec4(p.pos, glm::mix(p.s0, p.s1, t));

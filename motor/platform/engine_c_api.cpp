@@ -207,6 +207,7 @@ void engine_frame(Engine* e, float dt) {
         }
     }
     eng::atualizarBombas(e, dt);
+    eng::atualizarCapsulas(e, dt);
     eng::updateDoors(e, dt);
     resolucaoDinamica(e, dt);
     auto tw = std::chrono::steady_clock::now();

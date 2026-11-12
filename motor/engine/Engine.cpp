@@ -367,6 +367,7 @@ void clearScene(Engine* e) {
     e->attachments.clear();
     e->models.clear();
     e->weaponParts.clear();
+    e->capsulas.clear();  // (os objetos saem com a cena)
     e->snapshot.clear();
     e->player = -1;
     e->renderer.clearAssets();
@@ -727,6 +728,12 @@ int createWeapon(Engine* e, int kind, int ch, const WeaponLook& look) {
         c.weapon = h;
         c.weaponKind = kind;
         c.muzzle = muzzle;
+        {  // cápsula: tipo pela arma e a janela de ejeção (lado direito, logo à frente da mão, na altura do cano)
+            std::string f = look.file;
+            std::transform(f.begin(), f.end(), f.begin(), [](unsigned char ch2) { return char(std::tolower(ch2)); });
+            c.capsula = kind == WK_Shotgun || f.find("doze") != std::string::npos ? 2 : f.find("smg") != std::string::npos ? 1 : 0;
+            c.ejetor = glm::vec3(wb.min.x * 0.6f, muzzle.y * 0.85f, wb.min.z + (wb.max.z - wb.min.z) * 0.45f);
+        }
         // som: cada fuzil do kit tem o seu; os outros pelo tipo
         {
             std::string f = look.file;
@@ -1362,6 +1369,7 @@ void atualizarBombas(Engine* e, float dt) {
             if (!c.bombaSom) {
                 c.bombaSom = true;
                 if (GameObject* g = e->scene.get(c.root)) playSound(e, "bomba", g->transform.position, 0.75f);
+                ejetarCapsula(e, c);  // a bomba para trás joga o cartucho vazio para fora
             }
         }
         c.bombaOff = off;
@@ -1388,7 +1396,8 @@ static void fireGun(Engine* e, CharacterInfo& c, GameObject& root, btRigidBody* 
     glm::vec3 muzzle = from + aim;
     if (GameObject* w = e->scene.get(c.weapon)) muzzle = glm::vec3(w->transform.world() * glm::vec4(c.muzzle, 1.f));
     playSound(e, c.shotSound.empty() ? "tiro_m4" : c.shotSound.c_str(), muzzle, 1.f);
-    muzzleFx(e, c.weapon, muzzle, aim);
+    muzzleFx(e, c.weapon, muzzle, aim, c.capsula);  // (o estilo do fogo segue o tipo de arma, como a cápsula)
+    if (c.weaponKind != WK_Shotgun) ejetarCapsula(e, c);  // (a Doze solta o cartucho ao bombear)
     for (int k = 0; k < c.gunPellets; ++k) {
         glm::vec3 j(e->fxRng.range(-1.f, 1.f), e->fxRng.range(-1.f, 1.f), e->fxRng.range(-1.f, 1.f));
         glm::vec3 dir = glm::normalize(aim + j * spread);
@@ -1454,7 +1463,8 @@ static void fire(Engine* e, CharacterInfo& c, GameObject& root, btRigidBody* sel
         glm::vec3 muzzle = end;
         if (GameObject* w = e->scene.get(c.weapon)) muzzle = glm::vec3(w->transform.world() * glm::vec4(c.muzzle, 1.f));
         glm::vec3 shotDir = glm::normalize(end - muzzle);
-        muzzleFx(e, c.weapon, muzzle, shotDir);
+        muzzleFx(e, c.weapon, muzzle, shotDir, c.capsula);
+        if (kind != WK_Shotgun) ejetarCapsula(e, c);
         playSound(e, c.shotSound.empty() ? "tiro_m4" : c.shotSound.c_str(), muzzle, 1.f);
         if (any) playSound(e, "impacto", end, 0.5f);
         int pellets = kind == WK_Shotgun ? 6 : 1;
@@ -2463,7 +2473,7 @@ void atualizarAncoras(Engine* e, float dt) {
         a.ultimo = agora;
     }
 }
-void muzzleFx(Engine* e, Scene::Handle weapon, glm::vec3 muzzle, glm::vec3 dir) {
+void muzzleFx(Engine* e, Scene::Handle weapon, glm::vec3 muzzle, glm::vec3 dir, int estilo) {
     e->particles.ancoraAtual = ancoraDaArma(e, weapon, muzzle);
     if (Emitter* em = skinShot(e, weapon); em && em->energia) {
         tiroEnergia(e, *em, muzzle, dir);
@@ -2471,10 +2481,98 @@ void muzzleFx(Engine* e, Scene::Handle weapon, glm::vec3 muzzle, glm::vec3 dir) 
         addFlash(e, fxDisparoSkin(e->particles, e->fxRng, muzzle, dir, em->corDisparo, em->corDisparo2), 0.08f);
         em->pulso = 1.f;  // a pintura acende forte e apaga (updateEffects)
     } else {
-        addFlash(e, fxMuzzleFlash(e->particles, e->fxRng, muzzle, dir), 0.06f);
+        addFlash(e, fxMuzzleFlash(e->particles, e->fxRng, muzzle, dir, estilo), 0.06f);
     }
     e->particles.ancoraAtual = -1;
 }
+// ---------- Cápsulas: modelos feitos no MiniBlender (kit/armas/capsula_fuzil, capsula_9mm, cartucho_12; em metros,
+// eixo em Y, base em y = 0). Sai pela janela de ejeção para a direita e para cima, girando; cai com a gravidade no
+// chão que estava embaixo (um raio só, ao sair), quica duas ou três vezes, deita e some. Longe da câmera não sai.
+void ejetarCapsula(Engine* e, CharacterInfo& c) {
+    if (!isGun(c.weaponKind)) return;
+    GameObject* w = e->scene.get(c.weapon);
+    if (!w) return;
+    const glm::mat4& W = w->transform.world();
+    const glm::vec3 porta = glm::vec3(W * glm::vec4(c.ejetor, 1.f));
+    const glm::vec3 dc = porta - e->camera.position;
+    if (glm::dot(dc, dc) > 22.f * 22.f) return;  // ninguém vê uma cápsula a mais de 22 m
+    static const int kMax[4] = {6, 10, 16, 28};
+    static const char* kArq[3] = {"kit:armas/capsula_fuzil", "kit:armas/capsula_9mm", "kit:armas/cartucho_12"};
+    const int nv = std::clamp(e->nivel, 0, 3), tipo = std::clamp(int(c.capsula), 0, 2);
+    // reaproveita uma do mesmo tipo que já sumiu; no limite, a que vai sumir primeiro
+    Engine::Capsula* k = nullptr;
+    for (Engine::Capsula& x : e->capsulas)
+        if (x.tipo == tipo && x.vida <= 0.f && e->scene.get(x.h)) { k = &x; break; }
+    if (!k && int(e->capsulas.size()) >= kMax[nv]) {
+        for (Engine::Capsula& x : e->capsulas)
+            if (!k || x.vida < k->vida) k = &x;
+        if (k && k->tipo != tipo) { if (e->scene.get(k->h)) deleteObject(e, k->h); k->h = {}; }
+    }
+    if (!k) { e->capsulas.emplace_back(); k = &e->capsulas.back(); }
+    if (!e->scene.get(k->h)) {
+        auto it = e->weaponParts.find(kArq[tipo]);
+        if (it == e->weaponParts.end()) {
+            std::vector<ProtoPart> parts; AABB b{};
+            if (!modelParts(e, kArq[tipo], nullptr, parts, b)) parts.clear();
+            for (ProtoPart& p : parts) p.lodFar = 1e30f;
+            it = e->weaponParts.emplace(kArq[tipo], std::make_pair(parts, b)).first;
+            e->lastError.clear();
+        }
+        if (it->second.first.empty()) return;
+        // um pouco maior que o real (39 mm somem na tela do celular), sem sombra
+        k->h = spawnParts(e, it->second.first, glm::scale(glm::mat4(1.f), glm::vec3(1.35f)), "Capsula", porta);
+        if (GameObject* g = e->scene.get(k->h))
+            Scene::forEachInSubtree(*g, [](GameObject& o) { if (o.meshRenderer) o.meshRenderer->castShadows = false; o.noCut = true; });
+    }
+    GameObject* g = e->scene.get(k->h);
+    if (!g) return;
+    g->active = true;
+    // direita da arma = -X (cano em +Z, Y para cima); um pouco para trás
+    const glm::vec3 dir = glm::normalize(glm::vec3(W[0])) * -1.f, cima = glm::normalize(glm::vec3(W[1])), frente = glm::normalize(glm::vec3(W[2]));
+    Rng& r = e->fxRng;
+    k->tipo = tipo;
+    k->pos = porta;
+    k->vel = dir * r.range(1.6f, 2.6f) + cima * r.range(1.3f, 2.2f) - frente * r.range(0.f, 0.6f);
+    k->giro = glm::vec3(r.range(-25.f, 25.f), r.range(-8.f, 8.f), r.range(-25.f, 25.f));
+    k->rot = glm::quat_cast(glm::mat3(glm::normalize(glm::vec3(W[0])), cima, frente)) * glm::angleAxis(1.5707963f, glm::vec3(0, 0, 1));
+    k->vida = nv == 0 ? 1.6f : 2.6f;
+    k->parada = false;
+    glm::vec3 hit; GameObject* obj = nullptr;
+    k->chao = e->physics.raycast(porta + glm::vec3(0.f, 0.05f, 0.f), porta - glm::vec3(0.f, 4.f, 0.f), hit, obj) ? hit.y : mapHeight(e, porta.x, porta.z);
+    g->transform.setPosition(k->pos);
+    g->transform.setRotation(k->rot);
+}
+
+void atualizarCapsulas(Engine* e, float dt) {
+    for (Engine::Capsula& k : e->capsulas) {
+        if (k.vida <= 0.f) continue;
+        GameObject* g = e->scene.get(k.h);
+        if (!g) { k.vida = 0.f; continue; }
+        k.vida -= dt;
+        if (k.vida <= 0.f) { g->active = false; continue; }
+        if (!k.parada) {
+            k.vel.y -= 9.8f * dt;
+            k.pos += k.vel * dt;
+            k.rot = glm::normalize(k.rot + glm::quat(0.f, k.giro.x, k.giro.y, k.giro.z) * k.rot * (0.5f * dt));
+            if (k.pos.y <= k.chao + 0.006f) {  // bateu no chão: quica mais baixo, perde giro; devagar, deita e para
+                k.pos.y = k.chao + 0.006f;
+                if (k.vel.y < -0.7f) {
+                    k.vel.y = -k.vel.y * 0.35f;
+                    k.vel.x *= 0.5f; k.vel.z *= 0.5f;
+                    k.giro *= 0.5f;
+                } else {
+                    k.parada = true;
+                    const glm::vec3 eixo = k.rot * glm::vec3(0, 1, 0);
+                    const float yaw = std::atan2(eixo.x, eixo.z);
+                    k.rot = glm::angleAxis(yaw, glm::vec3(0, 1, 0)) * glm::angleAxis(1.5707963f, glm::vec3(1, 0, 0));
+                }
+            }
+        }
+        g->transform.setPosition(k.pos);
+        g->transform.setRotation(k.rot);
+    }
+}
+
 void impactFx(Engine* e, Scene::Handle weapon, glm::vec3 hit, glm::vec3 dir) {
     fxImpact(e->particles, e->fxRng, hit, dir);
     if (Emitter* em = skinShot(e, weapon); em && em->energia) impactoEnergia(e, *em, hit, dir);

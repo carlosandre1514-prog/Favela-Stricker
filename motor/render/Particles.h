@@ -59,6 +59,7 @@ private:
         float s0, s1, rot, rotVel, drag, gravity, stretch, seed, occlusion;
         int8_t ancora;
         uint8_t shape; bool additive;
+        bool novo;  // nasceu neste quadro: o 1º desenho é o começo (sem envelhecer antes)
     };
     struct GpuInstance { glm::vec4 posSize, color, velStretch, misc; };
     P parts_[kMax];
