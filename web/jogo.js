@@ -155,9 +155,12 @@ function destaqueDoMercado() {
 function cartaoConta() {
   const n = nivelDe(conta.xp);
   const pct = n.precisa ? Math.round(100 * n.noNivel / n.precisa) : 100;
-  return `<button class="cartao-conta" id="i-conta" aria-label="Sua conta: nível ${n.nivel}, ${esc(n.patente.nome)}">
+  const cor = conta.corCartao();
+  return `<button class="cartao-conta" id="i-conta" aria-label="Seu perfil: nível ${n.nivel}, ${esc(n.patente.nome)}"
+    style="background:linear-gradient(120deg, ${cor.a}ee, ${cor.b}cc)">
     <span class="insignia">${insignia(n.patente, 30)}</span>
     <span class="dados"><span class="linha1"><b>${esc(conta.nome())}</b><span class="nv">NV ${n.nivel}</span></span>
+      <span class="titulo-conta">${esc(conta.titulo().nome)}</span>
       <span class="pat">${esc(n.patente.nome)}${n.divisao ? ' ' + n.divisao : ''}${social.id || guardado.get('meu_id', '') ? ` · ID ${idBonito(social.id || guardado.get('meu_id', ''))}` : ''}</span>
       <span class="barra-xp"><i style="width:${pct}%"></i></span>
       <span class="xp">${n.precisa ? `${fmt(n.noNivel)} / ${fmt(n.precisa)} XP` : 'NÍVEL MÁXIMO'}</span></span>
@@ -247,7 +250,7 @@ function telaInicio() {
   ligarGiroBoneco(t);
   atualizarBadgeAmigos();
   $('#i-jogar', t).onclick = () => telaModo();
-  $('#i-conta', t).onclick = () => telaConfig('conta');
+  $('#i-conta', t).onclick = () => telaPerfil();
 }
 
 // ---------------- escolha do lado ----------------
@@ -580,6 +583,68 @@ function telaArmas(armaSel = null) {
     for (const b of $$('[data-loja]', t)) b.onclick = () => telaMercado(arma.key, `skin_arma:${arma.key}:${b.dataset.loja}`);
   };
   desenhar();
+}
+// ---------------- perfil ----------------
+// O seu cartão (cor escolhida, título conquistado, nível e patente), os números da carreira, os títulos (cada um com
+// o que falta para liberar) e as cores do cartão (liberadas pelo nível). Toque no cartão da tela inicial para abrir.
+function telaPerfil(aba = 'carreira') {
+  motor.girarMenu(true);
+  const n = nivelDe(conta.xp);
+  const cor = conta.corCartao(), tit = conta.titulo(), c = conta.carreira();
+  const pct = n.precisa ? Math.round(100 * n.noNivel / n.precisa) : 100;
+  const id = social.id || guardado.get('meu_id', '');
+  const t = mostrar(html(`<div class="tela" style="gap:12px">
+    <div class="linha cresce" style="align-items:stretch;gap:14px;min-height:0">
+      <div class="perfil-cartao" style="--a:${cor.a};--b:${cor.b}">
+        <div class="linha" style="gap:12px;align-items:center">
+          <span class="perfil-insignia">${insignia(n.patente, 46)}</span>
+          <div class="coluna" style="gap:2px;min-width:0"><span class="bebas perfil-nome">${esc(conta.nome())}</span>
+            <span class="perfil-titulo">${esc(tit.nome)}</span></div></div>
+        <div class="linha" style="gap:8px;align-items:center"><span class="nv-grande">NV ${n.nivel}</span>
+          <span class="perfil-pat">${esc(n.patente.nome)}${n.divisao ? ' ' + n.divisao : ''}</span></div>
+        <span class="barra-xp"><i style="width:${pct}%"></i></span>
+        <span class="perfil-xp">${n.precisa ? `${fmt(n.noNivel)} / ${fmt(n.precisa)} XP para o nível ${n.nivel + 1}` : 'NÍVEL MÁXIMO'}</span>
+        <span class="cresce"></span>
+        ${id ? `<span class="perfil-id">ID ${idBonito(id)}</span>` : ''}
+        <div class="linha" style="gap:8px"><button class="btn btn-fraco" id="pf-hist">${ICONE.relogio} Histórico</button>
+          <button class="btn btn-fraco" id="pf-conta">${ICONE.engrenagem} Conta</button></div>
+      </div>
+      <div class="coluna cresce" style="gap:10px;min-width:0;min-height:0">
+        <div class="segmento" role="tablist">${[['carreira', 'CARREIRA'], ['titulos', 'TÍTULOS'], ['cartao', 'CARTÃO']].map(([k, nm]) =>
+          `<button role="tab" class="${k === aba ? 'sel' : ''}" data-aba="${k}" aria-selected="${k === aba}">${nm}</button>`).join('')}</div>
+        <div class="perfil-corpo cresce" id="pf-corpo"></div>
+      </div></div></div>`), 'perfil');
+  t.prepend(topo('PERFIL', telaInicio, '', chipMoedas(false)));
+  for (const b of $$('[data-aba]', t)) b.onclick = () => telaPerfil(b.dataset.aba);
+  $('#pf-hist', t).onclick = () => telaHistorico();
+  $('#pf-conta', t).onclick = () => telaConfig('conta');
+  const corpo = $('#pf-corpo', t);
+  if (aba === 'carreira') {
+    const pc = (a, b) => (b ? Math.round(100 * a / b) + '%' : '—');
+    const itens = [
+      ['PARTIDAS', fmt(c.partidas)], ['VITÓRIAS', `${fmt(c.vitorias)} <small>${pc(c.vitorias, c.partidas)}</small>`],
+      ['RESSURGÊNCIA VENCIDAS', fmt(c.vitoriasBR)], ['TOP 3 NA RESSURGÊNCIA', fmt(c.top3)],
+      ['ABATES', fmt(c.abates)], ['A/Q', c.mortes ? (c.abates / c.mortes).toFixed(2).replace('.', ',') : fmt(c.abates)],
+      ['NA CABEÇA', `${fmt(c.cabecas)} <small>${pc(c.cabecas, c.abates)}</small>`], ['DANO TOTAL', fmt(c.dano)],
+      ['MAIOR SEQUÊNCIA', fmt(c.maiorSeq)], ['MELHOR MULTI', c.multiMax >= 2 ? NOMES_MULTI[Math.min(c.multiMax, 5)].replace('ABATE ', '') : '—'],
+    ];
+    corpo.innerHTML = `<div class="perfil-numeros">${itens.map(([nm, v]) => `<div class="hist-est"><b>${v}</b><span>${nm}</span></div>`).join('')}</div>`;
+  } else if (aba === 'titulos') {
+    const lib = new Set(conta.titulosLiberados().map((x) => x.k));
+    corpo.innerHTML = `<div class="perfil-titulos">${TITULOS.map((x) => {
+      const ok = lib.has(x.k), sel = x.k === tit.k;
+      return `<button class="perfil-tit ${sel ? 'sel' : ''} ${ok ? '' : 'travado'}" ${ok ? `data-tit="${x.k}"` : 'disabled'}>
+        <b>${ok ? '🏅' : '🔒'} ${esc(x.nome)}</b><span>${sel ? '✓ usando' : ok ? 'toque para usar' : esc(x.req)}</span></button>`;
+    }).join('')}</div>`;
+    for (const b of $$('[data-tit]', corpo)) b.onclick = () => { conta.usarTitulo(b.dataset.tit); telaPerfil('titulos'); };
+  } else {
+    corpo.innerHTML = `<div class="perfil-cores">${CORES_CARTAO.map((x) => {
+      const ok = x.nivel <= n.nivel, sel = x.k === cor.k;
+      return `<button class="perfil-cor ${sel ? 'sel' : ''} ${ok ? '' : 'travado'}" style="--a:${x.a};--b:${x.b}" ${ok ? `data-cor="${x.k}"` : 'disabled'}>
+        <i></i><b>${esc(x.nome)}</b><span>${sel ? '✓ usando' : ok ? 'toque para usar' : `🔒 nível ${x.nivel}`}</span></button>`;
+    }).join('')}</div>`;
+    for (const b of $$('[data-cor]', corpo)) b.onclick = () => { conta.usarCorCartao(b.dataset.cor); telaPerfil('cartao'); };
+  }
 }
 
 // ---------------- configurações ----------------
@@ -1026,18 +1091,21 @@ function fimRessurgencia(j) {
   const online = !!(partida && partida.sala);
   const xpAbates = (j.abates | 0) * XP_ABATE, xpResultado = lugar === 1 ? XP_VITORIA : lugar <= 3 ? XP_EMPATE : XP_DERROTA;
   const xp = conta.ganharXp(xpAbates + xpResultado);
-  registrarPartida(j, { xp: xpAbates + xpResultado, online });
+  const novos = registrarPartida(j, { xp: xpAbates + xpResultado, online });
+  const numeros = seusNumeros(j, novos);
   pararPartida();
   if (online) sairDaSala();
   const subiu = xp.depois.nivel > xp.antes.nivel;
   const pctXp = xp.depois.precisa ? Math.round(100 * xp.depois.noNivel / xp.depois.precisa) : 100;
   const meus = (j.jogadores || []).filter((p) => p.time === j.time).sort((a, b) => b.abates - a.abates);
+  const mvpBR = mvpDe(meus.filter((p) => p.abates > 0));
   const cor = lugar === 1 ? '#FCD34D' : lugar <= 3 ? '#86EFAC' : '#FCA5A5';
   const t = mostrar(html(`<div class="tela" style="padding:18px 26px">
     <div class="linha" style="align-items:flex-start">
       <div class="coluna cresce" style="gap:6px"><span style="font-size:12px;font-weight:800;letter-spacing:2px;color:${cor}">${lugar === 1 ? 'RESSURGÊNCIA · VITÓRIA' : 'RESSURGÊNCIA · SEU TIME FICOU EM'}</span>
-        <span class="bebas" style="font-size:52px;line-height:.92;color:${cor}">${lugar === 1 ? 'ÚLTIMO TIME DE PÉ' : lugar + 'º LUGAR'}</span>
+        <span class="bebas" style="font-size:42px;line-height:.92;color:${cor};white-space:nowrap">${lugar === 1 ? 'ÚLTIMO TIME DE PÉ' : lugar + 'º LUGAR'}</span>
         <span class="dica">de ${br.totalTimes || 10} times · time ${br.meuTime || 1}</span></div>
+      ${numeros}
       <div class="cartao coluna" style="padding:8px 18px;gap:0;align-items:center"><span class="bebas ouro" style="font-size:46px;line-height:1">#${lugar}</span><span class="dica" style="font-size:11px">COLOCAÇÃO</span></div>
     </div>
     <div class="cartao linha fim-xp">
@@ -1057,7 +1125,7 @@ function fimRessurgencia(j) {
       <div class="linha" style="font-size:11px;font-weight:800;letter-spacing:1px;padding:0 6px;color:#86EFAC"><span class="cresce">SEU TIME</span>
         <span style="width:58px;text-align:right">ABATES</span><span style="width:58px;text-align:right">QUEDAS</span></div>
       ${meus.map((p) => `<div class="linha" style="font-size:13px;padding:6px;border-radius:8px;${p.voce ? 'font-weight:800;background:rgba(255,255,255,.12)' : ''}">
-        <span class="cresce">${p.voce ? 'Você' : esc(p.nome)}</span><b style="width:58px;text-align:right">${p.abates}</b><span class="apagado" style="width:58px;text-align:right">${p.mortes}</span></div>`).join('')}</div>
+        <span class="cresce">${p.voce ? 'Você' : esc(p.nome)}${p === mvpBR ? ' <span class="mvp">MVP</span>' : ''}</span><b style="width:58px;text-align:right">${p.abates}</b><span class="apagado" style="width:58px;text-align:right">${p.mortes}</span></div>`).join('')}</div>
     <div class="linha" style="justify-content:flex-end"><button class="btn btn-escuro" id="f-menu" style="height:48px;font-size:14px">Menu inicial</button>
       <button class="btn btn-ouro" id="f-novo" style="height:48px;font-size:15px;letter-spacing:1px;padding:0 22px">JOGAR DE NOVO</button></div>
   </div>`), 'fim');
@@ -1072,7 +1140,9 @@ function fimDePartida(j) {
   const time = partida ? partida.time : 0;
   const s = partida && partida.sala;
   const xpAbates = (j.abates | 0) * XP_ABATE, xpResultado = venceu === time ? XP_VITORIA : venceu < 0 ? XP_EMPATE : XP_DERROTA;
-  registrarPartida(j, { xp: xpAbates + xpResultado, online: !!s });
+  const novos = registrarPartida(j, { xp: xpAbates + xpResultado, online: !!s });
+  const numeros = seusNumeros(j, novos);
+  const mvp = mvpDe((j.jogadores || []).filter((p) => p.abates > 0));
   pararPartida();
   const xp = conta.ganharXp(xpAbates + xpResultado);
   const subiu = xp.depois.nivel > xp.antes.nivel;
@@ -1083,13 +1153,14 @@ function fimDePartida(j) {
       <div class="linha" style="font-size:11px;font-weight:800;letter-spacing:1px;padding:0 6px"><span class="cresce" style="color:${tm ? '#FCD34D' : '#93C5FD'}">${tm ? 'BANDIDOS' : 'POLÍCIA'}</span>
         <span style="width:58px;text-align:right;color:${tm ? '#FCD34D' : '#93C5FD'}">ABATES</span><span style="width:58px;text-align:right;color:${tm ? '#FCD34D' : '#93C5FD'}">MORTES</span></div>
       ${l.map((p) => `<div class="linha" style="font-size:13px;padding:6px;border-radius:8px;${p.voce ? 'font-weight:800;background:rgba(255,255,255,.12)' : ''}">
-        <span class="cresce">${p.voce ? 'Você' : esc(p.nome)}</span><b style="width:58px;text-align:right">${p.abates}</b><span class="apagado" style="width:58px;text-align:right">${p.mortes}</span></div>`).join('')}</div>`;
+        <span class="cresce">${p.voce ? 'Você' : esc(p.nome)}${p === mvp ? ' <span class="mvp">MVP</span>' : ''}</span><b style="width:58px;text-align:right">${p.abates}</b><span class="apagado" style="width:58px;text-align:right">${p.mortes}</span></div>`).join('')}</div>`;
   };
   const corV = venceu === 1 ? '#FCD34D' : '#60A5FA';
   const t = mostrar(html(`<div class="tela" style="padding:18px 26px">
     <div class="linha" style="align-items:flex-start">
       <div class="coluna cresce" style="gap:6px"><span style="font-size:12px;font-weight:800;letter-spacing:2px;color:${corV}">${venceu < 0 ? 'FIM DE JOGO' : 'VITÓRIA DA'}</span>
         <span class="bebas" style="font-size:46px;line-height:.92;color:${corV}">${venceu < 0 ? 'EMPATE' : venceu === 0 ? 'POLÍCIA' : 'BANDIDOS'}</span></div>
+      ${numeros}
       <div class="coluna" style="align-items:flex-end;gap:4px"><div class="cartao linha" style="padding:8px 18px;gap:14px"><span class="bebas" style="font-size:46px;color:#60A5FA">${sc[0]}</span><span class="dica">x</span><span class="bebas ouro" style="font-size:46px">${sc[1]}</span></div></div>
     </div>
     <div class="cartao linha fim-xp">
@@ -1121,15 +1192,16 @@ function fimDePartida(j) {
 const HIST_MAX = 50;
 const historicoLocal = () => guardado.get('historico', []);
 function registrarPartida(j, { xp = 0, online = false, saiu = false } = {}) {
-  if (!partida || !j || !j.ativo) return;
+  if (!partida || !j || !j.ativo) return [];
   const dur = Math.round((Date.now() - (partida.inicio || Date.now())) / 1000);
-  if (saiu && dur < 20) return;  // abriu e saiu na hora: não conta
+  if (saiu && dur < 20) return [];  // abriu e saiu na hora: não conta
   const br = partida.modo === 1;
   const time = j.time ?? partida.time;
   const p = {
     id: 'p' + Date.now(), em: Date.now(), modo: br ? 'br' : 'pvb', online: !!(online || partida.sala), dur,
     abates: j.abates | 0, mortes: j.mortes | 0, dano: j.danoCausado | 0, cabecas: j.cabecas | 0, xp: Math.round(xp),
     roupa: partida.roupa || '', arma: partida.arma || '', skin: partida.arma ? conta.skinArma(partida.arma) : '', lado: partida.time | 0,
+    seq: partida.maiorSeq | 0, multi: partida.multiMax | 0,
     tabela: (j.jogadores || []).filter((x) => !br || x.time === time).slice(0, 10)
       .map((x) => ({ n: String(x.nome || '').slice(0, 16), t: x.time | 0, a: x.abates | 0, m: x.mortes | 0, v: !!x.voce })),
   };
@@ -1143,11 +1215,33 @@ function registrarPartida(j, { xp = 0, online = false, saiu = false } = {}) {
     p.placar = [sc[0] | 0, sc[1] | 0];
     p.res = saiu ? 's' : sc[0] === sc[1] ? 'e' : (sc[0] > sc[1] ? 0 : 1) === (partida.time | 0) ? 'v' : 'd';
   }
+  // carreira (vida inteira) e os títulos que esta partida liberou
+  const antes = new Set(conta.titulosLiberados().map((x) => x.k));
+  const c = conta.carreira();
+  c.partidas++; c.abates += p.abates; c.mortes += p.mortes; c.cabecas += p.cabecas; c.dano += p.dano;
+  if (p.res === 'v') c.vitorias++;
+  if (br && p.lugar === 1) c.vitoriasBR++;
+  if (br && p.lugar >= 1 && p.lugar <= 3) c.top3++;
+  c.maiorSeq = Math.max(c.maiorSeq, p.seq); c.multiMax = Math.max(c.multiMax, p.multi);
+  guardado.set('carreira', c);
+  partida.titulosNovos = conta.titulosLiberados().filter((x) => !antes.has(x.k));
   guardado.set('historico', [p, ...historicoLocal()].slice(0, HIST_MAX));
+  salvarConta();
   if (fb && fb.token) {
     fb.put(`usuarios/${fb.uid}/historico/${p.id}`, p).then(() => podarHistorico()).catch(() => {});
   }
+  return partida.titulosNovos;
 }
+// fim de partida: os seus números (dano, cabeça, maior sequência, multi) e os títulos novos
+function seusNumeros(j, novos) {
+  const p = partida || {};
+  const chips = [['DANO', fmt(j.danoCausado | 0)], ['NA CABEÇA', j.cabecas | 0], ['MAIOR SEQUÊNCIA', p.maiorSeq | 0],
+    ['MELHOR MULTI', (p.multiMax | 0) >= 2 ? NOMES_MULTI[Math.min(p.multiMax, 5)].replace('ABATE ', '') : '—']];
+  return `<div class="linha seus-numeros">${chips.map(([n, v]) => `<div><b>${v}</b><span>${n}</span></div>`).join('')}
+    ${(novos || []).map((x) => `<div class="titulo-novo"><b>🏅 ${esc(x.nome)}</b><span>TÍTULO NOVO</span></div>`).join('')}</div>`;
+}
+// MVP: quem mais abateu (na Ressurgência, do seu time)
+const mvpDe = (lista) => lista.reduce((m, p) => (!m || p.abates > m.abates ? p : m), null);
 // na conta ficam só as 50 últimas
 async function podarHistorico() {
   const u = await fb.url(`usuarios/${fb.uid}/historico`);

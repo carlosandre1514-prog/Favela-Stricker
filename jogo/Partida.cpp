@@ -104,8 +104,8 @@ void equipGun(Engine* e, Fighter& f) {
     // gráfico Avançado: a da AK Energia Cósmica tem 1 milhão de triângulos)
     const bool meu = !f.remote && !f.bot;
     const std::string arqMao = gunModelFile(e, gunOf(k).key, skinDe(gunOf(k).key), meu && e->nivel >= 3);
-    // Ressurgência: a arma dos outros fica leve (~3 a 8 mil triângulos) no Padrão e no Leve
-    look.file = matchOf(e).modo == 1 && !meu && e->nivel <= 1 ? armaLeve(e, arqMao) : arqMao;
+    // a arma dos outros fica leve (~3 a 8 mil triângulos) no Padrão e no Leve; a minha, só no Leve
+    look.file = (!meu && e->nivel <= 1) || e->nivel == 0 ? armaLeve(e, arqMao) : arqMao;
     int w = createWeapon(e, kind, ci, look);
     // pintura da skin; a de modelo próprio tem a dela (o UV de cada modelo é outro): armas/skins/<modelo>.jpg
     auto pintar = [&](GameObject& wg, const std::string& gun, const std::string& arquivo) {
@@ -125,8 +125,8 @@ void equipGun(Engine* e, Fighter& f) {
     if (!outra.empty() && outra != k && knownGun(outra)) {
         WeaponLook guardada;
         const std::string arqGuardada = gunModelFile(e, gunOf(outra).key, skinDe(gunOf(outra).key));
-        // guardada no corpo (fuzil nas costas, pistola na coxa): leve na Ressurgência, menos no Avançado
-        guardada.file = matchOf(e).modo == 1 && e->nivel <= 2 ? armaLeve(e, arqGuardada) : arqGuardada;
+        // guardada no corpo (fuzil nas costas, pistola na coxa): leve, menos no Avançado
+        guardada.file = e->nivel <= 2 ? armaLeve(e, arqGuardada) : arqGuardada;
         int hw = holsterWeapon(e, ci, outra == "tt33" ? WK_Pistol : WK_Rifle, guardada);
         if (GameObject* hg = objectById(e, hw)) pintar(*hg, gunOf(outra).key, arqGuardada);
     } else {
@@ -157,10 +157,10 @@ Scene::Handle g_projPlayer;  // o personagem do projeto que é o jogador (guarda
 // Cria (ou recria, ao trocar de roupa) o personagem em jogo do lutador, em pos/yaw
 void spawnFighterBody(Engine* e, Fighter& f, glm::vec3 pos, float yaw) {
     json spec = {{"tipo", "personagem"}, {"aparencia", fighterLook(f.lado, f.skin, f.name)}, {"semente", 7}};
-    // Ressurgência (40 na partida): o detalhe do corpo segue o gráfico. Avançado = o modelo completo (30 a 38 mil
-    // triângulos); Intermediário ~18 mil; Padrão ~9 a 12 mil; Leve o mínimo. A cabeça fica sempre inteira
-    // (tools/simplificar_personagem.py). Sem a versão pedida, a próxima mais detalhada.
-    if (matchOf(e).modo == 1 && spec["aparencia"].contains("modelo")) {
+    // o detalhe do corpo segue o gráfico (em todos os modos; na Ressurgência são 40). Avançado = o modelo completo
+    // (30 a 38 mil triângulos); Intermediário ~18 mil; Padrão ~9 a 12 mil; Leve o mínimo. A cabeça fica sempre
+    // inteira (tools/simplificar_personagem.py). Sem a versão pedida, a próxima mais detalhada.
+    if (spec["aparencia"].contains("modelo")) {
         static const char* kSufixo[4] = {"_minimo", "_leve", "_medio", ""};
         const std::string base = spec["aparencia"]["modelo"].get<std::string>();
         for (int n = std::clamp(e->nivel, 0, 3); n < 3; ++n) {

@@ -373,6 +373,7 @@ function atualizarHud(j) {
   $('#dinheiro', t).textContent = j.modo === 1 ? (j.br ? `TIME ${j.br.meuTime}` : '') : '$ ' + fmt(j.dinheiro | 0);
   $('#kd', t).textContent = `${j.abates | 0} abate${(j.abates | 0) === 1 ? '' : 's'} · ${j.mortes | 0} morte${(j.mortes | 0) === 1 ? '' : 's'}`;
   atualizarAquecimento(t, j);
+  avisosDeAbate(t, j);
   if (j.modo === 1 && j.br) atualizarHudBR(t, j);
   else {
     const pl = j.placar || [0, 0];
@@ -1096,4 +1097,61 @@ function fecharEquipamento() {
   if (!c) return;
   c.remove();
   if (!TOQUE && partida) travarMouse();
+}
+
+// ---------------- avisos de abate ----------------
+// A cada abate: faixa no meio da tela (ABATE / NA CABEÇA / DUPLO / TRIPLO ... / sequência sem cair) e um som curto.
+// Guarda a maior sequência e o maior multi-abate da partida (vão para o histórico e para a carreira).
+const NOMES_MULTI = ['', '', 'ABATE DUPLO', 'ABATE TRIPLO', 'ABATE QUÁDRUPLO', 'MASSACRE'];
+const NOMES_SEQ = { 3: 'EM SEQUÊNCIA', 5: 'IMPARÁVEL', 7: 'DOMINANDO O MORRO', 10: 'LENDA DA FAVELA', 15: 'INTOCÁVEL' };
+function avisosDeAbate(t, j) {
+  const p = partida;
+  if (!p) return;
+  const ab = j.abates | 0, cab = j.cabecas | 0, mo = j.mortes | 0;
+  if (p.abAntes === undefined || ab < p.abAntes || j.aquecimento > 0) {  // começo (ou fim do aquecimento): só sincroniza
+    p.abAntes = ab; p.cabAntes = cab; p.moAntes = mo; p.seq = 0; p.multi = 0; p.ultAbate = 0;
+    p.maiorSeq = p.maiorSeq || 0; p.multiMax = p.multiMax || 0;
+    return;
+  }
+  if (mo > p.moAntes) p.seq = 0;  // caiu: a sequência zera
+  p.moAntes = mo;
+  if (ab <= p.abAntes) return;
+  const agora = Date.now();
+  const novos = ab - p.abAntes, cabeca = cab > p.cabAntes;
+  p.abAntes = ab; p.cabAntes = cab;
+  p.multi = agora - p.ultAbate < 4500 ? p.multi + novos : novos;
+  p.ultAbate = agora;
+  p.seq += novos;
+  p.maiorSeq = Math.max(p.maiorSeq, p.seq);
+  p.multiMax = Math.max(p.multiMax, p.multi);
+  let titulo = cabeca ? 'NA CABEÇA!' : 'ABATE', classe = cabeca ? 'cabeca' : '';
+  if (p.multi >= 2) { titulo = NOMES_MULTI[Math.min(p.multi, 5)]; classe = 'multi'; }
+  else if (NOMES_SEQ[p.seq]) { titulo = NOMES_SEQ[p.seq]; classe = 'seq'; }
+  const sub = [`+${XP_ABATE * novos} XP`, p.seq >= 2 ? `${p.seq} seguidos` : '', cabeca && p.multi >= 2 ? 'na cabeça' : ''].filter(Boolean).join(' · ');
+  let el = $('#aviso-abate', t);
+  if (!el) { el = document.createElement('div'); el.id = 'aviso-abate'; t.appendChild(el); }
+  el.className = classe;
+  el.innerHTML = `<span class="bebas">${titulo}</span><small>${sub}</small>`;
+  void el.offsetWidth;  // reinicia a animação
+  el.classList.add('mostra');
+  clearTimeout(p.avisoT);
+  p.avisoT = setTimeout(() => el.classList.remove('mostra'), 1600);
+  somDeAbate(cabeca, p.multi);
+}
+// som curto feito na hora (sem arquivo): duas notas; mais agudo na cabeça, sobe a cada abate do multi
+function somDeAbate(cabeca, multi) {
+  const a = audio;
+  if (!a || volumeSons <= 0) return;
+  const base = cabeca ? 1046 : 784, passo = Math.min(multi, 5) - 1;
+  [0, 0.07].forEach((atraso, i) => {
+    const o = a.createOscillator(), g = a.createGain();
+    o.type = 'triangle';
+    o.frequency.value = base * Math.pow(1.122, passo + i * 2);
+    const t0 = a.currentTime + atraso;
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(0.16 * volumeSons, t0 + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.16);
+    o.connect(g); g.connect(a.destination);
+    o.start(t0); o.stop(t0 + 0.18);
+  });
 }

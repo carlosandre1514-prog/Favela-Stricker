@@ -581,3 +581,48 @@ body.menu-fundo canvas#tela { visibility: hidden; }
 .equip-arma.sel span { color: #FCD34D; font-weight: 800; }
 .equip-fixos { gap: 12px; align-items: center; font-size: 12px; color: #D1D5DB; }
 @media (max-width: 720px) { .equip-grade { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+
+/* avisos de abate (meio da tela, acima da mira) */
+#aviso-abate { position: absolute; left: 50%; top: 27%; transform: translate(-50%, 0) scale(.6); opacity: 0; pointer-events: none; z-index: 6;
+  display: flex; flex-direction: column; align-items: center; text-shadow: 0 2px 10px rgba(0,0,0,.7); transition: opacity .25s, transform .25s; }
+#aviso-abate .bebas { font-size: 38px; letter-spacing: 2px; color: #F9FAFB; line-height: 1; }
+#aviso-abate small { font-size: 12px; font-weight: 800; color: #FCD34D; letter-spacing: 1px; }
+#aviso-abate.cabeca .bebas { color: #F87171; }
+#aviso-abate.multi .bebas { color: #FBBF24; font-size: 46px; }
+#aviso-abate.seq .bebas { color: #A78BFA; font-size: 44px; }
+#aviso-abate.mostra { opacity: 1; transform: translate(-50%, 0) scale(1); animation: pulo-abate .32s ease-out; }
+@keyframes pulo-abate { 0% { transform: translate(-50%, 0) scale(1.45); } 100% { transform: translate(-50%, 0) scale(1); } }
+
+/* fim de partida: os seus números, MVP e títulos novos */
+.seus-numeros { gap: 6px; flex-wrap: wrap; flex: none; align-self: center; margin-right: 10px; justify-content: flex-end; max-width: 52%; }
+.seus-numeros > div { display: flex; flex-direction: column; padding: 4px 10px; border-radius: 10px; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.08); }
+.seus-numeros b { font-family: 'Bebas Neue', Impact, sans-serif; font-size: 20px; line-height: 1; }
+.seus-numeros span { font-size: 9px; font-weight: 800; letter-spacing: 1.5px; color: #9CA3AF; }
+.seus-numeros .titulo-novo { background: rgba(251,191,36,.16); border-color: rgba(251,191,36,.6); }
+.seus-numeros .titulo-novo b { color: #FCD34D; font-family: inherit; font-size: 14px; }
+.mvp { font-size: 9px; font-weight: 900; letter-spacing: 1px; color: #111827; background: #FBBF24; border-radius: 4px; padding: 1px 5px; vertical-align: middle; }
+
+/* perfil */
+.cartao-conta .titulo-conta { font-size: 10px; font-weight: 700; color: #FCD34D; letter-spacing: .5px; }
+.perfil-cartao { width: 300px; flex: none; display: flex; flex-direction: column; gap: 8px; padding: 16px; border-radius: 18px; overflow: hidden;
+  background: radial-gradient(ellipse at 85% 0%, color-mix(in srgb, var(--b) 70%, transparent), transparent 60%), linear-gradient(150deg, var(--a), color-mix(in srgb, var(--b) 45%, var(--a)));
+  border: 1px solid color-mix(in srgb, var(--b) 60%, transparent); box-shadow: 0 14px 30px rgba(0,0,0,.35); }
+.perfil-insignia { display: flex; width: 60px; height: 60px; align-items: center; justify-content: center; border-radius: 16px; background: rgba(0,0,0,.28); flex: none; }
+.perfil-nome { font-size: 34px; line-height: .95; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.perfil-titulo { font-size: 13px; font-weight: 800; color: #FCD34D; letter-spacing: .5px; }
+.nv-grande { font-size: 12px; font-weight: 900; color: #111827; background: var(--ouro); border-radius: 6px; padding: 2px 8px; }
+.perfil-pat { font-size: 13px; font-weight: 700; color: #F3F4F6; }
+.perfil-xp { font-size: 11px; color: #E5E7EB; }
+.perfil-id { font-family: 'Bebas Neue', Impact, sans-serif; font-size: 22px; letter-spacing: 3px; color: rgba(255,255,255,.85); }
+.perfil-corpo { overflow-y: auto; min-height: 0; }
+.perfil-numeros { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.perfil-titulos, .perfil-cores { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px; }
+.perfil-tit, .perfil-cor { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; padding: 10px 12px; border-radius: 12px; text-align: left; color: #F3F4F6;
+  background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.1); }
+.perfil-tit b, .perfil-cor b { font-size: 13px; }
+.perfil-tit span, .perfil-cor span { font-size: 11px; color: #9CA3AF; }
+.perfil-tit.sel, .perfil-cor.sel { border-color: #FBBF24; background: rgba(251,191,36,.14); }
+.perfil-tit.sel span, .perfil-cor.sel span { color: #FCD34D; font-weight: 800; }
+.perfil-tit.travado, .perfil-cor.travado { opacity: .55; }
+.perfil-cor i { width: 100%; height: 34px; border-radius: 8px; background: linear-gradient(120deg, var(--a), var(--b)); border: 1px solid rgba(255,255,255,.15); }
+@media (max-width: 720px) { .perfil-cartao { width: 240px; } }

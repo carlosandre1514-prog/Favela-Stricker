@@ -100,6 +100,36 @@ function nivelDe(xp) {
   const divisao = n >= NIVEL_MAX ? '' : ['I', 'II', 'III', 'IV', 'V'][n - pat.de] || '';
   return { nivel: n, noNivel: n >= NIVEL_MAX ? 0 : resto, precisa: n >= NIVEL_MAX ? 0 : xpDoNivel(n), patente: pat, divisao };
 }
+// ---------------- carreira, títulos e cor do cartão (perfil) ----------------
+// Números da vida inteira (somados a cada partida; vão junto com a conta)
+const CARREIRA0 = { partidas: 0, vitorias: 0, vitoriasBR: 0, top3: 0, abates: 0, mortes: 0, cabecas: 0, dano: 0, maiorSeq: 0, multiMax: 0 };
+// Títulos: aparecem embaixo do nome; cada um se conquista jogando
+const TITULOS = [
+  { k: 'novato', nome: 'Novato do Morro', req: 'Começou a jogar', ok: () => true },
+  { k: 'cria', nome: 'Cria da Favela', req: 'Jogue 10 partidas', ok: (c) => c.partidas >= 10 },
+  { k: 'atirador', nome: 'Atirador', req: 'Faça 100 abates', ok: (c) => c.abates >= 100 },
+  { k: 'cabeca', nome: 'Cabeça Fria', req: '25 abates na cabeça', ok: (c) => c.cabecas >= 25 },
+  { k: 'trator', nome: 'Trator', req: 'Abate triplo (3 em poucos segundos)', ok: (c) => c.multiMax >= 3 },
+  { k: 'imparavel', nome: 'Imparável', req: '5 abates seguidos sem cair', ok: (c) => c.maiorSeq >= 5 },
+  { k: 'sobrevivente', nome: 'Último de Pé', req: 'Vença uma Ressurgência', ok: (c) => c.vitoriasBR >= 1 },
+  { k: 'rei', nome: 'Rei do Morro', req: '10 vitórias', ok: (c) => c.vitorias >= 10 },
+  { k: 'lenda', nome: 'Lenda da Favela', req: '10 abates seguidos sem cair', ok: (c) => c.maiorSeq >= 10 },
+  { k: 'veterano', nome: 'Veterano', req: 'Chegue ao nível 20', ok: (c, n) => n >= 20 },
+  { k: 'massacre', nome: 'Massacre', req: '5 abates em poucos segundos', ok: (c) => c.multiMax >= 5 },
+  { k: 'dono', nome: 'Dono do Pedaço', req: '1.000 abates', ok: (c) => c.abates >= 1000 },
+];
+// Cores do cartão (perfil e tela inicial): liberadas pelo nível
+const CORES_CARTAO = [
+  { k: 'noite', nome: 'Noite', a: '#0B0F17', b: '#1F2937', nivel: 1 },
+  { k: 'policia', nome: 'Azul Polícia', a: '#0B1A3D', b: '#2563EB', nivel: 1 },
+  { k: 'morro', nome: 'Laranja Morro', a: '#3A1606', b: '#EA8A0C', nivel: 1 },
+  { k: 'grafite', nome: 'Grafite Verde', a: '#052E16', b: '#16A34A', nivel: 5 },
+  { k: 'neon', nome: 'Neon', a: '#3B0764', b: '#EC4899', nivel: 10 },
+  { k: 'carmesim', nome: 'Carmesim', a: '#2A0505', b: '#DC2626', nivel: 15 },
+  { k: 'ouro', nome: 'Ouro', a: '#3F2A05', b: '#F5B90B', nivel: 25 },
+  { k: 'cosmico', nome: 'Cósmico', a: '#140F3A', b: '#8B5CF6', nivel: 35 },
+];
+
 // Insígnia da patente (SVG): barra, divisas (com arcos), losango ou estrelas (com louros no máximo)
 function insignia(pat, tam = 28) {
   const c = pat.cor, sombra = 'rgba(0,0,0,.45)';
@@ -166,6 +196,26 @@ const conta = {
     return minhas.find((r) => r.key === guardado.get('roupa_' + time, '') && this.temRoupa(r)) || minhas.find((r) => this.temRoupa(r));
   },
   usarRoupa(time, key) { guardado.set('roupa_' + time, key); },
+  carreira() {
+    let c = guardado.get('carreira', null);
+    if (!c) {  // primeira vez: começa pelo histórico de partidas que já existe no aparelho
+      c = { ...CARREIRA0 };
+      for (const p of guardado.get('historico', [])) {
+        c.partidas++; c.abates += p.abates | 0; c.mortes += p.mortes | 0; c.cabecas += p.cabecas | 0; c.dano += p.dano | 0;
+        if (p.res === 'v') c.vitorias++;
+        if (p.modo === 'br' && p.lugar === 1) c.vitoriasBR++;
+        if (p.modo === 'br' && p.lugar >= 1 && p.lugar <= 3) c.top3++;
+        c.maiorSeq = Math.max(c.maiorSeq, p.seq | 0); c.multiMax = Math.max(c.multiMax, p.multi | 0);
+      }
+      guardado.set('carreira', c);
+    }
+    return { ...CARREIRA0, ...c };
+  },
+  titulosLiberados() { const c = this.carreira(), n = nivelDe(this.xp).nivel; return TITULOS.filter((t) => t.ok(c, n)); },
+  titulo() { const k = guardado.get('titulo', 'novato'); return this.titulosLiberados().find((t) => t.k === k) || TITULOS[0]; },
+  usarTitulo(k) { guardado.set('titulo', k); salvarConta(); },
+  corCartao() { const n = nivelDe(this.xp).nivel, k = guardado.get('cor_cartao', 'noite'); return CORES_CARTAO.find((c) => c.k === k && c.nivel <= n) || CORES_CARTAO[0]; },
+  usarCorCartao(k) { guardado.set('cor_cartao', k); salvarConta(); },
 };
 
 // ---------------- Firebase (API REST, sem biblioteca) ----------------
@@ -275,7 +325,8 @@ const novoFirebase = () => (CONFIG.firebase && CONFIG.firebase.apiKey ? new Fire
 function contaJson() {
   const itens = {};
   for (const i of conta.itens()) itens[i.replace(/:/g, '|')] = true;  // ':' não pode em chave do Firebase
-  return { nome: conta.nome(), moedas: conta.moedas, xp: conta.xp, itens, opacidadeHud: config.opacidadeHud, atualizado: { '.sv': 'timestamp' } };
+  return { nome: conta.nome(), moedas: conta.moedas, xp: conta.xp, itens, opacidadeHud: config.opacidadeHud,
+    carreira: conta.carreira(), titulo: guardado.get('titulo', 'novato'), corCartao: guardado.get('cor_cartao', 'noite'), atualizado: { '.sv': 'timestamp' } };
 }
 let salvando = null;
 function salvarConta() {
@@ -294,6 +345,8 @@ async function carregarConta() {
       guardado.set('moedas', MOEDAS_INICIAIS);
       guardado.set('itens', []);
       guardado.set('xp', 0);
+      guardado.set('carreira', { ...CARREIRA0 }); guardado.set('historico', []);  // nada da conta anterior do aparelho
+      guardado.set('titulo', 'novato'); guardado.set('cor_cartao', 'noite');
       await fb.put('usuarios/' + fb.uid, contaJson());
       return;
     }
@@ -301,6 +354,13 @@ async function carregarConta() {
     guardado.set('xp', Math.max(conta.xp, r.dado.xp | 0));  // XP só sobe (não perde o que foi feito sem internet)
     guardado.set('itens', Object.keys(r.dado.itens || {}).map((k) => k.replace(/\|/g, ':')));
     if (r.dado.nome) guardado.set('nome', r.dado.nome);
+    if (r.dado.carreira && typeof r.dado.carreira === 'object') {  // carreira: cada número fica com o maior (aparelho ou conta)
+      const c = conta.carreira();
+      for (const k of Object.keys(CARREIRA0)) c[k] = Math.max(c[k] | 0, r.dado.carreira[k] | 0);
+      guardado.set('carreira', c);
+    }
+    if (typeof r.dado.titulo === 'string') guardado.set('titulo', r.dado.titulo);
+    if (typeof r.dado.corCartao === 'string') guardado.set('cor_cartao', r.dado.corCartao);
     if (typeof r.dado.opacidadeHud === 'number') { config.opacidadeHud = Math.min(1, Math.max(0.3, r.dado.opacidadeHud)); salvarConfig(); }
   } catch (_) {}
 }
