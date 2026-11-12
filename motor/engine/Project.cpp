@@ -1123,7 +1123,14 @@ int createFromSpecJson(Engine* e, const std::string& specJson, std::string* err)
         int ci = int(e->characters.size()) - 1;
         if (!p.modelo.empty())  // personagem de modelo: a pintura dele (cor + _orm.jpg ao lado) e o normal map
             if (GameObject* root = objectById(e, id)) {
-                const std::string base = "kit:personagens/meshy/" + p.modelo;
+                // as versões leves (<nome>_minimo/_leve/_medio, tools/simplificar_personagem.py) usam a mesma pintura
+                // do modelo completo: sem tirar o sufixo, a textura não era achada e o boneco ficava branco
+                std::string nome = p.modelo;
+                for (const char* suf : {"_minimo", "_leve", "_medio"}) {
+                    const size_t n = std::strlen(suf);
+                    if (nome.size() > n && nome.compare(nome.size() - n, n, suf) == 0) { nome.resize(nome.size() - n); break; }
+                }
+                const std::string base = "kit:personagens/meshy/" + nome;
                 applyMaterialTo(e, *root, true, json{{"textura", base + ".jpg"}, {"textura_normal", base + "_normal.jpg"}});
                 e->lastError.clear();
             }

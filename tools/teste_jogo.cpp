@@ -2,7 +2,8 @@
 // ligado nele (jogo_criar), desenha num FBO e salva PNGs. Uso:
 //   favela_testes <pasta_shaders> <pasta_saida>
 // Sem variável: partida, online e escada. Ou um só: SO_JOGO, SO_ONLINE, SO_ESCADA_EXTERNA, SO_MEMORIA=<projeto.json>,
-// SO_RETRATOS_BLOCO (fotos das roupas), SO_PREVIAS="arma:skin,..." (fotos das armas)
+// SO_RETRATOS_BLOCO (fotos das roupas), SO_PREVIAS="arma:skin,..." (fotos das armas), SO_PICOS (quadros lentos da
+// Ressurgência), SO_ZONA (custo da fumaça da zona; NIVEL=0..3, TRIS=1, FOTOS_ZONA=1)
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
 #include <GLES3/gl32.h>
@@ -24,6 +25,7 @@
 #include "json.hpp"
 #include "platform/engine_c_api.h"
 #include "jogo/jogo_api.h"
+#include "assets/TextureManager.h"
 #include "engine/Engine.h"
 #include "jogo/Partida.h"
 #include "jogo/MapaFavela.h"
@@ -1325,6 +1327,77 @@ int main(int argc, char** argv) {
     }
     // Partidas em sequência no mesmo mapa (como no app): Ressurgência contra robôs, depois Polícia x Bandidos
     // (SO_SEQUENCIA=1): o jogador tem que existir, andar e atirar em todas; mede o tempo do quadro
+    // (SO_PICOS=1): Ressurgência longa no gráfico Leve; mede os quadros mais lentos da parte do jogo (CPU), onde
+    // nascem os engasgos: robôs, física, animação, renascer
+    if (std::getenv("SO_PICOS")) {
+        eng::Engine* E = reinterpret_cast<eng::Engine*>(e);
+        abrirPartida();
+        engine_set_quality(e, 0);
+        jogo_modo(e, 1);
+        jogo_escolhas(e, 0, 0, "ak47", "");
+        jogo_aquecimento(e, 3.f);
+        engine_set_first_person(e, 1);
+        engine_set_play(e, 1);
+        frames(e, 10);
+        std::vector<float> t;
+        for (int q = 0; q < 3600; ++q) { engine_frame(e, 1.f / 60.f); t.push_back(E->profGame + E->profSubmit); }
+        std::vector<float> o = t;
+        std::sort(o.begin(), o.end());
+        double soma = 0; for (float x : t) soma += x;
+        int acima = 0; for (float x : t) acima += x > 8.f;
+        std::printf("  CPU por quadro (60 s): média %.2f ms · p99 %.2f · máx %.2f · acima de 8 ms: %d quadros\n", soma / t.size(), o[o.size() * 99 / 100], o.back(), acima);
+        for (size_t q = 0; q < t.size(); ++q) if (t[q] > 8.f) std::printf("    quadro %zu: %.1f ms\n", q, t[q]);
+        return g_fail ? 1 : 0;
+    }
+    // (SO_ZONA=1): custo da parede da zona (fumaça) no gráfico Leve: perto da borda olhando para ela x longe dela
+    if (std::getenv("SO_ZONA")) {
+        eng::Engine* E = reinterpret_cast<eng::Engine*>(e);
+        abrirPartida();
+        engine_set_quality(e, std::getenv("NIVEL") ? std::atoi(std::getenv("NIVEL")) : 0);
+        jogo_modo(e, 1);
+        jogo_escolhas(e, 0, 0, "ak47", "");
+        jogo_aquecimento(e, 1.f);
+        engine_set_first_person(e, 1);
+        engine_set_play(e, 1);
+        frames(e, 120);
+        eng::TeamMatch& M = eng::matchOf(E);
+        const int pj = eng::playerFighter(E);
+        eng::GameObject* g = pj >= 0 ? E->scene.get(M.f[pj].root) : nullptr;
+        if (!g) { std::printf("  [ERRO] sem jogador\n"); return 1; }
+        const glm::vec2 dir = glm::normalize(glm::vec2(1.f, 0.4f));
+        auto medir = [&](float daBorda, const char* nome, const char* foto) {
+            const glm::vec2 q = M.zona.c + dir * (M.zona.r - daBorda);
+            double d = 0;
+            for (int k = 0; k < 150; ++k) {
+                g->transform.setPosition(glm::vec3(q.x, eng::mapHeight(E, q.x, q.y) + 12.f, q.y));
+                if (g->rigidBody) { E->physics.syncFromTransform(*g->rigidBody); g->rigidBody->setVelocity(glm::vec3(0.f)); }
+                E->editorCam.yaw = std::atan2(-dir.x, -dir.y);
+                E->editorCam.pitch = 0.05f;
+                E->game.playerHp = E->game.playerMax;
+                engine_frame(e, 1.f / 60.f);
+                glFinish();
+                if (k >= 120) d += E->profRender;
+            }
+            const auto& st = E->renderer.stats();
+            std::printf("  %s: desenho %.1f ms · partículas %d · triângulos %u · chamadas %u\n", nome, d / 30, E->particles.count(), st.triangles, st.drawCalls);
+            if (std::getenv("TRIS")) {
+                std::map<std::string, long> por;
+                E->renderer.trisPorNome = &por;
+                frames(e, 1);
+                E->renderer.trisPorNome = nullptr;
+                std::vector<std::pair<long, std::string>> v;
+                for (auto& [n, q] : por) v.push_back({q, n});
+                std::sort(v.rbegin(), v.rend());
+                for (size_t i = 0; i < v.size() && i < 8; ++i) std::printf("      %7ld  %s\n", v[i].first, v[i].second.c_str());
+            }
+            if (std::getenv("FOTOS_ZONA")) save(out, foto);
+            return d / 30;
+        };
+        const double longe = medir(M.zona.r * 0.5f, "longe da borda", "zona_longe.png");
+        const double perto = medir(10.f, "a 10 m da borda", "zona_perto.png");
+        std::printf("  a parede custa %.1f ms a mais\n", perto - longe);
+        return g_fail ? 1 : 0;
+    }
     if (std::getenv("SO_SEQUENCIA")) {
         using nlohmann::json;
         eng::Engine* E = reinterpret_cast<eng::Engine*>(e);
@@ -1369,6 +1442,7 @@ int main(int argc, char** argv) {
             frames(e, 2);
         }
         // Ressurgência em cada gráfico: o detalhe dos personagens cai do Avançado ao Leve; todos nascem no chão
+        std::map<int, long> porRoupaAntes;  // triângulos do corpo de cada roupa (lado * 100 + roupa) no gráfico anterior
         long trisAntes = -1;
         for (int nivel = 3; nivel >= 0; --nivel) {
             engine_set_quality(e, nivel);
@@ -1391,11 +1465,56 @@ int main(int argc, char** argv) {
             long corpo = por["Corpo"], armas = por["Peça de Fuzil"] + por["Peça de Pistola"];
             double d = 0;
             for (int q = 0; q < 30; ++q) { engine_frame(e, 1.f / 60.f); glFinish(); d += E->profRender; }
-            std::printf("  gráfico %d: corpos %ld · armas %ld triângulos visíveis · desenho %.1f ms · no alto %d\n", nivel, corpo, armas, d / 30, noAr);
+            // detalhe de todos os bonecos da partida (não depende do que a câmera pega: o nascimento é aleatório)
+            // (as roupas dos robôs são sorteadas a cada partida: compara roupa com roupa, não o total)
+            long todos = 0;
+            std::map<int, long> porRoupa;
+            for (const auto& f : M.f)
+                if (eng::GameObject* g = E->scene.get(f.root))
+                    eng::Scene::forEachInSubtree(*g, [&](eng::GameObject& o) {
+                        if (std::strcmp(o.name, "Corpo") == 0 && o.meshRenderer)
+                            if (const eng::Mesh* m = E->renderer.mesh(o.meshRenderer->mesh)) {
+                                todos += m->indexCount / 3;
+                                porRoupa[f.lado * 100 + f.skin] = m->indexCount / 3;
+                            }
+                    });
+            std::printf("  gráfico %d: %zu bonecos com %ld triângulos · na tela: corpos %ld, armas %ld · desenho %.1f ms · no alto %d\n",
+                        nivel, M.f.size(), todos, corpo, armas, d / 30, noAr);
             if (noAr > 2) { std::printf("  [ERRO] gente nascendo no ar\n"); ++g_fail; }
-            if (trisAntes >= 0 && corpo + armas > trisAntes * 115 / 100) {  // (folga: o que aparece na tela muda com o nascimento aleatório)
-                std::printf("  [ERRO] o gráfico mais fraco não ficou mais leve\n"); ++g_fail; }
-            trisAntes = corpo + armas;
+            // todo boneco com a pintura dele (as versões leves usam a textura do modelo completo; sem ela fica branco)
+            int brancos = 0;
+            const GLuint branco = eng::TextureManager::instance().white();
+            for (const auto& f : M.f)
+                if (eng::GameObject* g = E->scene.get(f.root)) {
+                    bool pintado = false;
+                    eng::Scene::forEachInSubtree(*g, [&](eng::GameObject& o) {
+                        if (std::strcmp(o.name, "Corpo") == 0 && o.meshRenderer)
+                            if (const eng::Material* m = E->renderer.material(o.meshRenderer->material))
+                                pintado = pintado || (o.meshRenderer->material != E->mats[int(eng::Mat::Painted)] && m->albedo != branco);
+                    });
+                    if (!pintado) ++brancos;
+                }
+            if (brancos) { std::printf("  [ERRO] gráfico %d: %d bonecos brancos (sem a pintura)\n", nivel, brancos); ++g_fail; }
+            if (std::getenv("FOTOS_GRAFICO")) {  // o próprio boneco de costas, em cada gráfico
+                engine_set_first_person(e, 0);
+                frames(e, 3);
+                save(out, ("grafico_" + std::to_string(nivel) + ".png").c_str());
+                engine_set_first_person(e, 1);
+            }
+            int maisPesadas = 0, comparadas = 0, maisLeves = 0;
+            for (const auto& [roupa, tris] : porRoupa)
+                if (auto a = porRoupaAntes.find(roupa); a != porRoupaAntes.end()) {
+                    ++comparadas;
+                    maisPesadas += tris > a->second;
+                    maisLeves += tris < a->second;
+                }
+            if (trisAntes >= 0 && (comparadas == 0 || maisPesadas > 0 || maisLeves == 0)) {
+                std::printf("  [ERRO] o gráfico mais fraco não ficou mais leve (%d roupas comparadas, %d mais pesadas, %d mais leves)\n",
+                            comparadas, maisPesadas, maisLeves);
+                ++g_fail;
+            }
+            trisAntes = todos;
+            porRoupaAntes = porRoupa;
             engine_set_play(e, 0);
             frames(e, 2);
         }

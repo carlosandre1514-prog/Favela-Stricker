@@ -743,18 +743,26 @@ void brUpdate(Engine* e, float dt) {
             const glm::vec3 pp = pg->transform.position;
             const glm::vec2 d = glm::vec2(pp.x, pp.z) - z.c;
             const float dist = glm::length(d);
-            if (std::abs(dist - z.r) < 70.f) {
+            // por gráfico: quantas fumaças por segundo e até onde. Cada fumaça é um quadrado grande e transparente:
+            // perto da borda eram ~900 umas sobre as outras cobrindo a tela (no celular, cada camada transparente da
+            // tela inteira custa caro: era o que mais travava a Ressurgência perto da zona)
+            static const float kPorSeg[4] = {45.f, 70.f, 120.f, 360.f}, kAte[4] = {45.f, 55.f, 60.f, 70.f};
+            const int nv = std::clamp(e->nivel, 0, 3);
+            if (std::abs(dist - z.r) < kAte[nv]) {
                 const float ang = std::atan2(d.y, d.x), meia = std::min(3.14159f, 45.f / std::max(z.r, 1.f));
-                const int n = int(360.f * dt + e->fxRng.f());
+                const int n = int(kPorSeg[nv] * dt + e->fxRng.f());
+                const float folga = nv >= 3 ? 0.f : 7.f;  // nada colado na câmera (é a que cobre a tela toda)
                 for (int k = 0; k < n; ++k) {
                     const float a = ang + e->fxRng.range(-meia, meia);
+                    const glm::vec2 ponto(z.c.x + std::cos(a) * z.r, z.c.y + std::sin(a) * z.r);
+                    if (glm::length(ponto - glm::vec2(pp.x, pp.z)) < folga) continue;
                     ParticleSpawn s;
-                    s.pos = glm::vec3(z.c.x + std::cos(a) * z.r, pp.y + e->fxRng.range(-3.f, 12.f), z.c.y + std::sin(a) * z.r);
+                    s.pos = glm::vec3(ponto.x, pp.y + e->fxRng.range(-3.f, 12.f), ponto.y);
                     s.vel = glm::vec3(0.f, e->fxRng.range(0.3f, 0.9f), 0.f);
                     s.life = e->fxRng.range(1.8f, 2.8f);
                     s.size0 = e->fxRng.range(2.2f, 3.f); s.size1 = e->fxRng.range(3.8f, 5.2f);
                     s.color0 = glm::vec4(0.95f, 0.22f, 0.16f, 0.f); s.color1 = glm::vec4(0.75f, 0.12f, 0.1f, 0.f);
-                    s.color0.a = 0.24f;
+                    s.color0.a = nv >= 3 ? 0.24f : nv == 2 ? 0.3f : 0.36f;  // menos fumaça: cada uma um pouco mais forte
                     s.shape = PS_Smoke; s.additive = false; s.rot = e->fxRng.range(0.f, 6.28f);
                     e->particles.emit(s);
                 }
