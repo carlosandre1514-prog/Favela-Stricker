@@ -93,10 +93,10 @@ void equipGun(Engine* e, Fighter& f) {
         return it == skins->end() ? std::string() : it->second;
     };
     WeaponLook look;
-    // skin com modelo próprio: a arma inteira troca; na mão do jogador deste aparelho, a versão detalhada (só no
-    // gráfico Avançado: a da AK Energia Cósmica tem 1 milhão de triângulos)
+    // skin com modelo próprio: a arma inteira troca; na mão do jogador deste aparelho, a versão detalhada (a
+    // original no Avançado; nos outros gráficos a _m_alta, ~150 mil triângulos, igual de perto e bem mais leve)
     const bool meu = !f.remote && !f.bot;
-    const std::string arqMao = gunModelFile(e, gunOf(k).key, skinDe(gunOf(k).key), meu && e->nivel >= 3);
+    const std::string arqMao = gunModelFile(e, gunOf(k).key, skinDe(gunOf(k).key), meu);
     // sempre o modelo completo de perto: o motor já troca pela versão de longe a partir de alguns metros
     // (spawnWeaponModel: kLowDist), então o visual das armas não muda e as dos outros longe custam pouco
     look.file = arqMao;
@@ -107,7 +107,8 @@ void equipGun(Engine* e, Fighter& f) {
         if (sk.empty()) return;
         float metal = -1.f, rough = -1.f;
         gunSkinFinish(gun, sk, metal, rough);
-        const std::string nome = arquivo != "kit:armas/" + gun ? arquivo.substr(10) : gun + "_" + sk;
+        std::string nome = arquivo != "kit:armas/" + gun ? arquivo.substr(10) : gun + "_" + sk;
+        if (const size_t m = nome.find("_m_alta"); m != std::string::npos) nome.replace(m, 7, "_alta");  // as texturas da detalhada
         applyKitTexture(e, wg, "armas/skins/" + nome + ".jpg", metal, rough);
     };
     if (GameObject* wg = objectById(e, w)) {
@@ -1349,7 +1350,7 @@ void preloadMatchWeapons(Engine* e) {
     for (const GunDef& g : kGuns) warmWeaponModel(e, std::string("kit:armas/") + g.key, std::string(g.key) == "tt33" ? int(WK_Pistol) : int(WK_Rifle));
     // as minhas skins com modelo próprio também (a partida não trava na hora de aparecer com elas)
     for (const auto& [gun, skin] : matchOf(e).gunSkins) {
-        const std::string f = gunModelFile(e, gun, skin, e->nivel >= 1);
+        const std::string f = gunModelFile(e, gun, skin, true);
         if (f != std::string("kit:armas/") + gun) warmWeaponModel(e, f, gun == "tt33" ? int(WK_Pistol) : int(WK_Rifle));
     }
 }
@@ -1362,7 +1363,10 @@ std::string gunModelFile(Engine* e, const std::string& gun, const std::string& s
             return f != nullptr;
         };
         const std::string nome = gun + "_" + skin;
-        if (alta && existe(nome + "_alta")) return "kit:armas/" + nome + "_alta";  // (o site não leva a versão alta)
+        // na mão do jogador: a original (_alta, até 1 milhão de triângulos) no gráfico Avançado; nos outros, a mesma
+        // reduzida (_m_alta, tools/simplificar_arma.py) com as mesmas texturas (o site não leva nenhuma das duas)
+        if (alta && e->nivel >= 3 && existe(nome + "_alta")) return "kit:armas/" + nome + "_alta";
+        if (alta && existe(nome + "_m_alta")) return "kit:armas/" + nome + "_m_alta";
         if (existe(nome)) return "kit:armas/" + nome;
     }
     return "kit:armas/" + gun;
