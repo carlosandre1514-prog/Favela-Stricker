@@ -38,6 +38,7 @@ object NativeBridge {
     @JvmStatic external fun nativeGameMode(modo: Int)
     @JvmStatic external fun nativeWarmup(segundos: Float)
     @JvmStatic external fun nativeEquip(gun: String): Boolean
+    @JvmStatic external fun nativeGunAcc(gun: String, bits: Int)
     @JvmStatic external fun nativeHudJson(): ByteArray
     @JvmStatic external fun nativeShopJson(): ByteArray
     @JvmStatic external fun nativeShopBuy(item: Int): ByteArray

@@ -785,7 +785,7 @@ int main(int argc, char** argv) {
             camera();
             json look = json::parse(jogo_aparencia_roupa(t, k));
             const int id = engine_add_spec(e, json{{"tipo", "personagem"}, {"aparencia", look}, {"semente", 7}, {"pos", {0, 0, 0}},
-                                                   {"rot", {0, giro, 0}}, {"arma", arma}}.dump().c_str());
+                                                   {"rot", {0, giro, 0}}, {"arma", arma}, {"arma_tamanho", arma == "smg" ? 0.66 : 1.0}}.dump().c_str());
             const std::string modelo = eng::gunModelFile(E, arma, skin);  // skin com modelo próprio: troca a arma
             if (id >= 0 && modelo != "kit:armas/" + arma)
                 engine_add_spec(e, json{{"tipo", "arma"}, {"arma", arma}, {"arquivo", modelo}, {"portador", id}}.dump().c_str());
@@ -1089,6 +1089,12 @@ int main(int argc, char** argv) {
             std::string g = item.substr(0, c), sk = c == std::string::npos ? "" : item.substr(c + 1);
             json spec = {{"tipo", "arma"}, {"arma", g}, {"pos", {0, 1.0, 0}}, {"arquivo", eng::gunModelFile(reinterpret_cast<eng::Engine*>(e), g, sk, std::getenv("ALTA") != nullptr)}};
             if (const char* arq = std::getenv("ARQUIVO")) spec["arquivo"] = arq;  // outro modelo (ex.: o FBX original, para comparar)
+            if (const char* ac = std::getenv("ACESSORIOS")) {  // ex.: ACESSORIOS=silenciador,holografica,pente,coronha_tatica
+                json lista = json::array();
+                std::string sa = ac;
+                for (size_t i = 0; i < sa.size();) { size_t j = sa.find(';', i); if (j == std::string::npos) j = sa.size(); lista.push_back(sa.substr(i, j - i)); i = j + 1; }
+                spec["acessorios"] = lista;
+            }
             {
                 const std::string arq = spec["arquivo"].get<std::string>();  // skin de modelo próprio: a pintura do modelo
                 if (std::getenv("ARQUIVO")) {}
@@ -1271,6 +1277,47 @@ int main(int argc, char** argv) {
         return g_fail ? 1 : 0;
     }
     // Offline: inimigo abatido derruba munição; a vida volta fora do combate (SO_DROP=1)
+    // Acessórios na partida (SO_ACESSORIOS=1): M4A1 com holográfica + silenciador + pente + coronha (mira em primeira
+    // pessoa com o ponto vermelho no meio), depois com luneta (zoom) e freio de boca
+    if (std::getenv("SO_ACESSORIOS")) {
+        using nlohmann::json;
+        eng::Engine* E = reinterpret_cast<eng::Engine*>(e);
+        abrirPartida();
+        jogo_acessorios(e, "m4a1", 32 | 8 | 128 | 256);
+        jogo_escolhas(e, 0, 0, "m4a1", "tt33");
+        jogo_aquecimento(e, 60.f);
+        engine_set_first_person(e, 1);
+        engine_set_play(e, 1);
+        frames(e, 30);
+        eng::CharacterInfo& c = E->characters[E->player];
+        json h = json::parse(std::string(jogo_hud(e)));
+        std::printf("  holográfica+silenciador+pente+coronha: silenciada %d · pente %d (hud %d) · mira %.3f %.3f %.3f\n", c.silenciada, c.magSize,
+                    h["armas"][0].value("pente", 0), c.sight.x, c.sight.y, c.sight.z);
+        if (!c.silenciada || c.magSize != 45) { std::printf("  [ERRO] silenciador/pente não valeram\n"); ++g_fail; }
+        engine_player_aim(e, 1);
+        frames(e, 40);
+        save(out, "ads_holografica.png");
+        engine_player_aim(e, 0);
+        jogo_acessorios(e, "m4a1", 64 | 16);
+        if (!jogo_equipar(e, "m4a1")) { std::printf("  [ERRO] não equipou de novo\n"); ++g_fail; }
+        frames(e, 10);
+        eng::CharacterInfo& c2 = E->characters[E->player];
+        std::printf("  luneta+freio: luneta %d · silenciada %d · dano %.1f\n", c2.scope, c2.silenciada, c2.gunDmg);
+        if (!c2.scope || c2.silenciada || c2.gunDmg < 26.f) { std::printf("  [ERRO] luneta/freio não valeram\n"); ++g_fail; }
+        engine_set_first_person(e, 0);
+        float p[3], r[3], sc[3];
+        engine_get_transform(e, engine_player_id(e), p, r, sc);
+        engine_set_camera(e, p[0], p[1] + 1.3f, p[2], E->editorCam.yaw + 1.9f, 0.1f, 1.6f);
+        frames(e, 4);
+        save(out, "tp_luneta.png");
+        engine_set_first_person(e, 1);
+        engine_player_aim(e, 1);
+        frames(e, 40);
+        save(out, "ads_luneta.png");
+        engine_destroy(e);
+        std::printf(g_fail ? "FALHOU\n" : "OK\n");
+        return g_fail ? 1 : 0;
+    }
     // Armas novas na mão (SO_ARMAS_NOVAS="doze,smg"): primeira pessoa e de fora, parado e atirando
     if (const char* lista = std::getenv("SO_ARMAS_NOVAS")) {
         eng::Engine* E = reinterpret_cast<eng::Engine*>(e);

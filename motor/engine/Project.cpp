@@ -247,7 +247,9 @@ void anexarRaios(Engine* e, GameObject& g, glm::vec3 cor, int estilo) {
 
 void applyMaterialTo(Engine* e, GameObject& g, bool subtree, const json& spec) {
     auto each = [&](auto&& f) {
-        if (subtree) Scene::forEachInSubtree(g, [&](GameObject& o) { if (o.meshRenderer) f(*o.meshRenderer); });
+        // (os acessórios da arma ficam com a cor deles: a pintura da skin é só da arma)
+        auto acessorio = [](const GameObject& o) { return !std::strcmp(o.name, "Acessório") || !std::strcmp(o.name, "Lente") || !std::strcmp(o.name, "Ponto vermelho"); };
+        if (subtree) Scene::forEachInSubtree(g, [&](GameObject& o) { if (o.meshRenderer && !acessorio(o)) f(*o.meshRenderer); });
         else if (g.meshRenderer) f(*g.meshRenderer);
     };
     if (auto it = spec.find("material"); it != spec.end() && it->is_string()) {
@@ -716,6 +718,13 @@ WeaponLook weaponLookOf(const json& spec, bool onCharacter) {
         for (const auto& a : *it) {
             if (!a.is_string()) continue;
             std::string n = norm(a.get<std::string>());
+            // acessórios do jogo (encaixados pela montagem.json)
+            if (n == "silenciador") { l.accessories |= ACC_Silenciador; continue; }
+            if (n == "freio") { l.accessories |= ACC_Freio; continue; }
+            if (n == "holografica") { l.accessories |= ACC_Holo; continue; }
+            if (n == "luneta") { l.accessories |= ACC_Luneta; continue; }
+            if (n == "pente") { l.accessories |= ACC_Pente; continue; }
+            if (n == "coronhatatica" || n == "coronha_tatica") { l.accessories |= ACC_Coronha; continue; }
             if (n.find("mira") != std::string::npos || n.find("red") != std::string::npos) l.accessories |= ACC_RedDot;
             else if (n.find("coronha") != std::string::npos) l.accessories |= ACC_Stock;
             else if (n.find("empunhadura") != std::string::npos || n.find("grip") != std::string::npos) l.accessories |= ACC_Foregrip;
@@ -1487,4 +1496,154 @@ void applyKitTexture(Engine* e, GameObject& g, const std::string& kitName, float
     applyMaterialTo(e, g, true, spec);
 }
 
+}  // namespace eng
+
+namespace eng {
+// ---------- acessórios das armas (silenciador, freio de boca, mira holográfica, luneta, pente alongado, coronha) ----------
+// Os pontos de encaixe de cada modelo (ponta do cano, topo da caixa, fundo do pente, soleira) vêm de
+// shaders/kit/armas/montagem.json (tools/medir_montagem_armas.py), no espaço do arquivo; `fix` leva para o espaço da
+// arma (cano em +Z, mão na origem, metros). As peças são geometria feita aqui, no tamanho certo para cada arma.
+namespace {
+const json& tabelaMontagem(Engine* e) {
+    static json t;
+    static bool lido = false;
+    if (!lido) {
+        lido = true;
+        std::ifstream in(e->renderer.shaderDir() + "/kit/armas/montagem.json");
+        if (in) t = json::parse(in, nullptr, false);
+        if (!t.is_object()) t = json::object();
+    }
+    return t;
+}
+glm::vec3 vec3De(const json& j) { return j.is_array() && j.size() == 3 ? glm::vec3(j[0].get<float>(), j[1].get<float>(), j[2].get<float>()) : glm::vec3(0.f); }
+// caixa orientada: centro, eixos (unitários) e meias medidas
+void caixa(MeshBuilder& mb, glm::vec3 c, glm::vec3 ex, glm::vec3 ey, glm::vec3 ez, glm::vec3 meia) {
+    glm::mat4 m(1.f);
+    m[0] = glm::vec4(ex, 0.f); m[1] = glm::vec4(ey, 0.f); m[2] = glm::vec4(ez, 0.f); m[3] = glm::vec4(c, 1.f);
+    const glm::mat4 antes = mb.xf;
+    mb.xf = m;
+    mb.box(-meia, meia * 2.f);
+    mb.xf = antes;
+}
+}  // namespace
+
+bool montarAcessorios(Engine* e, GameObject& weapon, const std::string& file, uint32_t acc, const glm::mat4& fix, AcessorioInfo& info) {
+    info = AcessorioInfo{};
+    const uint32_t novos = ACC_Silenciador | ACC_Freio | ACC_Holo | ACC_Luneta | ACC_Pente | ACC_Coronha;
+    if (!(acc & novos)) return false;
+    std::string chave = file.rfind("kit:armas/", 0) == 0 ? file.substr(10) : file;
+    const json& t = tabelaMontagem(e);
+    if (!t.contains(chave)) {  // versão detalhada da skin: as medidas da skin
+        for (const char* suf : {"_m_alta", "_alta"})
+            if (chave.size() > std::strlen(suf) && chave.compare(chave.size() - std::strlen(suf), std::strlen(suf), suf) == 0) chave.resize(chave.size() - std::strlen(suf));
+    }
+    if (!t.contains(chave)) return false;
+    const json& m = t[chave];
+    auto P = [&](const char* k) { return glm::vec3(fix * glm::vec4(vec3De(m.value(k, json())), 1.f)); };
+    auto D = [&](const char* k) { glm::vec3 d = glm::vec3(fix * glm::vec4(vec3De(m.value(k, json())), 0.f)); return glm::length(d) > 1e-6f ? glm::normalize(d) : glm::vec3(0, -1, 0); };
+    const float escala = glm::length(glm::vec3(fix[0]));  // metros por unidade do arquivo
+    const glm::vec3 X(1, 0, 0), Y(0, 1, 0), Z(0, 0, 1);
+    MeshBuilder metal, poli, vidro, ponto;
+    if ((acc & (ACC_Silenciador | ACC_Freio)) && m.contains("boca")) {
+        const glm::vec3 b = P("boca");
+        const float r = std::max(0.006f, m.value("boca_raio", 0.01f) * escala);
+        if (acc & ACC_Silenciador) {  // tubo de 17 cm, um pouco mais grosso que o cano; anéis nas pontas
+            const float rs = std::max(r * 1.35f, 0.016f);
+            metal.cylinder(b - Z * 0.012f, b + Z * 0.17f, rs, rs, 18);
+            poli.cylinder(b - Z * 0.014f, b + Z * 0.012f, rs * 1.06f, rs * 1.06f, 18);
+            poli.cylinder(b + Z * 0.155f, b + Z * 0.172f, rs * 1.05f, rs * 0.92f, 18);
+            info.muzzle = b + Z * 0.172f;
+        } else {  // freio de boca: corpo curto com janelas dos lados
+            const float rf = std::max(r * 1.25f, 0.012f);
+            metal.cylinder(b - Z * 0.008f, b + Z * 0.062f, rf, rf, 14);
+            for (int k = 0; k < 3; ++k)
+                for (float lado : {-1.f, 1.f})
+                    caixa(poli, b + Z * (0.012f + k * 0.017f) + X * (lado * rf * 0.98f), X, Y, Z, glm::vec3(0.0025f, rf * 0.55f, 0.0045f));
+            info.muzzle = b + Z * 0.064f;
+        }
+        info.temBoca = true;
+    }
+    if ((acc & (ACC_Holo | ACC_Luneta)) && m.contains("trilho")) {
+        glm::vec3 tp = P("trilho");
+        // calço: a linha da mira passa por cima do que fica entre ela e o olho (alça de mira de ferro etc.)
+        {
+            const float linha = (acc & ACC_Luneta) ? 0.046f : 0.034f;
+            const float folga = m.contains("folga") ? P("folga").y : tp.y;
+            const float calco = folga + 0.007f - (tp.y + linha);
+            if (calco > 0.f) {
+                caixa(metal, tp + Y * (calco * 0.5f), X, Y, Z, glm::vec3(0.012f, calco * 0.5f + 0.001f, (acc & ACC_Luneta) ? 0.06f : 0.035f));
+                tp.y += calco;
+            }
+        }
+        if (acc & ACC_Luneta) {  // luneta 4x: base com dois anéis, tubo, objetiva maior na frente, ocular atrás, torres
+            const float h = 0.046f, rt = 0.0165f;
+            caixa(metal, tp + Y * 0.004f, X, Y, Z, glm::vec3(0.011f, 0.004f, 0.075f));
+            for (float dz : {-0.045f, 0.045f}) caixa(metal, tp + Y * (h * 0.5f) + Z * dz, X, Y, Z, glm::vec3(0.008f, h * 0.5f, 0.007f));
+            const glm::vec3 eixo = tp + Y * h;
+            metal.cylinder(eixo - Z * 0.11f, eixo + Z * 0.075f, rt, rt, 20);
+            metal.cylinder(eixo + Z * 0.075f, eixo + Z * 0.12f, rt, rt * 1.45f, 20);
+            metal.cylinder(eixo + Z * 0.12f, eixo + Z * 0.15f, rt * 1.45f, rt * 1.45f, 20);
+            metal.cylinder(eixo - Z * 0.15f, eixo - Z * 0.11f, rt * 1.2f, rt, 20);
+            vidro.cylinder(eixo + Z * 0.147f, eixo + Z * 0.149f, rt * 1.3f, rt * 1.3f, 20);
+            vidro.cylinder(eixo - Z * 0.149f, eixo - Z * 0.147f, rt * 1.05f, rt * 1.05f, 20);
+            poli.cylinder(eixo + Y * rt * 0.9f, eixo + Y * (rt + 0.013f), 0.008f, 0.008f, 12);   // torre de cima
+            poli.cylinder(eixo + X * rt * 0.9f, eixo + X * (rt + 0.012f), 0.0075f, 0.0075f, 12); // torre do lado
+            info.sight = eixo - Z * 0.16f;
+            info.luneta = true;
+        } else {  // holográfica: base, janela com moldura e o ponto vermelho no meio da janela
+            const float hj = 0.034f;  // centro da janela acima do trilho
+            caixa(poli, tp + Y * 0.006f, X, Y, Z, glm::vec3(0.016f, 0.006f, 0.045f));          // base / corpo
+            caixa(metal, tp + Y * 0.016f + Z * 0.02f, X, Y, Z, glm::vec3(0.017f, 0.006f, 0.022f));  // caixa da bateria
+            for (float zz : {-0.022f, 0.022f}) {  // duas molduras (atrás e na frente)
+                const glm::vec3 c = tp + Y * hj + Z * zz;
+                caixa(metal, c + X * 0.0175f, X, Y, Z, glm::vec3(0.0025f, 0.019f, 0.004f));
+                caixa(metal, c - X * 0.0175f, X, Y, Z, glm::vec3(0.0025f, 0.019f, 0.004f));
+                caixa(metal, c + Y * 0.017f, X, Y, Z, glm::vec3(0.02f, 0.0025f, 0.004f));
+            }
+            caixa(metal, tp + Y * (hj + 0.017f), X, Y, Z, glm::vec3(0.02f, 0.002f, 0.022f));  // capô
+            const glm::vec3 centro = tp + Y * hj + Z * 0.02f;
+            ponto.cylinder(centro - Z * 0.0005f, centro + Z * 0.0005f, 0.0017f, 0.0017f, 12);  // o ponto vermelho
+            info.sight = tp + Y * hj - Z * 0.07f;
+        }
+        info.temMira = true;
+    }
+    if ((acc & ACC_Pente) && m.contains("pente")) {  // pente alongado: o pente desce mais 4,5 cm, com a base mais larga
+        const glm::vec3 fundo = P("pente"), d = D("pente_dir");
+        const float larg = std::max(0.012f, m.value("pente_larg", 0.02f) * escala), prof = std::max(0.02f, m.value("pente_prof", 0.04f) * escala);
+        const glm::vec3 ey = -d, ez = glm::normalize(Z - d * glm::dot(Z, d)), ex = glm::normalize(glm::cross(ey, ez));
+        caixa(metal, fundo + d * 0.0215f, ex, ey, ez, glm::vec3(larg * 0.48f, 0.0225f, prof * 0.46f));
+        caixa(poli, fundo + d * 0.046f, ex, ey, ez, glm::vec3(larg * 0.6f, 0.0035f, prof * 0.56f));
+        info.temPente = true;
+    }
+    if ((acc & ACC_Coronha) && m.contains("coronha")) {  // coronha: almofada de borracha na soleira
+        const glm::vec3 c = P("coronha");
+        const float alt = std::max(0.05f, m.value("coronha_alt", 0.1f) * escala), larg = std::max(0.02f, m.value("coronha_larg", 0.03f) * escala);
+        caixa(poli, c - Z * 0.011f, X, Y, Z, glm::vec3(larg * 0.55f, alt * 0.5f, 0.011f));
+        info.temCoronha = true;
+    }
+    if (e->matPonto == kInvalidId) {
+        Material pm;
+        TextureManager& tx = TextureManager::instance();
+        pm.albedo = tx.white(); pm.normal = tx.flatNormal(); pm.orm = tx.white(); pm.emissive = tx.white();
+        pm.albedoFactor = glm::vec4(1.f, 0.08f, 0.05f, 1.f);
+        pm.emissive_factor = glm::vec3(3.2f, 0.04f, 0.02f);  // (forte demais o tom puxa para o branco)
+        pm.roughness = 0.4f; pm.metallic = 0.f;
+        e->matPonto = e->renderer.createMaterial(pm);
+    }
+    struct Camada { MeshBuilder* mb; MaterialId mat; const char* nome; bool sombra; };
+    const Camada camadas[] = {{&metal, e->mats[int(Mat::GunMetal)], "Acessório", true}, {&poli, e->mats[int(Mat::Polymer)], "Acessório", true},
+                              {&vidro, e->mats[int(Mat::Glass)], "Lente", false}, {&ponto, e->matPonto, "Ponto vermelho", false}};
+    for (const Camada& cm : camadas) {
+        if (cm.mb->empty()) continue;
+        const MeshId id = cm.mb->build(e->renderer);
+        if (id == kInvalidId) continue;
+        Scene::Handle ch = e->scene.create(cm.nome, &weapon);
+        GameObject* g = e->scene.get(ch);
+        if (!g) continue;
+        auto rh = e->meshRenderers.acquire();
+        if (MeshRenderer* mr = e->meshRenderers.get(rh)) { mr->mesh = id; mr->material = cm.mat; mr->castShadows = cm.sombra; g->meshRenderer = mr; }
+        registerObject(e, ch);
+    }
+    return true;
+}
 }  // namespace eng

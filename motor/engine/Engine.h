@@ -70,6 +70,7 @@ struct CharacterInfo {
     float bombaT = 0.f, bombaOff = 0.f;  // tempo restante do movimento / quanto está para trás agora (m)
     bool bombaSom = false;               // o som da bomba já tocou neste movimento
     bool cartucho = false;               // recarregando cartucho por cartucho
+    bool silenciada = false;             // arma com silenciador: tiro baixo e sem clarão
     bool precisaBombear = false;         // esvaziou: depois do último cartucho, bombeia
     float adsW = 0.f;
     // primeira pessoa (só o jogador): inclinação do olhar (radianos, + para cima) e se a câmera está no olho
@@ -241,6 +242,7 @@ struct Engine {
     MaterialId matFloor = kInvalidId;
     MaterialId matPalette[6] = {};
     MaterialId mats[int(Mat::Count)] = {};
+    MaterialId matPonto = kInvalidId;  // o ponto vermelho da mira holográfica (aceso)
     std::map<uint64_t, MaterialId> tintCache;
 
     // Mapa atual
@@ -361,7 +363,12 @@ MaterialId tintedMaterial(Engine* e, MaterialId base, glm::vec3 color);
 // ---- personagens e armas (Engine.cpp)
 int createCharacter(Engine* e, const CharacterParams& p, glm::vec3 pos, float yaw, bool controllable);
 // Aparência da arma: modelo de arquivo (vazio = a do motor) e acessórios encaixados
-enum WeaponAccessory { ACC_RedDot = 1, ACC_Stock = 2, ACC_Foregrip = 4 };
+enum WeaponAccessory { ACC_RedDot = 1, ACC_Stock = 2, ACC_Foregrip = 4,
+                       // acessórios do jogo (montagem.json): boca, mira, pente e coronha
+                       ACC_Silenciador = 8, ACC_Freio = 16, ACC_Holo = 32, ACC_Luneta = 64, ACC_Pente = 128, ACC_Coronha = 256 };
+// o que os acessórios montados mudaram na arma (espaço da arma)
+struct AcessorioInfo { bool temBoca = false, temMira = false, luneta = false, temPente = false, temCoronha = false; glm::vec3 muzzle{0.f}, sight{0.f}; };
+bool montarAcessorios(Engine* e, GameObject& weapon, const std::string& file, uint32_t acc, const glm::mat4& fix, AcessorioInfo& info);
 struct WeaponLook {
     std::string file;        // .glb/.gltf/.fbx/.obj: deitado com o cano para a frente e no tamanho do tipo da arma
     bool flip = false;       // o arquivo veio com o cano para trás: vira 180°

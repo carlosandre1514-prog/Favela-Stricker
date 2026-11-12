@@ -2,7 +2,8 @@
 """Sons da Doze, gerados (sem gravação): a bomba indo para trás e voltando, e o cartucho entrando no tubo.
 
 Uso: python3 tools/gerar_sons_doze.py <pasta_dos_sons>   (app/src/main/assets/sons)
-Saída: bomba.wav (~0,45 s: "tec" para trás e "tec" para a frente) e cartucho.wav (~0,15 s: clique do cartucho).
+Saída: bomba.wav (~0,45 s: "tec" para trás e "tec" para a frente), cartucho.wav (~0,15 s: clique do cartucho) e
+tiro_silenciado.wav (o tiro com silenciador).
 """
 import os
 import sys
@@ -69,5 +70,23 @@ def main():
     print('bomba.wav e cartucho.wav em', pasta)
 
 
+
+
+def silenciado(pasta):
+    """tiro com silenciador: um "pff" abafado (ar saindo) e o clique do ferrolho, bem mais baixo que o tiro."""
+    rng = np.random.default_rng(7)
+    s = np.zeros(int(TAXA * 0.35))
+    sopro = ruido_filtrado(0.22, 250, 2600, rng)
+    t = np.arange(len(sopro)) / TAXA
+    colocar(s, sopro / (np.abs(sopro).max() + 1e-9) * np.minimum(1, t / 0.003) * np.exp(-t * 22), 0.0)
+    colocar(s, 0.8 * estalo(0.05, 50, 260, 60, rng), 0.0)
+    colocar(s, 0.35 * estalo(0.05, 2500, 8000, 90, rng, tom=3300, amp_tom=0.3), 0.06)
+    gravar(os.path.join(pasta, 'tiro_silenciado.wav'), s)
+    print('tiro_silenciado.wav em', pasta)
+
+
+
+
 if __name__ == '__main__':
     main()
+    silenciado(sys.argv[1])

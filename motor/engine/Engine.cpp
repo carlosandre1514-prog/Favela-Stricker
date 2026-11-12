@@ -614,6 +614,9 @@ static void addAccessories(Engine* e, GameObject& weapon, uint32_t acc, const AA
               glm::vec3(0.f, procedural ? 0.024f : wb.min.y + (wb.max.y - wb.min.y) * 0.57f, wb.max.z * 0.55f));  // embaixo do guarda-mão
 }
 
+// o que os acessórios da última arma montada mudaram (createWeapon usa logo depois)
+static AcessorioInfo g_acessorio;
+
 // Modelo da arma (cano em +Z, origem no cabo, no tamanho do tipo); muzzle e wb saem no espaço da arma
 static Scene::Handle spawnWeaponModel(Engine* e, int kind, const WeaponLook& look, glm::vec3& muzzle, AABB& wb) {
     glm::vec3 pos = e->editorCam.target + glm::vec3(0, 0.6f, 0);
@@ -665,6 +668,8 @@ static Scene::Handle spawnWeaponModel(Engine* e, int kind, const WeaponLook& loo
         muzzle = glm::vec3(0.f, (rb.min.y + rb.max.y) * 0.5f + (rb.max.y - rb.min.y) * 0.2f - grip.y, rb.max.z - grip.z);
         wb = AABB{rb.min - grip, rb.max - grip};
         h = spawnParts(e, parts, fix, weaponName(kind), pos);
+        if (GameObject* wgo = e->scene.get(h)) montarAcessorios(e, *wgo, look.file, look.accessories, fix, g_acessorio);
+        else g_acessorio = AcessorioInfo{};
         // versão detalhada (_alta, centenas de milhares de triângulos, só na mão do jogador): sem sombra, que
         // desenharia a arma de novo em cada faixa do mapa de sombra (a sombra de uma arma na mão quase não aparece)
         if (look.file.size() > 5 && look.file.compare(look.file.size() - 5, 5, "_alta") == 0)
@@ -711,7 +716,9 @@ int createWeapon(Engine* e, int kind, int ch, const WeaponLook& look) {
     }
     glm::vec3 muzzle;
     AABB wb;
+    g_acessorio = AcessorioInfo{};
     Scene::Handle h = spawnWeaponModel(e, kind, look, muzzle, wb);
+    const AcessorioInfo acc = g_acessorio;
     GameObject* w = e->scene.get(h);
     if (!w) return -1;
     if (ch >= 0 && ch < int(e->characters.size())) {
@@ -726,7 +733,8 @@ int createWeapon(Engine* e, int kind, int ch, const WeaponLook& look) {
         e->attachments.push_back({h, c.anim, c.handJoint, c.handFix * weaponGripOffset(kind, c.height)});
         c.weapon = h;
         c.weaponKind = kind;
-        c.muzzle = muzzle;
+        c.muzzle = acc.temBoca ? acc.muzzle : muzzle;  // silenciador/freio: o tiro sai da ponta dele
+        c.silenciada = (look.accessories & ACC_Silenciador) && acc.temBoca;
         // som: cada fuzil do kit tem o seu; os outros pelo tipo
         {
             std::string f = look.file;
@@ -775,6 +783,7 @@ int createWeapon(Engine* e, int kind, int ch, const WeaponLook& look) {
             c.sight = glm::vec3(0.f, wb.max.y - hgt * 0.03f, wb.min.z + len * 0.15f);
             c.gripPt = glm::vec3(0.f, wb.min.y + hgt * 0.35f, wb.min.z + len * 0.2f);
         }
+        if (acc.temMira) { c.sight = acc.sight; c.scope = c.scope || acc.luneta; }  // mira holográfica / luneta
         // bomba (Doze): as peças que deslizam; a mão de apoio vai no meio delas
         c.bombaObjs.clear(); c.bombaBase.clear(); c.bombaT = 0.f; c.bombaOff = 0.f; c.cartucho = false; c.precisaBombear = false;
         AABB bb{glm::vec3(1e30f), glm::vec3(-1e30f)};
@@ -1387,8 +1396,8 @@ static void fireGun(Engine* e, CharacterInfo& c, GameObject& root, btRigidBody* 
     if (c.gunPellets > 1) spread = c.gunSpread;
     glm::vec3 muzzle = from + aim;
     if (GameObject* w = e->scene.get(c.weapon)) muzzle = glm::vec3(w->transform.world() * glm::vec4(c.muzzle, 1.f));
-    playSound(e, c.shotSound.empty() ? "tiro_m4" : c.shotSound.c_str(), muzzle, 1.f);
-    muzzleFx(e, c.weapon, muzzle, aim);
+    if (c.silenciada) playSound(e, "tiro_silenciado", muzzle, 0.9f);  // silenciador: "pff" baixo e sem clarão
+    else { playSound(e, c.shotSound.empty() ? "tiro_m4" : c.shotSound.c_str(), muzzle, 1.f); muzzleFx(e, c.weapon, muzzle, aim); }
     for (int k = 0; k < c.gunPellets; ++k) {
         glm::vec3 j(e->fxRng.range(-1.f, 1.f), e->fxRng.range(-1.f, 1.f), e->fxRng.range(-1.f, 1.f));
         glm::vec3 dir = glm::normalize(aim + j * spread);

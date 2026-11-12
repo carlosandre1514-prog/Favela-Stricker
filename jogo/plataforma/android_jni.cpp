@@ -155,6 +155,12 @@ JNI_FN(void, nativeTeamLoadout)(JNIEnv* env, jclass, jint team, jint skin, jstri
 }
 JNI_FN(void, nativeGameMode)(JNIEnv*, jclass, jint modo) { if (g_engine) jogo_modo(g_engine, modo); }
 JNI_FN(void, nativeWarmup)(JNIEnv*, jclass, jfloat s) { if (g_engine) jogo_aquecimento(g_engine, s); }
+JNI_FN(void, nativeGunAcc)(JNIEnv* env, jclass, jstring gun, jint bits) {
+    if (!g_engine) return;
+    const char* a = env->GetStringUTFChars(gun, nullptr);
+    jogo_acessorios(g_engine, a, bits);
+    env->ReleaseStringUTFChars(gun, a);
+}
 JNI_FN(jboolean, nativeEquip)(JNIEnv* env, jclass, jstring gun) {
     if (!g_engine) return false;
     const char* a = env->GetStringUTFChars(gun, nullptr);

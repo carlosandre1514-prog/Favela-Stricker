@@ -51,6 +51,7 @@ struct Fighter {
     int netShots = 0;
     std::string netWeapon;
     std::map<std::string, std::string> gunSkins;  // online: skins das armas de outra pessoa (arma -> skin)
+    std::map<std::string, uint32_t> gunAcc;       // acessórios de cada arma (bits ACC_*): o jogador deste aparelho e os de outro celular
     glm::vec3 lastPos{0.f}, goal{0.f};
 };
 struct ShopRT { Scene::Handle obj; int kind = 0; int team = 0; };  // kind 0 armas, 1 roupas
@@ -81,6 +82,7 @@ struct TeamMatch {
     int playerSkin = -1;
     std::string playerPrimary, playerSecondary;
     std::map<std::string, std::string> gunSkins;   // skin escolhida de cada arma do jogador
+    std::map<std::string, uint32_t> gunAcc;        // acessórios de cada arma do jogador (bits ACC_*)
     // aquecimento: antes de valer, todo mundo troca tiro (nada conta, volta em 2-3 s) e o jogador escolhe o equipamento;
     // no fim, todos voltam para o começo (base ou queda) e a partida começa valendo
     float aquecimentoDur = 0.f;                // pedido antes do Play (segundos; 0 = sem aquecimento)
@@ -128,6 +130,7 @@ void teamLoadout(Engine* e, int team, int skin, const std::string& primary, cons
 bool teamSwapWeapon(Engine* e);     // troca rápida principal <-> segunda arma
 std::string teamSkinLook(int team, int skin);  // aparência do boneco da roupa (JSON)
 void teamGunSkin(Engine* e, const std::string& gun, const std::string& skin);
+void teamGunAcc(Engine* e, const std::string& gun, uint32_t bits);  // acessórios de uma arma do jogador (bits ACC_*)
 void teamWarmup(Engine* e, float segundos);       // antes do Play: duração do aquecimento; na partida: encurta (0 = já vale)
 bool teamEquip(Engine* e, const std::string& gun); // aquecimento: troca a arma principal do jogador  // skin da arma do jogador ("" = padrão)
 void gunSkinFinish(const std::string& gun, const std::string& skin, float& metal, float& rough);  // acabamento da skin de arma
