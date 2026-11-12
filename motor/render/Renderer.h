@@ -135,6 +135,9 @@ public:
     GLuint loadProgram(const char* vsFile, const char* fsFile);
     ParticleSystem* particles = nullptr;  // desenhado depois do céu, antes das linhas do editor
     GLuint targetFbo = 0;         // 0 = tela. Outro valor: renderiza em FBO (ex.: textura do Flutter)
+    // Resolução dinâmica: fração da tela desenhada (< 1: desenha menor num FBO e estica no alvo no fim). O alvo
+    // não pode ter MSAA (o app não liga no Avançado)
+    float escala = 1.f;
     float shadowDistance = 40.f;
     // Aberturas (porta/janela/vão cortados em paredes): o que estiver dentro da caixa some nos objetos
     // marcados (não personagens, não objetos com noCut). Preenchidas pelo motor a cada frame.
@@ -177,6 +180,8 @@ private:
     bool envValid_ = false;
     glm::vec4 sh_[9] = {};
     int width_ = 1, height_ = 1;
+    GLuint escFbo_ = 0, escCor_ = 0, escProf_ = 0;  // alvo da resolução dinâmica
+    int escW_ = 0, escH_ = 0;
     std::string shaderDir_;
 public:
     const std::string& shaderDir() const { return shaderDir_; }

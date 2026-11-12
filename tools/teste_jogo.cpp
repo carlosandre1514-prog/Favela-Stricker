@@ -3,7 +3,7 @@
 //   favela_testes <pasta_shaders> <pasta_saida>
 // Sem variável: partida, online e escada. Ou um só: SO_JOGO, SO_ONLINE, SO_ESCADA_EXTERNA, SO_MEMORIA=<projeto.json>,
 // SO_RETRATOS_BLOCO (fotos das roupas), SO_PREVIAS="arma:skin,..." (fotos das armas), SO_PICOS (quadros lentos da
-// Ressurgência), SO_ZONA (custo da fumaça da zona; NIVEL=0..3, TRIS=1, FOTOS_ZONA=1)
+// Ressurgência), SO_ZONA (custo da fumaça da zona; NIVEL=0..3, TRIS=1, FOTOS_ZONA=1), SO_RESOLUCAO (resolução dinâmica)
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
 #include <GLES3/gl32.h>
@@ -1347,6 +1347,41 @@ int main(int argc, char** argv) {
         int acima = 0; for (float x : t) acima += x > 8.f;
         std::printf("  CPU por quadro (60 s): média %.2f ms · p99 %.2f · máx %.2f · acima de 8 ms: %d quadros\n", soma / t.size(), o[o.size() * 99 / 100], o.back(), acima);
         for (size_t q = 0; q < t.size(); ++q) if (t[q] > 8.f) std::printf("    quadro %zu: %.1f ms\n", q, t[q]);
+        return g_fail ? 1 : 0;
+    }
+    // (SO_RESOLUCAO=1): resolução dinâmica. Quadros lentos (20 por segundo com alvo 45): a resolução baixa até o
+    // mínimo; depois, com os quadros no alvo, volta para a tela inteira; a imagem menor ocupa a tela toda (esticada)
+    if (std::getenv("SO_RESOLUCAO")) {
+        eng::Engine* E = reinterpret_cast<eng::Engine*>(e);
+        abrirPartida();
+        engine_set_quality(e, 1);
+        jogo_modo(e, 0);
+        jogo_escolhas(e, 0, 0, "ak47", "");
+        jogo_aquecimento(e, 1.f);
+        engine_set_first_person(e, 1);
+        engine_set_play(e, 1);
+        engine_set_fps_alvo(e, 45);
+        frames(e, 30);
+        save(out, "resolucao_inteira.png");
+        float menor = 1.f;
+        for (int q = 0; q < 20 * 12; ++q) { engine_frame(e, 1.f / 20.f); menor = std::min(menor, engine_escala_resolucao(e)); }
+        glFinish();
+        const float baixou = engine_escala_resolucao(e);
+        save(out, "resolucao_menor.png");
+        // a imagem menor tem que cobrir a tela toda: confere que o canto de cima à direita não ficou vazio (preto)
+        std::vector<unsigned char> px(4 * 4 * 4);
+        glBindFramebuffer(GL_FRAMEBUFFER, g_fbo);
+        glReadPixels(W - 6, H - 6, 4, 4, GL_RGBA, GL_UNSIGNED_BYTE, px.data());
+        int soma = 0; for (size_t k = 0; k < px.size(); k += 4) soma += px[k] + px[k + 1] + px[k + 2];
+        for (int q = 0; q < 60 * 50; ++q) engine_frame(e, 1.f / 45.f);
+        const float voltou = engine_escala_resolucao(e);
+        std::printf("  resolução: lenta %.2f (mínimo %.2f) · canto da tela %d · no alvo de novo %.2f\n", baixou, menor, soma, voltou);
+        if (baixou > 0.7f) { std::printf("  [ERRO] com os quadros lentos a resolução não baixou\n"); ++g_fail; }
+        if (soma < 30) { std::printf("  [ERRO] a imagem menor não ocupou a tela toda\n"); ++g_fail; }
+        if (voltou < 0.99f) { std::printf("  [ERRO] com folga a resolução não voltou para a tela inteira\n"); ++g_fail; }
+        engine_set_fps_alvo(e, 0);
+        if (engine_escala_resolucao(e) != 1.f) { std::printf("  [ERRO] desligar não voltou para a tela inteira\n"); ++g_fail; }
+        std::printf(g_fail ? "FALHOU\n" : "OK\n");
         return g_fail ? 1 : 0;
     }
     // (SO_ZONA=1): custo da parede da zona (fumaça) no gráfico Leve: perto da borda olhando para ela x longe dela

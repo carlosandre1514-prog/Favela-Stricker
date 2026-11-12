@@ -325,13 +325,23 @@ class JogoActivity : Activity() {
 
     fun nivelGrafico() = prefs.getInt("nivel", 0).coerceIn(0, 3)
 
+    // Quadros por segundo: 30 (estável) ou 60 (fluido). Sem escolha da pessoa: 30 abaixo do Avançado, 60 no Avançado.
+    // 30 numa tela de 60 Hz é uma imagem a cada 2 atualizações, sempre igual (liso); 40 ou 45 não dividem 60 e
+    // alternam 1 e 2 atualizações (parece engasgo mesmo com mais quadros)
+    fun fpsEscolhido(): Int = if (prefs.contains("fps")) (if (prefs.getInt("fps", 30) >= 60) 60 else 30) else if (nivelGrafico() >= 3) 60 else 30
+    fun mudarFps(f: Int) {
+        prefs.edit().putInt("fps", if (f >= 60) 60 else 30).apply()
+        runOnUiThread { if (::motorView.isInitialized) aplicarResolucao() }
+    }
+
     // resolução e quadros por segundo de cada nível (o motor cuida de sombras, visão, texturas e modelos)
     private fun aplicarResolucao() {
+        val fps = fpsEscolhido()
         when (val n = nivelGrafico()) {
-            0 -> motorView.applyQuality(0.5f, 30, n)
-            1 -> motorView.applyQuality(0.6f, 40, n)
-            2 -> motorView.applyQuality(0.7f, 45, n)
-            else -> motorView.applyQuality(1f, 60, n)
+            0 -> motorView.applyQuality(0.5f, fps, n)
+            1 -> motorView.applyQuality(0.6f, fps, n)
+            2 -> motorView.applyQuality(0.7f, fps, n)
+            else -> motorView.applyQuality(1f, fps, n)
         }
     }
 

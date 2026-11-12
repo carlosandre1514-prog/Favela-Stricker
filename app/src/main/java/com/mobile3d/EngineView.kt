@@ -26,8 +26,12 @@ class EngineView(activity: Activity, private val shaderDir: String, private val 
         renderScale = scale; maxFps = fps; quality = q
         intervaloTroca = -1  // recalcula o ritmo da tela
         if (width > 0 && height > 0) holder.setFixedSize((width * scale).toInt().coerceAtLeast(1), (height * scale).toInt().coerceAtLeast(1))
-        queueEvent { NativeBridge.nativeSetQuality(q) }
+        queueEvent { NativeBridge.nativeSetQuality(q); NativeBridge.nativeSetFpsAlvo(fpsAlvo()) }
     }
+
+    // resolução dinâmica do motor: abaixo do Avançado (o Avançado usa antisserrilhado e tela inteira), com o limite
+    // de quadros do nível como alvo; se o celular não aguenta, o motor desenha menor e estica (sem piscar)
+    private fun fpsAlvo() = if (quality >= 3 || amostras > 0) 0 else maxFps
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
@@ -82,6 +86,7 @@ class EngineView(activity: Activity, private val shaderDir: String, private val 
                 if (NativeBridge.nativeCreate(shaderDir)) {
                     if (w0 > 0 && h0 > 0) NativeBridge.nativeResize(w0, h0)
                     NativeBridge.nativeSetQuality(quality)
+                    NativeBridge.nativeSetFpsAlvo(fpsAlvo())
                     onReady?.invoke()
                 } else {
                     post { Toast.makeText(context, "Falha ao iniciar o motor (shaders). Veja o logcat: Mobile3D", Toast.LENGTH_LONG).show() }

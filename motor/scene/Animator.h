@@ -73,6 +73,7 @@ struct Animator {
     int ownCount = 0;
     const Transform3D* space = nullptr;    // nó pai da raiz do esqueleto (define o espaço de mundo)
     float time = 0.f, speed = 1.f;
+    float atraso = 0.f;  // tempo ainda não aplicado (personagem longe ou fora da tela anima menos vezes)
     bool loop = true;
     glm::mat4 palette[kMaxJoints];  // enviado ao UBO de skinning
     glm::mat4 global[kMaxJoints];   // pose de cada joint no espaço do esqueleto (para encaixar armas/acessórios)

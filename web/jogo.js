@@ -674,8 +674,19 @@ function telaConfig(aba = 'sens') {
     $('#c-padrao', c).onclick = () => { for (const k of ['sens', 'sensMira', 'sensLuneta', 'inverterY', 'vibrar', 'medidor']) config[k] = CONFIG_PADRAO[k]; salvarConfig(); telaConfig('sens'); };
   } else if (aba === 'graficos') {
     const atual = motor.nivel();
+    const fps = motor.fps();
     c.innerHTML = `<div class="niveis">${NIVEIS.map((n, i) => `<button class="nivel ${i === atual ? 'sel' : ''}" data-n="${i}"><span class="n">${n.nome}</span><small>${esc(n.info)}</small></button>`).join('')}</div>
-      <span class="dica">Trocar a qualidade reabre o jogo (as texturas e os modelos são preparados ao abrir). Se o jogo travar ou esquentar, use um nível abaixo.</span>`;
+      <span class="dica">Trocar a qualidade reabre o jogo (as texturas e os modelos são preparados ao abrir). Se o jogo travar ou esquentar, use um nível abaixo.</span>
+      <div class="ajuste"><span class="nome">Quadros por segundo<small>30: sempre igual, esquenta menos (o melhor para celular fraco) · 60: mais fluido, pede um celular forte</small></span><span class="cresce"></span>
+        <div class="segmento" role="radiogroup" aria-label="Quadros por segundo"><button role="radio" data-fps="30" class="${fps < 60 ? 'sel' : ''}" aria-checked="${fps < 60}">30 · estável</button>
+        <button role="radio" data-fps="60" class="${fps >= 60 ? 'sel' : ''}" aria-checked="${fps >= 60}">60 · fluido</button></div></div>
+      <span class="dica">Se o celular não segurar os quadros escolhidos, a resolução baixa um pouco sozinha durante a partida (e volta quando sobra folga).</span>`;
+    for (const b of $$('[data-fps]', c)) b.onclick = () => {
+      const f = Number(b.dataset.fps);
+      motor.mudarFps(f);
+      for (const o of $$('[data-fps]', c)) { const sel = Number(o.dataset.fps) === f; o.classList.toggle('sel', sel); o.setAttribute('aria-checked', String(sel)); }
+      aviso(f >= 60 ? '60 quadros: mais fluido (se esquentar ou engasgar, volte para 30)' : '30 quadros: estável e mais frio');
+    };
     for (const b of $$('[data-n]', c)) b.onclick = async () => {
       const n = Number(b.dataset.n);
       if (n === motor.nivel()) return;

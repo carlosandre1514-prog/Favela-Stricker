@@ -10,10 +10,14 @@
 static Engine* g = nullptr;
 static double g_last = 0.0;
 static int g_w = 0, g_h = 0;
+static int g_limite = 0;  // quadros por segundo (30 ou 60); 0 = a taxa da tela
 
 static void frame() {
     if (!g) return;
     double now = emscripten_get_now();
+    // limite: pula as atualizações da tela que chegam antes da hora (30 numa tela de 60 Hz = uma sim, uma não,
+    // sempre igual; numa de 120 Hz, uma a cada 4)
+    if (g_limite > 0 && g_last > 0.0 && now - g_last < 1000.0 / g_limite - 4.0) return;
     float dt = g_last > 0.0 ? float((now - g_last) / 1000.0) : 1.f / 60.f;
     g_last = now;
     int w = 0, h = 0;
@@ -47,11 +51,17 @@ EMSCRIPTEN_KEEPALIVE int web_iniciar(int quality) {
     g = jogo_criar("/jogo");  // motor + o jogo ligado nele
     if (!g) return 0;
     engine_set_quality(g, quality);
+    engine_set_fps_alvo(g, quality >= 3 ? 0 : 45);  // resolução dinâmica abaixo do Ultra (o navegador não tem limite fixo)
     emscripten_set_main_loop(frame, 0, 0);
     return 1;
 }
 
-EMSCRIPTEN_KEEPALIVE void web_qualidade(int q) { if (g) engine_set_quality(g, q); }
+EMSCRIPTEN_KEEPALIVE void web_qualidade(int q) { if (g) { engine_set_quality(g, q); engine_set_fps_alvo(g, q >= 3 ? 0 : 45); } }
+// quadros por segundo: 30 (estável) ou 60 (fluido); a resolução dinâmica mira no limite escolhido
+EMSCRIPTEN_KEEPALIVE void web_limite_fps(int fps, int quality) {
+    g_limite = fps >= 60 ? 0 : 30;
+    if (g) engine_set_fps_alvo(g, quality >= 3 ? 0 : fps >= 60 ? 45 : 30);
+}
 EMSCRIPTEN_KEEPALIVE int web_abrir_projeto(const char* json) { return g ? engine_import_project(g, json) : 0; }
 EMSCRIPTEN_KEEPALIVE void web_play(int on) { if (g) engine_set_play(g, on); }
 EMSCRIPTEN_KEEPALIVE void web_camera(float tx, float ty, float tz, float yaw, float pitch, float dist) { if (g) engine_set_camera(g, tx, ty, tz, yaw, pitch, dist); }

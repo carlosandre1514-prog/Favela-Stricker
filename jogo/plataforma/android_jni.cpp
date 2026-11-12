@@ -114,6 +114,7 @@ JNI_FN(void, nativeDestroy)(JNIEnv*, jclass) { if (g_engine) { engine_destroy(g_
 JNI_FN(void, nativeResize)(JNIEnv*, jclass, jint w, jint h) { if (g_engine) engine_resize(g_engine, w, h); }
 JNI_FN(void, nativeFrame)(JNIEnv*, jclass, jfloat dt) { if (g_engine) { g_phase = "desenhando a tela"; engine_frame(g_engine, dt); } }
 JNI_FN(void, nativeSetQuality)(JNIEnv*, jclass, jint q) { if (g_engine) engine_set_quality(g_engine, q); }
+JNI_FN(void, nativeSetFpsAlvo)(JNIEnv*, jclass, jint fps) { if (g_engine) engine_set_fps_alvo(g_engine, fps); }
 // sons pedidos pelo jogo desde a última chamada ("nome\tvolume\tpan" por linha) e tempo (chuva, noite, hora)
 JNI_FN(jstring, nativePollSounds)(JNIEnv* env, jclass) { return env->NewStringUTF(g_engine ? engine_poll_sounds(g_engine) : ""); }
 JNI_FN(void, nativeGetWeather)(JNIEnv* env, jclass, jfloatArray out3) {

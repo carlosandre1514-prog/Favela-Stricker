@@ -120,6 +120,50 @@ void engine_resize(Engine* e, int w, int h) {
 
 void engine_set_target_fbo(Engine* e, uint32_t fbo) { if (e) e->renderer.targetFbo = fbo; }
 
+void engine_set_fps_alvo(Engine* e, int fps) {
+    if (!e) return;
+    e->fpsAlvo = std::max(0, fps);
+    if (!e->fpsAlvo) e->renderer.escala = 1.f;
+    e->dinT = 0.f; e->dinQ = 0; e->dinBons = 0; e->dinEspera = 0; e->dinTeto = 1.f;
+}
+float engine_escala_resolucao(Engine* e) { return e ? e->renderer.escala : 1.f; }
+
+namespace {
+// Resolução dinâmica: a cada segundo jogando compara os quadros com o alvo. Abaixo de 88%: baixa (mais e mais
+// rápido se estiver bem abaixo) e espera 2 a 4 s para ver o efeito; perto do alvo por 4 s seguidos: sobe 5%, sem passar do teto (o valor em que
+// já engasgou, que só é esquecido depois de 30 s bons). Assim não fica subindo e descendo.
+void resolucaoDinamica(Engine* e, float dt) {
+    if (e->fpsAlvo <= 0 || !e->playing) { e->dinT = 0.f; e->dinQ = 0; return; }
+    e->dinT += dt;
+    ++e->dinQ;
+    if (e->dinT < 1.f) return;
+    const float fps = float(e->dinQ) / e->dinT, alvo = float(e->fpsAlvo);
+    e->dinT = 0.f; e->dinQ = 0;
+    float& s = e->renderer.escala;
+    const float minimo = e->nivel <= 0 ? 0.7f : 0.65f;  // (o Leve já desenha com metade da tela no celular)
+    if (e->dinEspera > 0) --e->dinEspera;
+    if (fps < alvo * 0.88f) {
+        e->dinBons = 0;
+        if (e->dinEspera == 0 && s > minimo) {
+            e->dinTeto = s;
+            const bool muito = fps < alvo * 0.7f;  // bem abaixo: desce mais e mais rápido (engasgo forte)
+            s = std::max(minimo, s - (muito ? 0.12f : 0.06f));
+            e->dinEspera = muito ? 2 : 4;
+        }
+    } else if (fps >= alvo * 0.96f) {
+        ++e->dinBons;
+        if (e->dinBons >= 30) e->dinTeto = 1.f;
+        if (e->dinBons % 4 == 0 && e->dinEspera == 0 && s < 1.f) {
+            const float novo = std::min({1.f, s + 0.05f, std::max(e->dinTeto - 0.001f, s)});
+            if (novo > s + 0.01f) { s = novo; e->dinEspera = 3; }
+        }
+    } else {
+        e->dinBons = 0;
+    }
+    if (s > 0.995f) s = 1.f;
+}
+}  // namespace
+
 void engine_frame(Engine* e, float dt) {
     if (!e) return;
     auto t0 = std::chrono::steady_clock::now();
@@ -134,9 +178,37 @@ void engine_frame(Engine* e, float dt) {
     } else {
         for (auto& t : e->tracers) t.life = 0.f;
     }
-    for (Animator* a : e->animators) a->update(dt, e->playing || e->previewAnim);
+    // Animação pela distância (gráficos abaixo do Avançado, jogando): perto da câmera todo quadro; longe ou fora da
+    // tela a cada 2 a 4 quadros, com o tempo acumulado (o passo da animação não muda, só fica menos fluido de longe).
+    // Na Ressurgência são 40 esqueletos por quadro: no celular fraco é boa parte do processador.
+    {
+        static uint32_t quadroAnim = 0;
+        ++quadroAnim;
+        const bool reduz = e->playing && e->nivel <= 2;
+        const glm::vec3 camPos = e->camera.position;
+        const eng::Frustum fr = e->camera.frustum();
+        uint32_t k = 0;
+        for (Animator* a : e->animators) {
+            ++k;
+            uint32_t passo = 1;
+            if (reduz && a->space) {
+                const glm::vec3 p = a->space->worldPosition();
+                const float d2 = glm::dot(p - camPos, p - camPos);
+                eng::AABB caixa{p - glm::vec3(1.f, 0.2f, 1.f), p + glm::vec3(1.f, 2.2f, 1.f)};
+                const bool naTela = fr.intersects(caixa);
+                if (d2 < 12.f * 12.f) passo = 1;
+                else if (naTela) passo = d2 < 35.f * 35.f ? 2 : 3;
+                else passo = d2 < 20.f * 20.f ? 2 : 4;
+            }
+            a->atraso += dt;
+            if (passo > 1 && (quadroAnim + k) % passo != 0) continue;  // (espalhados: nem todos no mesmo quadro)
+            a->update(a->atraso, e->playing || e->previewAnim);
+            a->atraso = 0.f;
+        }
+    }
     eng::atualizarBombas(e, dt);
     eng::updateDoors(e, dt);
+    resolucaoDinamica(e, dt);
     auto tw = std::chrono::steady_clock::now();
     auto ms = [](auto a, auto b) { return std::chrono::duration<float, std::milli>(b - a).count(); };
     e->profWorld = ms(tw, std::chrono::steady_clock::now());
@@ -254,6 +326,7 @@ void engine_set_play(Engine* e, int playing) {
         e->moveInput = glm::vec2(0.f);
         e->runInput = e->jumpRequest = e->fireRequest = e->crouchInput = false;
         e->playing = true;  // a lógica de jogo só cria/danifica com o Play ligado
+        e->dinT = 0.f; e->dinQ = 0; e->dinEspera = 3;  // resolução dinâmica: o começo (criando os bonecos) não conta
         e->playStartHour = e->timeOfDay;
         e->scopeZoom = 0;  // luneta começa no zoom pequeno
         eng::weatherStart(e);

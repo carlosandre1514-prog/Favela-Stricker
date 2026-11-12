@@ -132,6 +132,8 @@ class PonteJogo(private val jogo: JogoActivity) {
     // aparelho
     @JavascriptInterface fun nivel(): Int = jogo.nivelGrafico()
     @JavascriptInterface fun mudarNivel(n: Int) = jogo.mudarNivelGrafico(n)
+    @JavascriptInterface fun fps(): Int = jogo.fpsEscolhido()
+    @JavascriptInterface fun mudarFps(f: Int) = jogo.mudarFps(f)
     @JavascriptInterface fun volume(v: Float) = jogo.mudarVolume(v)
     @JavascriptInterface fun vibrar(ms: Int) = jogo.vibrar(ms)
     @JavascriptInterface fun sair() = jogo.runOnUiThread { jogo.finish() }

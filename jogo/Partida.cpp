@@ -891,6 +891,13 @@ void botUpdate(Engine* e, int fi, float dt) {
     // escolhe o alvo: inimigo vivo mais perto que dá para ver
     if ((f.think -= dt) <= 0.f) {
         f.think = e->fxRng.range(0.2f, 0.35f);
+        // Ressurgência: robô longe do jogador (o que ele não vê) pensa menos vezes por segundo (são 40: alivia o
+        // processador do celular fraco); perto, igual
+        if (M.modo == 1 && e->nivel <= 2) {
+            const int pf = playerFighter(e);
+            GameObject* pg = pf >= 0 ? e->scene.get(M.f[pf].root) : nullptr;
+            if (pg && glm::length(pg->transform.position - pos) > 70.f) f.think = e->fxRng.range(0.5f, 0.8f);
+        }
         int best = -1; float bd = M.modo == 1 ? 42.f : 55.f;  // Ressurgência: vê um pouco menos longe (são 40)
         for (size_t k = 0; k < M.f.size(); ++k) {
             Fighter& o = M.f[k];

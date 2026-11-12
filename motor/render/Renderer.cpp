@@ -239,6 +239,8 @@ void Renderer::resize(int w, int h) { width_ = std::max(w, 1); height_ = std::ma
 
 void Renderer::shutdown() {
     clearAssets();
+    if (escFbo_) { glDeleteFramebuffers(1, &escFbo_); glDeleteRenderbuffers(1, &escCor_); glDeleteRenderbuffers(1, &escProf_); }
+    escFbo_ = escCor_ = escProf_ = 0; escW_ = escH_ = 0;
     std::free(instanceScratch_);
     instanceScratch_ = nullptr;
     for (auto& lv : lineVerts_) { std::free(lv); lv = nullptr; }
@@ -535,7 +537,29 @@ void Renderer::render(const Camera& cam, const DirectionalLight& sun, const Envi
     // 3) sombras e passe principal
     if (sun.castShadows) shadowPass(cs);
 
-    glBindFramebuffer(GL_FRAMEBUFFER, targetFbo);
+    // resolução dinâmica: desenha numa área menor e estica para a tela no fim (o "piscar" de mudar o tamanho da
+    // tela do Android não acontece; muda de um quadro para o outro)
+    const int telaW = width_, telaH = height_;
+    GLuint alvo = targetFbo;
+    if (escala < 0.995f) {
+        const int w = std::max(16, int(float(telaW) * escala)), h = std::max(16, int(float(telaH) * escala));
+        if (w != escW_ || h != escH_ || !escFbo_) {
+            if (!escFbo_) { glGenFramebuffers(1, &escFbo_); glGenRenderbuffers(1, &escCor_); glGenRenderbuffers(1, &escProf_); }
+            glBindRenderbuffer(GL_RENDERBUFFER, escCor_);
+            glRenderbufferStorage(GL_RENDERBUFFER, GL_RGBA8, w, h);
+            glBindRenderbuffer(GL_RENDERBUFFER, escProf_);
+            glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, w, h);
+            glBindFramebuffer(GL_FRAMEBUFFER, escFbo_);
+            glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, escCor_);
+            glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, escProf_);
+            const bool ok = glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
+            escW_ = ok ? w : 0; escH_ = ok ? h : 0;
+            if (!ok) escala = 1.f;  // (sem suporte: fica na tela inteira)
+        }
+        if (escW_ > 0) { alvo = escFbo_; width_ = escW_; height_ = escH_; }
+    }
+
+    glBindFramebuffer(GL_FRAMEBUFFER, alvo);
     glViewport(0, 0, width_, height_);
     glDepthMask(GL_TRUE);
     glClearColor(0.f, 0.f, 0.f, 1.f);
@@ -558,12 +582,19 @@ void Renderer::render(const Camera& cam, const DirectionalLight& sun, const Envi
     flushLines();
 
     // GPUs tiled: não precisamos gravar o depth de volta na memória
-    if (targetFbo == 0) {
+    if (alvo == 0) {
         const GLenum att[] = {GL_DEPTH, GL_STENCIL};
         glInvalidateFramebuffer(GL_FRAMEBUFFER, 2, att);
     } else {
         const GLenum att[] = {GL_DEPTH_ATTACHMENT};
         glInvalidateFramebuffer(GL_FRAMEBUFFER, 1, att);
+    }
+    if (alvo == escFbo_ && escFbo_) {  // estica a imagem menor para a tela inteira (filtro linear)
+        glBindFramebuffer(GL_READ_FRAMEBUFFER, escFbo_);
+        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, targetFbo);
+        glBlitFramebuffer(0, 0, width_, height_, 0, 0, telaW, telaH, GL_COLOR_BUFFER_BIT, GL_LINEAR);
+        glBindFramebuffer(GL_FRAMEBUFFER, targetFbo);
+        width_ = telaW; height_ = telaH;
     }
 }
 

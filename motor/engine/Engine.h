@@ -328,6 +328,10 @@ struct Engine {
     int nivel = 2;    // nível gráfico do jogo: 0 Leve, 1 Padrão, 2 Intermediária, 3 Ultra (applyQualityLevel)
     bool lowTextures = false;  // celular fraco (qualidade.txt = 0 ao abrir): texturas na metade e terreno simples
     int statFrames = 0;
+    // resolução dinâmica (engine_set_fps_alvo): mede os quadros por segundo jogando e baixa/sobe renderer.escala
+    int fpsAlvo = 0;              // 0 = desligada
+    float dinT = 0.f, dinTeto = 1.f;
+    int dinQ = 0, dinBons = 0, dinEspera = 0;
 };
 
 // ---- cena (Engine.cpp)

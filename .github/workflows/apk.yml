@@ -59,6 +59,8 @@ jobs:
         run: SO_ESCADA_EXTERNA=1 ./build/favela_testes shaders saida
       - name: Pular janela e câmera sem atravessar parede
         run: SO_JANELA=1 ./build/favela_testes shaders saida
+      - name: Resolução dinâmica (baixa com quadros lentos, volta com folga)
+        run: SO_RESOLUCAO=1 ./build/favela_testes shaders saida
       - name: Memória no nível Leve (o mesmo mapa do APK)
         run: |
           echo 0 > shaders/qualidade.txt

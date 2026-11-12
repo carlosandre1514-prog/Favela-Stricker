@@ -42,6 +42,10 @@ void    engine_get_stats(Engine*, float* out6);
 void    engine_get_profile(Engine*, float* out3);
 void    engine_memory_stats(Engine*, float* out4);           // texturas MB, malhas MB, nº de malhas
 void    engine_set_quality(Engine*, int q);                  // nível 0 Leve, 1 Padrão, 2 Intermediária, 3 Ultra
+// Resolução dinâmica: quadros por segundo esperados (o limite do app). Jogando, se ficar abaixo, desenha numa
+// resolução menor (até ~65%) e estica; com folga, volta. 0 desliga (tela inteira sempre). Não usar com MSAA.
+void    engine_set_fps_alvo(Engine*, int fps);
+float   engine_escala_resolucao(Engine*);                    // fração atual (1 = tela inteira)
 
 int     engine_create_random_character(Engine*, uint32_t seed, int controllable);
 

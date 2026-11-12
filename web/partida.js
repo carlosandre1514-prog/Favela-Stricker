@@ -360,33 +360,38 @@ const ABATES_SKIN = {
   'm4a1:dragao_raio': { classe: 'dragao', frase: 'eletrocutou', arma: 'M4A1 Dragão Relâmpago' },
   'm4a1:mitica': { classe: 'carmesim', frase: 'coroou', arma: 'M4A1 Mítica' },
 };
+// O placar atualiza 10 vezes por segundo: só mexe na página quando o valor muda (cada mudança faz o WebView
+// recalcular e redesenhar a camada que fica por cima do jogo; no celular fraco isso disputa com o 3D)
+const hTx = (el, v) => { if (el && el._tx !== v) { el.textContent = v; el._tx = v; } };
+const hHtml = (el, v) => { if (el && el._hm !== v) { el.innerHTML = v; el._hm = v; } };
+const hSt = (el, prop, v) => { if (el && el['_s' + prop] !== v) { el.style[prop] = v; el['_s' + prop] = v; } };
+
 function atualizarHud(j) {
   const t = partida && partida.hud;
   if (!t || !t.isConnected) return;
   const hp = j.vida | 0, max = Math.max(1, j.vidaMax | 0);
   const barra = $('#vida .barra', t);
-  barra.style.width = (100 * hp / max) + '%';
-  barra.style.background = hp > 50 ? '#4ADE80' : hp > 25 ? '#FBBF24' : '#F87171';
-  $('#hp', t).textContent = hp;
-  $('#dinheiro', t).textContent = j.modo === 1 ? (j.br ? `TIME ${j.br.meuTime}` : '') : '$ ' + fmt(j.dinheiro | 0);
-  $('#kd', t).textContent = `${j.abates | 0} abate${(j.abates | 0) === 1 ? '' : 's'} · ${j.mortes | 0} morte${(j.mortes | 0) === 1 ? '' : 's'}`;
+  hSt(barra, 'width', (100 * hp / max) + '%');
+  hSt(barra, 'background', hp > 50 ? '#4ADE80' : hp > 25 ? '#FBBF24' : '#F87171');
+  hTx($('#hp', t), String(hp));
+  hTx($('#dinheiro', t), j.modo === 1 ? (j.br ? `TIME ${j.br.meuTime}` : '') : '$ ' + fmt(j.dinheiro | 0));
+  hTx($('#kd', t), `${j.abates | 0} abate${(j.abates | 0) === 1 ? '' : 's'} · ${j.mortes | 0} morte${(j.mortes | 0) === 1 ? '' : 's'}`);
   atualizarAquecimento(t, j);
   avisosDeAbate(t, j);
   if (j.modo === 1 && j.br) atualizarHudBR(t, j);
   else {
     const pl = j.placar || [0, 0];
-    $('#pt-pol', t).textContent = pl[0];
-    $('#pt-ban', t).textContent = pl[1];
-    $('#relogio', t).textContent = j.tempo < 0 ? '--:--' : `${Math.floor(j.tempo / 60)}:${String(j.tempo % 60).padStart(2, '0')}`;
-    $('#meta', t).textContent = `até ${j.meta || 25} abates`;
+    hTx($('#pt-pol', t), String(pl[0]));
+    hTx($('#pt-ban', t), String(pl[1]));
+    hTx($('#relogio', t), j.tempo < 0 ? '--:--' : `${Math.floor(j.tempo / 60)}:${String(j.tempo % 60).padStart(2, '0')}`);
+    hTx($('#meta', t), `até ${j.meta || 25} abates`);
   }
-  const ng = $('#n-granadas', t);
-  if (ng) ng.textContent = j.granadas | 0;
+  hTx($('#n-granadas', t), String(j.granadas | 0));
   // armas: imagem com a skin escolhida, balas no pente / reserva
   const armas = j.armas || [];
   $$('.slot', t).forEach((s, i) => {
     const a = armas[i];
-    s.style.display = a ? '' : 'none';
+    hSt(s, 'display', a ? '' : 'none');
     if (!a) return;
     s.classList.toggle('ativa', i === j.slot);
     const sk = conta.skinArma(a.arma);
@@ -395,27 +400,27 @@ function atualizarHud(j) {
     if (img.getAttribute('src') !== src) img.src = src;
     const recarregando = j.recarregando && i === j.slot;
     const sp = s.querySelector('span');
-    sp.textContent = recarregando ? 'recarregando…' : `${a.balas} / ${a.reserva < 0 ? '∞' : a.reserva}`;
-    sp.style.color = a.balas === 0 && !recarregando ? '#F87171' : '#F3F4F6';
+    hTx(sp, recarregando ? 'recarregando…' : `${a.balas} / ${a.reserva < 0 ? '∞' : a.reserva}`);
+    hSt(sp, 'color', a.balas === 0 && !recarregando ? '#F87171' : '#F3F4F6');
   });
-  const bt = $('#b-trocar', t);
-  if (bt) bt.style.display = armas.length > 1 ? '' : 'none';
+  hSt($('#b-trocar', t), 'display', armas.length > 1 ? '' : 'none');
   // mira e luneta
   const luneta = j.mirando && j.luneta;
-  $('#luneta', t).style.display = luneta ? 'block' : 'none';
+  hSt($('#luneta', t), 'display', luneta ? 'block' : 'none');
   const zl = $('#zoom-luneta', t);  // botões + e - da luneta: só mirando com ela
   if (zl) {
-    zl.style.visibility = luneta ? 'visible' : 'hidden';  // (display não serve: .so-toque força display com !important)
-    $('#zoom-nivel', t).textContent = ['1,7x', '2,4x', '3,6x'][j.zoom | 0] || '1,7x';
+    hSt(zl, 'visibility', luneta ? 'visible' : 'hidden');  // (display não serve: .so-toque força display com !important)
+    hTx($('#zoom-nivel', t), ['1,7x', '2,4x', '3,6x'][j.zoom | 0] || '1,7x');
   }
   if (j.morto && partida.correAuto) pararCorrida(t);
   const mira = $('#mira', t);
-  mira.style.visibility = luneta ? 'hidden' : 'visible';
-  desenharMira(mira, j.mirando, j.acerto, j.cabeca);
+  hSt(mira, 'visibility', luneta ? 'hidden' : 'visible');
+  const chaveMira = `${!!j.mirando}${!!j.acerto}${!!j.cabeca}`;  // a mira só é redesenhada quando muda
+  if (mira._chave !== chaveMira) { mira._chave = chaveMira; desenharMira(mira, j.mirando, j.acerto, j.cabeca); }
   const bm = $('#b-mira', t);
   if (bm) bm.classList.toggle('ligado', !!j.mirando);
   // dano: tela vermelha nas bordas (e vibra, se ligado)
-  $('#dano', t).style.display = j.dano ? 'block' : 'none';
+  hSt($('#dano', t), 'display', j.dano ? 'block' : 'none');
   if (j.dano && !partida.danoAntes && config.vibrar) motor.vibrar(35);
   partida.danoAntes = !!j.dano;
   const centro = $('#centro', t);
@@ -423,37 +428,42 @@ function atualizarHud(j) {
     ? (j.renasce < 0 ? `Você está fora<br><span style="font-size:13px;font-weight:600">${j.br && j.br.time && j.br.time.some((m) => m.vivo) ? 'seu time continua: torça por eles' : 'seu time caiu'}</span>`
       : `Você foi abatido<br><span style="font-size:13px;font-weight:600">${j.modo === 1 ? `Volta em ${j.renasce} s perto do seu time` : `Renasce em ${j.renasce} s`}</span>`)
     : j.estado ? esc(j.msg) : '';
-  centro.innerHTML = msg;
-  centro.style.display = msg ? 'block' : 'none';
+  hHtml(centro, msg);
+  hSt(centro, 'display', msg ? 'block' : 'none');
   // botão do meio: loja de armas na base (ou outra interação perto)
   const rot = (j.interagir || '').replace(/^[^\p{L}🔒]+/u, '');
   const bl = $('#botao-loja', t);
-  bl.style.display = rot && !j.morto && !partida.loja ? 'flex' : 'none';
+  hSt(bl, 'display', rot && !j.morto && !partida.loja ? 'flex' : 'none');
   bl.classList.toggle('outro', !/Loja de armas/.test(rot));
-  bl.querySelector('span').textContent = rot;
+  hTx(bl.querySelector('span'), rot);
   // abates (últimos 4)
   const feed = (j.abatidos || []).slice(-4);
-  $('#abates', t).innerHTML = feed.map((f) => {
+  hHtml($('#abates', t), feed.map((f) => {
     if (!f.a) return / eliminado$/.test(f.v) ? `<span><b style="color:${corTime(f.vt)}">${esc(f.v)}</b></span>` : `<span><b style="color:${corTime(f.vt)}">${esc(f.v)}</b> caiu</span>`;
     const s = ABATES_SKIN[f.skin];
     if (s) return `<span class="abate-${s.classe}"><b style="color:${corTime(f.at)}">${f.voce ? 'Você' : esc(f.a)}</b> <i>${s.frase}</i> <b style="color:${corTime(f.vt)}">${esc(f.v)}</b> · <em>${s.arma}</em></span>`;
     return `<span><b style="color:${corTime(f.at)}">${f.voce ? 'Você' : esc(f.a)}</b> abateu <b style="color:${corTime(f.vt)}">${esc(f.v)}</b>${f.arma ? ' · ' + esc(f.arma) : ''}</span>`;
-  }).join('');
-  desenharMinimapa($('#minimapa', t), j.mapa, j.time | 0, j.modo === 1 ? j.br : null);
+  }).join(''));
+  // minimapa: no Leve e no Padrão 4 vezes por segundo (é um desenho inteiro a cada vez)
+  const agora = performance.now();
+  if (motor.nivel() >= 2 || !partida.minimapaEm || agora - partida.minimapaEm >= 240) {
+    partida.minimapaEm = agora;
+    desenharMinimapa($('#minimapa', t), j.mapa, j.time | 0, j.modo === 1 ? j.br : null);
+  }
 }
 
 // HUD da Ressurgência: times vivos, quem está de pé, a zona (tempo e se está fechando) e o meu time
 function atualizarHudBR(t, j) {
   const b = j.br;
-  $('#br-times', t).textContent = b.times | 0;
-  $('#br-vivos', t).textContent = b.jogadores | 0;
-  $('#relogio', t).textContent = `${Math.floor((b.tempo | 0) / 60)}:${String((b.tempo | 0) % 60).padStart(2, '0')}`;
+  hTx($('#br-times', t), String(b.times | 0));
+  hTx($('#br-vivos', t), String(b.jogadores | 0));
+  hTx($('#relogio', t), `${Math.floor((b.tempo | 0) / 60)}:${String((b.tempo | 0) % 60).padStart(2, '0')}`);
   const meta = $('#meta', t);
-  meta.textContent = b.fase > 6 || !b.tempo && !b.fechando ? 'zona final' : b.fechando ? `ZONA FECHANDO · fase ${b.fase}` : `a zona fecha em · fase ${b.fase}/6`;
+  hTx(meta, (b.fase > 6 || !b.tempo && !b.fechando ? 'zona final' : b.fechando ? `ZONA FECHANDO · fase ${b.fase}` : `a zona fecha em · fase ${b.fase}/6`)
+    + (b.renascer ? '' : ' · sem renascer'));
   meta.classList.toggle('alerta', !!b.fechando);
   const sem = $('#placar', t);
   sem.classList.toggle('sem-renascer', !b.renascer);
-  if (!b.renascer) meta.textContent += ' · sem renascer';
   const mt = $('#meu-time', t);
   const html = (b.time || []).map((m) => {
     const estado = m.fora ? '<i class="fora">fora</i>' : !m.vivo ? `<i class="volta">volta em ${m.renasce}s</i>`
@@ -462,8 +472,8 @@ function atualizarHudBR(t, j) {
   }).join('');
   if (mt.dataset.html !== html) { mt.innerHTML = html; mt.dataset.html = html; }
   const fz = $('#fora-zona', t);
-  fz.style.display = b.fora ? 'block' : 'none';
-  if (b.fora) fz.textContent = `FORA DA ZONA · volte para o círculo (${b.distancia | 0} m)`;
+  hSt(fz, 'display', b.fora ? 'block' : 'none');
+  if (b.fora) hTx(fz, `FORA DA ZONA · volte para o círculo (${b.distancia | 0} m)`);
 }
 
 // ---------------- controles de toque: metade esquerda anda, metade direita olha ----------------

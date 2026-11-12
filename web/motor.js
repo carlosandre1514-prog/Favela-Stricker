@@ -89,6 +89,8 @@ const motor = ANDROID ? {
   redeEvento: (s) => Nativo.redeEvento(s),
   nivel: () => Nativo.nivel(),
   mudarNivel: (n) => Nativo.mudarNivel(n),
+  fps: () => { try { return Nativo.fps(); } catch (_) { return 30; } },  // 30 (estável) ou 60 (fluido)
+  mudarFps: (f) => { try { Nativo.mudarFps(f); } catch (_) {} },
   volume: (v) => Nativo.volume(v),
   vibrar: (ms) => Nativo.vibrar(ms),
   sair: () => Nativo.sair(),
@@ -134,6 +136,8 @@ const motor = ANDROID ? {
   redeEvento: (s) => wasm('web_rede_evento', null, ['string'], [s]),
   nivel: () => guardado.get('nivel', TOQUE ? 0 : 2),
   mudarNivel: (n) => { guardado.set('nivel', n); location.reload(); },  // texturas e modelos são preparados ao abrir
+  fps: () => guardado.get('fps', motor.nivel() >= 3 ? 60 : 30),  // sem escolha: 30 abaixo do Ultra, 60 no Ultra
+  mudarFps: (f) => { guardado.set('fps', f >= 60 ? 60 : 30); if (M) wasm('web_limite_fps', null, ['number', 'number'], [f >= 60 ? 60 : 30, motor.nivel()]); },
   volume: (v) => { volumeSons = v; },
   vibrar: (ms) => { try { navigator.vibrate && navigator.vibrate(ms); } catch (_) {} },
   sair: () => {},
@@ -246,6 +250,7 @@ async function iniciarMotor(aoProgresso) {
   aoProgresso && aoProgresso('Preparando o mapa…');
   await new Promise((r) => setTimeout(r, 30));
   if (!M.ccall('web_iniciar', 'number', ['number'], [motor.nivel()])) throw new Error(PLATAFORMA === 'ios' ? 'Seu iPhone/iPad precisa do iOS 15 ou mais novo (WebGL 2). Atualize o sistema e abra pelo Safari.' : 'Seu navegador não tem WebGL 2. Use o Chrome ou o Firefox atualizados.');
+  try { M.ccall('web_limite_fps', null, ['number', 'number'], [motor.fps(), motor.nivel()]); } catch (_) {}  // 30 ou 60 quadros
   // o mapa fica guardado e só abre na primeira partida (barracas de roupa fora: roupa é no mercado)
   projetoPartida = await (await fetch('exemplos/5_policia_x_bandidos.json')).json();
   projetoPartida.objetos = (projetoPartida.objetos || []).filter((o) => !(o.tipo === 'loja' && o.loja === 'roupas'));
