@@ -785,7 +785,7 @@ int main(int argc, char** argv) {
             camera();
             json look = json::parse(jogo_aparencia_roupa(t, k));
             const int id = engine_add_spec(e, json{{"tipo", "personagem"}, {"aparencia", look}, {"semente", 7}, {"pos", {0, 0, 0}},
-                                                   {"rot", {0, giro, 0}}, {"arma", arma}}.dump().c_str());
+                                                   {"rot", {0, giro, 0}}, {"arma", arma}, {"arma_tamanho", arma == "smg" ? 0.66 : 1.0}}.dump().c_str());
             const std::string modelo = eng::gunModelFile(E, arma, skin);  // skin com modelo próprio: troca a arma
             if (id >= 0 && modelo != "kit:armas/" + arma)
                 engine_add_spec(e, json{{"tipo", "arma"}, {"arma", arma}, {"arquivo", modelo}, {"portador", id}}.dump().c_str());
