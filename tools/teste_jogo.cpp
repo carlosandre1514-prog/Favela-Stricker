@@ -1271,6 +1271,39 @@ int main(int argc, char** argv) {
         return g_fail ? 1 : 0;
     }
     // Offline: inimigo abatido derruba munição; a vida volta fora do combate (SO_DROP=1)
+    // Armas novas na mão (SO_ARMAS_NOVAS="doze,smg"): primeira pessoa e de fora, parado e atirando
+    if (const char* lista = std::getenv("SO_ARMAS_NOVAS")) {
+        eng::Engine* E = reinterpret_cast<eng::Engine*>(e);
+        abrirPartida();
+        std::string l = lista;
+        for (size_t a = 0; a < l.size();) {
+            size_t b = l.find(',', a); if (b == std::string::npos) b = l.size();
+            const std::string arma = l.substr(a, b - a); a = b + 1;
+            jogo_escolhas(e, 1, 0, arma.c_str(), "tt33");
+            engine_set_first_person(e, 1);
+            engine_set_play(e, 1);
+            frames(e, 40);
+            save(out, ("fp_" + arma + ".png").c_str());
+            engine_player_fire(e);
+            frames(e, 2);
+            save(out, ("fp_tiro_" + arma + ".png").c_str());
+            frames(e, 30);
+            engine_set_first_person(e, 0);
+            float p[3], r[3], sc[3];
+            engine_get_transform(e, engine_player_id(e), p, r, sc);
+            engine_set_camera(e, p[0], p[1] + 1.2f, p[2], E->editorCam.yaw + 2.4f, 0.12f, 2.2f);
+            frames(e, 4);
+            save(out, ("tp_" + arma + ".png").c_str());
+            const int pf = eng::playerFighter(E);
+            std::printf("  %s: na mão %s · tipo %d\n", arma.c_str(), pf >= 0 ? eng::matchOf(E).f[pf].weapon.c_str() : "?", E->player >= 0 ? E->characters[E->player].weaponKind : -1);
+            if (pf < 0 || eng::matchOf(E).f[pf].weapon != arma) { std::printf("  [ERRO] a arma não entrou na mão\n"); ++g_fail; }
+            engine_set_play(e, 0);
+            frames(e, 2);
+        }
+        engine_destroy(e);
+        std::printf(g_fail ? "FALHOU\n" : "OK\n");
+        return g_fail ? 1 : 0;
+    }
     // Partidas em sequência no mesmo mapa (como no app): Ressurgência contra robôs, depois Polícia x Bandidos
     // (SO_SEQUENCIA=1): o jogador tem que existir, andar e atirar em todas; mede o tempo do quadro
     if (std::getenv("SO_SEQUENCIA")) {

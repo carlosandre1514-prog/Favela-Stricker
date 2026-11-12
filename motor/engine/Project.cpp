@@ -80,9 +80,15 @@ int weaponOf(const std::string& s) {
                       {"taco", WK_Bat}, {"bastao", WK_Bat}});
 }
 // Armas realistas do app (fuzis com textura): nome -> arquivo do kit. Vazio = não é uma delas.
+// (tipo: a TT-33 é pistola, a Doze escopeta, o resto fuzil)
+int realWeaponKind(const std::string& real) {
+    return real.find("tt33") != std::string::npos ? int(WK_Pistol) : real.find("doze") != std::string::npos ? int(WK_Shotgun) : int(WK_Rifle);
+}
 std::string realWeaponFile(const std::string& s) {
     std::string n = norm(s);
     n.erase(std::remove(n.begin(), n.end(), '_'), n.end());
+    if (n.find("doze") != std::string::npos || n.find("calibre12") != std::string::npos) return "kit:armas/doze";  // escopeta de bomba
+    if (n == "smg" || n.find("sub9") != std::string::npos || n.find("submetralhadora") != std::string::npos) return "kit:armas/smg";
     if (n.find("ak74tat") != std::string::npos) return "kit:armas/ak74_tatica";
     if (n.find("ak74") != std::string::npos) return "kit:armas/ak74";
     if (n.find("ak47") != std::string::npos || n == "ak") return "kit:armas/ak47";
@@ -1221,7 +1227,7 @@ int createFromSpecJson(Engine* e, const std::string& specJson, std::string* err)
         if (auto it = spec.find("arma"); it != spec.end() && it->is_string() && !it->get<std::string>().empty()) {
             WeaponLook look = weaponLookOf(spec, true);
             std::string real = realWeaponFile(it->get<std::string>());
-            int wk = real.empty() ? weaponOf(it->get<std::string>()) : real.find("tt33") != std::string::npos ? int(WK_Pistol) : int(WK_Rifle);
+            int wk = real.empty() ? weaponOf(it->get<std::string>()) : realWeaponKind(real);
             if (!real.empty() && look.file.empty()) look.file = real;
             if (wk >= 0 && createWeapon(e, wk, ci, look) < 0) e->lastError.clear();  // arquivo sumiu: fica sem arma
         }
@@ -1231,7 +1237,7 @@ int createFromSpecJson(Engine* e, const std::string& specJson, std::string* err)
     if (tipo == "arma") {
         std::string armaName = str(spec, "arma", str(spec, "modelo", "pistola").c_str());
         std::string real = realWeaponFile(armaName);
-        int wk = real.empty() ? weaponOf(armaName) : real.find("tt33") != std::string::npos ? int(WK_Pistol) : int(WK_Rifle);
+        int wk = real.empty() ? weaponOf(armaName) : realWeaponKind(real);
         if (wk < 0) return fail("arma desconhecida");
         if (!real.empty() && !spec.contains("arquivo")) spec["arquivo"] = real;
         if (auto it = spec.find("portador"); it != spec.end() && it->is_number()) {  // equipa num personagem

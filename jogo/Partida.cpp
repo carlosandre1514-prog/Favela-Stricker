@@ -46,10 +46,18 @@ const GunDef kGuns[] = {  // só as armas realistas (modelos do kit)
     {"ak74", "AK-74", 1400, 1, 27.f, 1.f / 9.f, 0.035f, 4, 1, 30, 90, 40.f},
     {"ak74_tatica", "AK-74 tática", 1800, 1, 28.f, 1.f / 9.5f, 0.03f, 4, 1, 30, 90, 45.f},
     {"tt33", "TT-33", 0, -1, 25.f, 1.f / 3.f, 0.03f, 2, 1, 8, 32, 20.f},  // pistola (dos dois lados)
+    // Doze (calibre 12, de bomba): 8 bagos de 14 (de perto derruba com 1 tiro bem dado), cai rápido de longe
+    {"doze", "Doze", 1600, -1, 14.f, 0.85f, 0.085f, 1, 8, 6, 24, 12.f},
+    // Sub 9mm: rápida (14 tiros/s), dano baixo, pente de 30
+    {"smg", "Sub 9mm", 1300, -1, 19.f, 1.f / 14.f, 0.05f, 6, 1, 30, 120, 25.f},
 };
 constexpr int kGunCount = int(sizeof(kGuns) / sizeof(kGuns[0]));
 const char* kTeamName[2] = {"Polícia", "Bandidos"};
 const char* kTeamIcon[2] = {"🚓", "🔫"};
+
+// tipo da arma no motor (pose, tamanho, som): pistola, escopeta ou fuzil (a Sub 9mm é um fuzil menor)
+int gunKind(const std::string& key) { return key == "tt33" ? WK_Pistol : key == "doze" ? WK_Shotgun : WK_Rifle; }
+float gunSize(const std::string& key) { return key == "smg" ? 0.66f : 1.f; }
 
 const GunDef& gunOf(const std::string& key) {
     for (const GunDef& g : kGuns) if (key == g.key) return g;
@@ -84,7 +92,7 @@ void equipGun(Engine* e, Fighter& f) {
     int ci = charIndexOfRoot(e, f.root);
     if (ci < 0) return;
     const std::string& k = f.weapon;
-    int kind = k == "tt33" ? WK_Pistol : WK_Rifle;
+    int kind = gunKind(k);
     // skin de arma: a minha (jogador deste aparelho) ou a de outra pessoa da sala; robô não tem
     const std::map<std::string, std::string>* skins = f.remote ? &f.gunSkins : !f.bot ? &matchOf(e).gunSkins : nullptr;
     auto skinDe = [&](const std::string& gun) -> std::string {
@@ -100,6 +108,7 @@ void equipGun(Engine* e, Fighter& f) {
     // sempre o modelo completo de perto: o motor já troca pela versão de longe a partir de alguns metros
     // (spawnWeaponModel: kLowDist), então o visual das armas não muda e as dos outros longe custam pouco
     look.file = arqMao;
+    look.size = gunSize(gunOf(k).key);
     int w = createWeapon(e, kind, ci, look);
     // pintura da skin; a de modelo próprio tem a dela (o UV de cada modelo é outro): armas/skins/<modelo>.jpg
     auto pintar = [&](GameObject& wg, const std::string& gun, const std::string& arquivo) {
@@ -121,7 +130,8 @@ void equipGun(Engine* e, Fighter& f) {
         WeaponLook guardada;
         const std::string arqGuardada = gunModelFile(e, gunOf(outra).key, skinDe(gunOf(outra).key));
         guardada.file = arqGuardada;  // (de longe, a versão reduzida do motor)
-        int hw = holsterWeapon(e, ci, outra == "tt33" ? WK_Pistol : WK_Rifle, guardada);
+        guardada.size = gunSize(outra);
+        int hw = holsterWeapon(e, ci, gunKind(outra), guardada);
         if (GameObject* hg = objectById(e, hw)) pintar(*hg, gunOf(outra).key, arqGuardada);
     } else {
         holsterWeapon(e, ci, -1, {});
@@ -577,7 +587,7 @@ void brStart(Engine* e) {
         pousos.push_back(cand[best]);
     }
     M.pousos = pousos;
-    static const char* armas[] = {"m4a1", "m4colt", "ak47", "ak74", "ak74_tatica"};
+    static const char* armas[] = {"m4a1", "m4colt", "ak47", "ak74", "ak74_tatica", "smg", "doze"};
     int nome = e->fxRng.irange(0, int(std::size(kNomesBR)) - 1);
     if (online) {
         std::vector<int> noTime(kMaxTimesBR, 0);
@@ -627,7 +637,7 @@ void brStart(Engine* e) {
             f.name = f.bot ? kNomesBR[nome++ % int(std::size(kNomesBR))] : "Você";
             f.money = 0;
             if (f.bot) {
-                f.weapon = armas[e->fxRng.irange(0, 4)];
+                f.weapon = armas[e->fxRng.irange(0, int(std::size(armas)) - 1)];
                 f.primary = f.weapon;
                 f.secondary = "tt33";
             } else {  // começa com a arma escolhida (e a skin dela)
@@ -1051,7 +1061,7 @@ void teamStart(Engine* e) {
         f.name = f.bot ? std::string(g->name) : "Você";
         f.skin = clampSkin(f.team, r.value("roupa", 0));
         // robôs: a arma do projeto se for do lado (pistola, escopeta e sniper saíram: viram o fuzil do lado)
-        static const char* botGuns[2][5] = {{"m4a1", "m4colt", "m4a1", "m4colt", "m4a1"}, {"ak47", "ak74", "ak74_tatica", "ak47", "ak74"}};
+        static const char* botGuns[2][5] = {{"m4a1", "m4colt", "smg", "doze", "m4a1"}, {"ak47", "ak74", "smg", "doze", "ak74_tatica"}};
         std::string arma = r.value("arma", "");
         f.weapon = knownGun(arma) ? gunForTeam(arma, f.team) : botGuns[f.team][M.f.size() % 5];
         f.primary = f.weapon;
@@ -1347,11 +1357,11 @@ void teamStop(Engine* e) {
 
 // Armas da partida carregadas junto com o mapa (a partida começa e as compras trocam a arma na hora)
 void preloadMatchWeapons(Engine* e) {
-    for (const GunDef& g : kGuns) warmWeaponModel(e, std::string("kit:armas/") + g.key, std::string(g.key) == "tt33" ? int(WK_Pistol) : int(WK_Rifle));
+    for (const GunDef& g : kGuns) warmWeaponModel(e, std::string("kit:armas/") + g.key, gunKind(g.key));
     // as minhas skins com modelo próprio também (a partida não trava na hora de aparecer com elas)
     for (const auto& [gun, skin] : matchOf(e).gunSkins) {
         const std::string f = gunModelFile(e, gun, skin, true);
-        if (f != std::string("kit:armas/") + gun) warmWeaponModel(e, f, gun == "tt33" ? int(WK_Pistol) : int(WK_Rifle));
+        if (f != std::string("kit:armas/") + gun) warmWeaponModel(e, f, gunKind(gun));
     }
 }
 

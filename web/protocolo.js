@@ -15,7 +15,7 @@ const PROTO = (() => {
   const VERSAO = 2;
   const T_ESTADO = 1, T_VOZ = 2;
   const TAM = 22;
-  const ARMAS_IDX = ['m4a1', 'm4colt', 'ak47', 'ak74', 'ak74_tatica', 'tt33'];
+  const ARMAS_IDX = ['m4a1', 'm4colt', 'ak47', 'ak74', 'ak74_tatica', 'tt33', 'doze', 'smg'];  // (novas sempre no fim)
   const i16 = (v, k) => Math.max(-32768, Math.min(32767, Math.round((+v || 0) * k)));
 
   function escrever(d, o, s) {

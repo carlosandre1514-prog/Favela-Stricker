@@ -1077,7 +1077,7 @@ function abrirEquipamento() {
       const sk = conta.skinArma(a.key);
       return `<button class="equip-arma ${a.key === atual ? 'sel' : ''}" data-arma="${a.key}">
         <img src="armas/${a.key}${sk ? '_' + sk : ''}.png" alt="" onerror="this.src='armas/${a.key}.png'">
-        <b>${esc(a.nome)}</b><span>${a.key === atual ? '✓ equipada' : sk ? '★ com a sua skin' : a.luneta ? 'com luneta' : 'pente ' + a.pente}</span></button>`;
+        <b>${esc(a.nome)}</b><span>${a.key === atual ? '✓ equipada' : sk ? '★ com a sua skin' : a.luneta ? 'com luneta' : a.tipo ? a.tipo : 'pente ' + a.pente}</span></button>`;
     }).join('');
     for (const b of $$('[data-arma]', c)) b.onclick = () => {
       const k = b.dataset.arma;

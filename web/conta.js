@@ -34,6 +34,8 @@ const ARMAS = [
   { key: 'ak47', nome: 'AK-47', dano: 30, cadencia: 8, pente: 30, cai: 35, inicial: true },
   { key: 'ak74', nome: 'AK-74', dano: 27, cadencia: 9, pente: 30, cai: 40 },
   { key: 'ak74_tatica', nome: 'AK-74 tática', dano: 28, cadencia: 9.5, pente: 30, cai: 45 },
+  { key: 'doze', nome: 'Doze', dano: 14, bagos: 8, cadencia: 1.2, pente: 6, cai: 12, tipo: 'escopeta' },
+  { key: 'smg', nome: 'Sub 9mm', dano: 19, cadencia: 14, pente: 30, cai: 25, tipo: 'submetralhadora' },
 ];
 const armaPorKey = (k) => ARMAS.find((a) => a.key === k) || ARMAS[0];
 // Armas para começar a partida (o resto compra na base com o $ dos abates): as grátis (M4A1 e AK-47) e as que têm

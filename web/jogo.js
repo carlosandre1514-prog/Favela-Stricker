@@ -547,7 +547,7 @@ function telaArmas(armaSel = null) {
         <img src="${imgArma(a)}" alt="" onerror="this.src='armas/${a.key}.png'">
         <span class="bebas nome">${esc(a.nome)}</span>
         <span class="skin">${s ? esc(s.nome.replace(a.nome + ' ', '')) : 'Padrão'}</span>
-        <span class="conta-skins">${n} de ${total} skin${total === 1 ? '' : 's'}${a.luneta ? ' · luneta' : a.key === 'tt33' ? ' · pistola' : ''}</span></button>`;
+        <span class="conta-skins">${total ? `${n} de ${total} skin${total === 1 ? '' : 's'}` : 'sem skins ainda'}${a.luneta ? ' · luneta' : a.key === 'tt33' ? ' · pistola' : a.tipo ? ' · ' + a.tipo : ''}</span></button>`;
     }).join('');
     for (const b of $$('[data-arma]', t)) b.onclick = () => telaArmas(b.dataset.arma);
     return;
