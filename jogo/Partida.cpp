@@ -80,13 +80,6 @@ int teamOf(const json& r) {
     return t.rfind("pol", 0) == 0 ? 0 : t.rfind("band", 0) == 0 ? 1 : -1;
 }
 
-// "kit:armas/x" -> "kit:armas/x_leve" se existir (tools/simplificar_arma.py); a pintura das skins usa o nome sem _leve
-std::string armaLeve(Engine* e, const std::string& arquivo) {
-    if (arquivo.rfind("kit:", 0) != 0) return arquivo;
-    if (FILE* t = std::fopen(kitPath(e, arquivo.substr(4) + "_leve").c_str(), "rb")) { std::fclose(t); return arquivo + "_leve"; }
-    return arquivo;
-}
-
 void equipGun(Engine* e, Fighter& f) {
     int ci = charIndexOfRoot(e, f.root);
     if (ci < 0) return;
@@ -104,8 +97,9 @@ void equipGun(Engine* e, Fighter& f) {
     // gráfico Avançado: a da AK Energia Cósmica tem 1 milhão de triângulos)
     const bool meu = !f.remote && !f.bot;
     const std::string arqMao = gunModelFile(e, gunOf(k).key, skinDe(gunOf(k).key), meu && e->nivel >= 3);
-    // a arma dos outros fica leve (~3 a 8 mil triângulos) no Padrão e no Leve; a minha, só no Leve
-    look.file = (!meu && e->nivel <= 1) || e->nivel == 0 ? armaLeve(e, arqMao) : arqMao;
+    // sempre o modelo completo de perto: o motor já troca pela versão de longe a partir de alguns metros
+    // (spawnWeaponModel: kLowDist), então o visual das armas não muda e as dos outros longe custam pouco
+    look.file = arqMao;
     int w = createWeapon(e, kind, ci, look);
     // pintura da skin; a de modelo próprio tem a dela (o UV de cada modelo é outro): armas/skins/<modelo>.jpg
     auto pintar = [&](GameObject& wg, const std::string& gun, const std::string& arquivo) {
@@ -125,8 +119,7 @@ void equipGun(Engine* e, Fighter& f) {
     if (!outra.empty() && outra != k && knownGun(outra)) {
         WeaponLook guardada;
         const std::string arqGuardada = gunModelFile(e, gunOf(outra).key, skinDe(gunOf(outra).key));
-        // guardada no corpo (fuzil nas costas, pistola na coxa): leve, menos no Avançado
-        guardada.file = e->nivel <= 2 ? armaLeve(e, arqGuardada) : arqGuardada;
+        guardada.file = arqGuardada;  // (de longe, a versão reduzida do motor)
         int hw = holsterWeapon(e, ci, outra == "tt33" ? WK_Pistol : WK_Rifle, guardada);
         if (GameObject* hg = objectById(e, hw)) pintar(*hg, gunOf(outra).key, arqGuardada);
     } else {
