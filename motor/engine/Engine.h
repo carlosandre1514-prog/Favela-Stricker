@@ -68,6 +68,7 @@ struct CharacterInfo {
     std::vector<Scene::Handle> bombaObjs;
     std::vector<glm::vec3> bombaBase;
     float bombaT = 0.f, bombaOff = 0.f;  // tempo restante do movimento / quanto está para trás agora (m)
+    float tamArma = 1.f;       // tamanho da arma em relação a um fuzil (Sub 9mm 0,66): muda o jeito de segurar
     uint8_t capsula = 0;       // cápsula que a arma solta: 0 fuzil, 1 9 mm (Sub), 2 cartucho 12 (Doze, ao bombear)
     glm::vec3 ejetor{0.f};     // janela de ejeção no espaço da arma (de onde a cápsula sai)
     bool bombaSom = false;               // o som da bomba já tocou neste movimento

@@ -199,6 +199,9 @@ function atualizarChuva() {
   chuva.ganho.gain.setTargetAtTime(nivel * 0.85 * volumeSons, a.currentTime, 0.4);
 }
 
+// saiu da partida: a chuva para na hora (sem esperar o próximo ajuste de volume)
+function pararChuva() { try { if (chuva && audio) chuva.ganho.gain.setTargetAtTime(0, audio.currentTime, 0.05); } catch (_) {} }
+
 // laço do site: chamado pelo motor depois de desenhar cada quadro
 const aposQuadroExtra = [];
 function aposQuadroSite() {

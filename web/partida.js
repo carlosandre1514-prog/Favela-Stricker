@@ -39,20 +39,20 @@ function posicionarTodas(raiz) { for (const el of $$('.peca[data-peca]', raiz)) 
 
 function pecaHtml(id) {
   switch (id) {
-    case 'analogico': return '<div class="peca so-toque" data-peca="analogico" id="analogico" style="width:108px;height:108px"><div class="bola"></div></div>';
-    case 'tiro2': return `<button class="peca so-toque redondo tiro esq" data-peca="tiro2" id="b-tiro2" style="width:56px;height:56px" aria-label="Atirar (lado esquerdo)">${ICONE.alvo(24)}</button>`;
-    case 'tiro': return `<button class="peca so-toque redondo tiro" data-peca="tiro" id="b-tiro" style="width:82px;height:82px" aria-label="Atirar">${ICONE.alvo(34)}</button>`;
-    case 'mira': return '<button class="peca so-toque redondo" data-peca="mira" id="b-mira" style="width:54px;height:54px;font-size:11px">MIRA</button>';
-    case 'pular': return `<button class="peca so-toque redondo" data-peca="pular" id="b-pular" style="width:54px;height:54px">${ICONE.cima}<span class="r">PULAR</span></button>`;
-    case 'agachar': return `<button class="peca so-toque redondo" data-peca="agachar" id="b-agachar" style="width:54px;height:54px">${ICONE.baixo}<span class="r">AGACHAR</span></button>`;
-    case 'granada': return `<button class="peca so-toque redondo" data-peca="granada" id="b-granada" style="width:54px;height:54px;border-color:rgba(252,211,77,.8)">${ICONE.granada}<span class="contador" id="n-granadas">2</span></button>`;
-    case 'correr': return `<button class="peca so-toque redondo" data-peca="correr" id="b-correr" style="width:54px;height:54px"><span style="font-size:20px;font-weight:900;line-height:1">»</span><span class="r">CORRER</span></button>`;
+    case 'analogico': return '<div class="peca so-toque" data-peca="analogico" id="analogico" style="width:94px;height:94px"><div class="bola"></div></div>';
+    case 'tiro2': return `<button class="peca so-toque redondo tiro esq" data-peca="tiro2" id="b-tiro2" style="width:46px;height:46px" aria-label="Atirar (lado esquerdo)">${ICONE.alvo(20)}</button>`;
+    case 'tiro': return `<button class="peca so-toque redondo tiro" data-peca="tiro" id="b-tiro" style="width:68px;height:68px" aria-label="Atirar">${ICONE.alvo(28)}</button>`;
+    case 'mira': return '<button class="peca so-toque redondo" data-peca="mira" id="b-mira" style="width:44px;height:44px;font-size:9.5px">MIRA</button>';
+    case 'pular': return `<button class="peca so-toque redondo" data-peca="pular" id="b-pular" style="width:44px;height:44px">${ICONE.cima}<span class="r">PULAR</span></button>`;
+    case 'agachar': return `<button class="peca so-toque redondo" data-peca="agachar" id="b-agachar" style="width:44px;height:44px">${ICONE.baixo}<span class="r">AGACHAR</span></button>`;
+    case 'granada': return `<button class="peca so-toque redondo" data-peca="granada" id="b-granada" style="width:44px;height:44px;border-color:rgba(252,211,77,.8)">${ICONE.granada}<span class="contador" id="n-granadas">2</span></button>`;
+    case 'correr': return `<button class="peca so-toque redondo" data-peca="correr" id="b-correr" style="width:44px;height:44px"><span style="font-size:17px;font-weight:900;line-height:1">»</span><span class="r">CORRER</span></button>`;
     case 'zoom': return '<div class="peca so-toque" data-peca="zoom" id="zoom-luneta" style="flex-direction:column;align-items:center;gap:6px;visibility:hidden"><button class="redondo" id="b-zoom-mais" style="width:44px;height:44px;font-size:24px;font-weight:800">+</button><span id="zoom-nivel" style="font-size:11px;font-weight:800;text-shadow:0 1px 2px #000">1,7x</span><button class="redondo" id="b-zoom-menos" style="width:44px;height:44px;font-size:24px;font-weight:800">−</button></div>';
-    case 'recarregar': return `<button class="peca so-toque redondo" data-peca="recarregar" id="b-recarregar" style="width:48px;height:48px">${ICONE.recarregar}</button>`;
+    case 'recarregar': return `<button class="peca so-toque redondo" data-peca="recarregar" id="b-recarregar" style="width:40px;height:40px">${ICONE.recarregar}</button>`;
     case 'armas': return `<div class="peca" data-peca="armas" id="armas"><button class="slot ativa" data-slot="0"><img alt=""><span>–</span></button><button class="slot" data-slot="1"><img alt=""><span>–</span></button><button class="troca" id="b-trocar" aria-label="Troca rápida de arma">${ICONE.trocar}</button></div>`;
-    case 'minimapa': return '<canvas class="peca" data-peca="minimapa" id="minimapa" width="168" height="168" style="width:84px;height:84px"></canvas>';
-    case 'falar': return `<button class="peca redondo" data-peca="falar" id="b-falar" style="width:48px;height:48px" aria-label="Microfone (tocar liga e desliga)" aria-pressed="false">${ICONE.microfone}</button>`;
-    case 'ouvir': return `<button class="peca redondo" data-peca="ouvir" id="b-ouvir" style="width:40px;height:40px" aria-label="Som da voz">${ICONE.altofalante}</button>`;
+    case 'minimapa': return '<canvas class="peca" data-peca="minimapa" id="minimapa" width="144" height="144" style="width:72px;height:72px"></canvas>';
+    case 'falar': return `<button class="peca redondo" data-peca="falar" id="b-falar" style="width:40px;height:40px" aria-label="Microfone (tocar liga e desliga)" aria-pressed="false">${ICONE.microfone}</button>`;
+    case 'ouvir': return `<button class="peca redondo" data-peca="ouvir" id="b-ouvir" style="width:34px;height:34px" aria-label="Som da voz">${ICONE.altofalante}</button>`;
   }
   return '';
 }
@@ -206,6 +206,7 @@ function pararPartida() {
   motor.redeSala(false, '', '');
   motor.visaoGeral();
   motor.girarMenu(true);
+  if (typeof pararChuva === 'function') pararChuva();  // (site; no APK, o desenhar(false) do girarMenu já para)
   partida = null;
   if (document.pointerLockElement) document.exitPointerLock();
 }
@@ -225,7 +226,7 @@ function montarHud(online, br = false) {
   const t = mostrar(html(`<div id="hud">
     <div id="zona-andar" class="toque so-toque"></div><div id="zona-olhar" class="toque so-toque"></div>
     <canvas id="luneta"></canvas><div id="dano"></div>
-    <canvas id="mira" width="160" height="160" style="width:80px;height:80px"></canvas>
+    <canvas id="mira" width="128" height="128" style="width:64px;height:64px"></canvas>
     <div id="vida" class="caixa">${ICONE.coracao}<div class="trilho"><div class="barra"></div></div><b id="hp">100</b></div>
     <div id="info"><span id="dinheiro">$ 0</span><span id="kd">0 abates · 0 mortes</span></div>
     ${placar}
@@ -333,9 +334,13 @@ function desenharMinimapa(cv, pontos, meuTime, br) {
     c.save();
     c.beginPath(); c.arc(cx, cy, r - 4, 0, 7); c.clip();
     const zx = cx + br.zona.c[0] * k, zy = cy - br.zona.c[1] * k;
+    // fora da zona: o quadro todo com um furo redondo (volta completa, regra par-ímpar). Antes o furo era um arco
+    // anti-horário de 0 a 7 rad, que o canvas não trata como volta inteira: virava uma fatia e sobrava uma cunha
+    // vermelha dentro da área segura
+    const rz = Math.max(0, br.zona.r * k);
     c.fillStyle = 'rgba(220,38,38,.28)';
-    c.beginPath(); c.rect(0, 0, w, w); c.arc(zx, zy, Math.max(0, br.zona.r * k), 0, 7, true); c.fill();
-    c.strokeStyle = '#F9FAFB'; c.lineWidth = 3; c.beginPath(); c.arc(zx, zy, Math.max(0, br.zona.r * k), 0, 7); c.stroke();
+    c.beginPath(); c.rect(0, 0, w, w); c.moveTo(zx + rz, zy); c.arc(zx, zy, rz, 0, Math.PI * 2); c.fill('evenodd');
+    c.strokeStyle = '#F9FAFB'; c.lineWidth = 3; c.beginPath(); c.arc(zx, zy, rz, 0, Math.PI * 2); c.stroke();
     if (br.proxima && br.proxima.r > 0) {
       c.setLineDash([8, 7]); c.strokeStyle = 'rgba(255,255,255,.75)'; c.lineWidth = 2;
       c.beginPath(); c.arc(cx + br.proxima.c[0] * k, cy - br.proxima.c[1] * k, br.proxima.r * k, 0, 7); c.stroke();
@@ -437,7 +442,13 @@ function atualizarHud(j) {
   bl.classList.toggle('outro', !/Loja de armas/.test(rot));
   hTx(bl.querySelector('span'), rot);
   // abates (últimos 4)
-  const feed = (j.abatidos || []).slice(-4);
+  const agoraFeed = performance.now();
+  partida.vistoAbate = partida.vistoAbate || new Map();
+  const feed = (j.abatidos || []).slice(-3).filter((f) => {
+    const chave = `${f.a}|${f.v}|${f.arma}|${f.skin}`;
+    if (!partida.vistoAbate.has(chave)) partida.vistoAbate.set(chave, agoraFeed);
+    return agoraFeed - partida.vistoAbate.get(chave) < 6000;
+  });
   hHtml($('#abates', t), feed.map((f) => {
     if (!f.a) return / eliminado$/.test(f.v) ? `<span><b style="color:${corTime(f.vt)}">${esc(f.v)}</b></span>` : `<span><b style="color:${corTime(f.vt)}">${esc(f.v)}</b> caiu</span>`;
     const s = ABATES_SKIN[f.skin];
@@ -773,7 +784,7 @@ function abrirEditorHud(aoSair) {
     <div id="hud" style="pointer-events:none">
       <div id="vida" class="caixa">${ICONE.coracao}<div class="trilho"><div class="barra" style="width:72%"></div></div><b>72</b></div>
       <div id="placar"><div class="faixa"><div class="pol"><span class="rot">POLÍCIA</span><span class="num">6</span></div><div class="relogio">7:42</div><div class="ban"><span class="num">4</span><span class="rot">BANDIDOS</span></div></div></div>
-      <canvas id="mira" width="160" height="160" style="width:80px;height:80px"></canvas>
+      <canvas id="mira" width="128" height="128" style="width:64px;height:64px"></canvas>
     </div>
     ${Object.keys(PECAS).map((id) => pecaHtml(id).replace('class="peca', 'class="peca editavel')).join('')}
     <div class="barra"><span class="dica" id="ed-nome" style="width:110px;color:#F3F4F6;font-weight:800">Toque num botão</span>
@@ -970,7 +981,8 @@ function mostrarMicrofone(aberto) {
   }
 }
 
-// Chat de voz: 8 kHz μ-law, pacotes de 20 ms (o mesmo formato do servidor). Microfone aberto: ligado, transmite sem
+// Chat de voz: 8 kHz μ-law, pacotes de 20 ms (o mesmo formato do servidor), captura em blocos de ~11 ms e no máximo
+// 0,2 s de fila tocando (tempo real). Microfone aberto: ligado, transmite sem
 // parar; desligado, o microfone é solto (o sistema apaga o aviso de gravação). Uma captura só por vez.
 class ChatDeVoz {
   constructor(enviar) { this.enviar = enviar; this.ouvindo = true; this.falando = false; this.prox = {}; this.mic = null; this.abrindo = null; }
@@ -992,7 +1004,12 @@ class ChatDeVoz {
     const src = a.createBufferSource();
     src.buffer = buf;
     src.connect(a.destination);
-    const quando = Math.max(this.prox[quem] || 0, a.currentTime + 0.06);  // folga contra a internet oscilando
+    // fila de cada pessoa: começa 50 ms à frente (folga contra a internet oscilando) e nunca passa de 0,2 s. Antes,
+    // depois de um engasgo da internet os pacotes chegavam todos juntos, a fila ficava com segundos de áudio e a
+    // voz seguia atrasada para sempre; agora o que passa do limite é descartado e a fala volta ao tempo real
+    const fila = (this.prox[quem] || 0) - a.currentTime;
+    if (fila > 0.2) return;
+    const quando = Math.max(this.prox[quem] || 0, a.currentTime + 0.05);
     src.start(quando);
     this.prox[quem] = quando + buf.duration;
   }
@@ -1010,7 +1027,7 @@ class ChatDeVoz {
       const a = ctxAudio();
       const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
       const fonte = a.createMediaStreamSource(stream);
-      const proc = a.createScriptProcessor(2048, 1, 1);
+      const proc = a.createScriptProcessor(512, 1, 1);  // blocos de ~11 ms (eram 2048, ~43 ms esperando antes de mandar)
       const passo = a.sampleRate / 8000;
       let pos = 0, n = 0;
       const quadro = new Uint8Array(160);

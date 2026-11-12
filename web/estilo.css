@@ -626,3 +626,81 @@ body.menu-fundo canvas#tela { visibility: hidden; }
 .perfil-tit.travado, .perfil-cor.travado { opacity: .55; }
 .perfil-cor i { width: 100%; height: 34px; border-radius: 8px; background: linear-gradient(120deg, var(--a), var(--b)); border: 1px solid rgba(255,255,255,.15); }
 @media (max-width: 720px) { .perfil-cartao { width: 240px; } }
+
+/* HUD compacto: o palco (844x390) é ampliado ~2,3x num celular deitado; tudo um número menor e menos coisa fixa */
+#vida { top: 6px; left: 10px; width: 150px; padding: 3px 8px; gap: 6px; }
+#vida svg { width: 12px; height: 12px; }
+#vida .trilho, #vida .barra { height: 6px; }
+#vida b { font-size: 11px; width: 22px; }
+#info { top: 31px; left: 10px; gap: 4px; }
+#info span { font-size: 9.5px; padding: 2px 6px; border-radius: 6px; }
+#placar { top: 5px; gap: 2px; }
+#placar .faixa { height: 15px; min-width: 200px; border-radius: 6px; }
+#placar .pol, #placar .ban { padding: 0 8px; gap: 5px; }
+#placar .rot { font-size: 8px; }
+#placar .num { font-size: 14px; }
+#placar .relogio { font-size: 10.5px; padding: 0 8px; }
+#placar .meta { font-size: 8.5px; padding: 1px 6px; }
+#abates { right: 52px; top: 6px; gap: 3px; }
+#abates span { font-size: 9.5px; padding: 2px 7px; border-radius: 6px; animation: abate-entra .2s ease-out; }
+@keyframes abate-entra { from { opacity: 0; transform: translateX(8px); } to { opacity: 1; transform: none; } }
+#pausar { right: 10px; top: 6px; width: 34px; height: 34px; border-radius: 10px; }
+#medidor { top: 50px; left: 10px; font-size: 8.5px; padding: 1px 5px; }
+#rede { top: 38px; font-size: 8.5px; padding: 1px 6px; }
+#centro { font-size: 14px; padding: 7px 12px; transform: translate(-50%, 40px); }
+#botao-loja { top: 240px; height: 30px; padding: 0 12px; gap: 6px; font-size: 12px; border-radius: 10px; }
+#botao-loja svg { width: 15px; height: 15px; }
+.slot { width: 84px; height: 44px; border-radius: 10px; }
+.slot img { width: 70px; height: 25px; }
+.slot span { font-size: 9.5px; }
+.redondo .r { font-size: 7.5px; }
+.redondo svg { width: 17px; height: 17px; }
+#b-tiro svg, #b-tiro2 svg { width: auto; height: auto; }
+/* Ressurgência: o time numa coluna fina ao lado do minimapa (não fica mais por baixo do botão de tiro) */
+#meu-time { top: 78px; left: 92px; gap: 2px; }
+#meu-time > div { min-width: 0; width: 104px; gap: 5px; padding: 1px 6px; border-radius: 6px; font-size: 9.5px; }
+#meu-time .n { max-width: 52px; }
+#meu-time .vida-mini { width: 34px; height: 4px; }
+#meu-time i { font-size: 8.5px; }
+#fora-zona { top: 56px; font-size: 10px; padding: 4px 10px; }
+#aquec { top: 40px; gap: 4px; }
+#aquec .aq-faixa { padding: 3px 12px; gap: 7px; }
+#aquec .aq-faixa .bebas { font-size: 16px; }
+#aquec .aq-faixa b { font-size: 13px; }
+#aquec .aq-faixa span:last-child { font-size: 9px; }
+#aquec button { height: 28px; font-size: 11px; padding: 0 10px; }
+/* (2ª passada: ainda menor; no celular deitado o palco é ampliado ~2,3x, então 8,5 px ainda ficam legíveis) */
+#vida { width: 122px; padding: 2px 6px; gap: 5px; }
+#vida svg { width: 10px; height: 10px; }
+#vida .trilho, #vida .barra { height: 5px; }
+#vida b { font-size: 9.5px; width: 18px; }
+#info { top: 25px; }
+#info span { font-size: 8.5px; padding: 1px 5px; }
+#medidor { top: 41px; font-size: 7.5px; }
+#placar .faixa { height: 13px; min-width: 168px; }
+#placar .rot { font-size: 7px; }
+#placar .num { font-size: 12px; }
+#placar .relogio { font-size: 9.5px; padding: 0 6px; }
+#placar .meta { font-size: 7.5px; }
+#rede { top: 32px; font-size: 7.5px; }
+#abates { right: 46px; }
+#abates span { font-size: 8.5px; padding: 1px 6px; }
+#pausar { width: 30px; height: 30px; }
+#meu-time { top: 74px; left: 90px; }
+#meu-time > div { width: 92px; font-size: 8.5px; padding: 1px 5px; }
+#meu-time .n { max-width: 46px; }
+#meu-time .vida-mini { width: 30px; }
+#meu-time i { font-size: 7.5px; }
+#aquec { top: 34px; }
+#aquec .aq-faixa .bebas { font-size: 13px; }
+#aquec .aq-faixa b { font-size: 11px; }
+#aquec .aq-faixa span:last-child { font-size: 8px; }
+#aquec button { height: 24px; font-size: 9.5px; padding: 0 9px; }
+#aquec button svg { width: 13px; height: 13px; }
+#botao-loja { height: 25px; font-size: 10px; padding: 0 10px; }
+#botao-loja svg { width: 13px; height: 13px; }
+.slot { width: 72px; height: 38px; }
+.slot img { width: 60px; height: 21px; }
+.slot span { font-size: 8.5px; }
+#centro { font-size: 12px; }
+#fora-zona { font-size: 9px; }

@@ -728,6 +728,7 @@ int createWeapon(Engine* e, int kind, int ch, const WeaponLook& look) {
         c.weapon = h;
         c.weaponKind = kind;
         c.muzzle = muzzle;
+        c.tamArma = std::clamp(look.size, 0.4f, 1.5f);
         {  // cápsula: tipo pela arma e a janela de ejeção (lado direito, logo à frente da mão, na altura do cano)
             std::string f = look.file;
             std::transform(f.begin(), f.end(), f.begin(), [](unsigned char ch2) { return char(std::tolower(ch2)); });
@@ -752,8 +753,8 @@ int createWeapon(Engine* e, int kind, int ch, const WeaponLook& look) {
                 c.support = glm::vec3(0.f, (look.file.empty() ? 0.024f : wb.min.y + hgt * 0.57f) - 0.05f, wb.max.z * 0.55f);
             else if (look.file.empty())
                 c.support = kind == WK_Shotgun ? glm::vec3(0.f, 0.01f, 0.43f) : glm::vec3(0.f, 0.03f, kind == WK_Sniper ? 0.4f : 0.38f);
-            else
-                c.support = glm::vec3(0.f, wb.min.y + hgt * 0.55f, wb.min.z + len * 0.64f);
+            else  // arma curta (Sub): a mão esquerda um pouco mais à frente (a frente do pente / o guarda-mão curto)
+                c.support = glm::vec3(0.f, wb.min.y + hgt * 0.55f, wb.min.z + len * (look.size < 0.85f ? 0.72f : 0.64f));
             // alça de mira: no alto da arma, um terço do comprimento a partir da coronha
             c.sight = glm::vec3(0.f, wb.max.y - hgt * 0.06f, wb.min.z + len * 0.36f);
             // AK (alça de mira aberta): o olho passa rente por cima da alça traseira e a ponta da massa de mira
@@ -1106,7 +1107,11 @@ void updateSupportHands(Engine* e, float dt) {
         glm::vec3 shoulder = rup >= 0 ? world(rup) : R;
         // (os personagens de modelo têm peito e colete de verdade: a arma 6 cm mais para a frente, senão a mão do cabo
         // entrava no corpo)
-        glm::vec3 pocket = shoulder + (fwd * glm::mix(0.15f, 0.09f, c.adsW) + left * 0.06f - upW * glm::mix(0.035f, -0.03f, c.adsW)) * scale;
+        // arma curta (Sub 9mm): segurada mais à frente do corpo, com os braços mais estendidos; com a coronha no
+        // ombro como a de um fuzil, o cabo e o guarda-mão ficavam colados no peito e os braços entravam no tronco
+        const float curta = (1.f - std::clamp(c.tamArma, 0.5f, 1.f)) * 0.42f;  // Sub 9mm: ~14 cm
+        glm::vec3 pocket = shoulder + (fwd * (glm::mix(0.15f, 0.09f, c.adsW) + curta * glm::mix(1.f, 0.75f, c.adsW)) + left * (0.06f + curta * 0.15f)
+                                       - upW * (glm::mix(0.035f, -0.03f, c.adsW) + curta * 0.1f)) * scale;
         {
             glm::quat cur = w->transform.rotation;
             if (glm::dot(cur, q) < 0.f) q = -q;

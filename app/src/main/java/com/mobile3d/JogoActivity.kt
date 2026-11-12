@@ -321,6 +321,7 @@ class JogoActivity : Activity() {
     fun desenhar(on: Boolean) = runOnUiThread {
         if (!::motorView.isInitialized) return@runOnUiThread
         motorView.renderMode = if (on) GLSurfaceView.RENDERMODE_CONTINUOUSLY else GLSurfaceView.RENDERMODE_WHEN_DIRTY
+        if (!on) sons.pararChuva()  // saiu da partida: a chuva acaba junto (no menu não há quadro para baixar o volume)
     }
 
     fun nivelGrafico() = prefs.getInt("nivel", 0).coerceIn(0, 3)

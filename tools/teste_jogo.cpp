@@ -1347,9 +1347,20 @@ int main(int argc, char** argv) {
             engine_set_first_person(e, 0);
             float p[3], r[3], sc[3];
             engine_get_transform(e, engine_player_id(e), p, r, sc);
-            engine_set_camera(e, p[0], p[1] + 1.2f, p[2], E->editorCam.yaw + 2.4f, 0.12f, 2.2f);
+            const float yawJog = E->editorCam.yaw;  // (cada engine_set_camera muda o editorCam)
+            engine_set_camera(e, p[0], p[1] + 1.2f, p[2], yawJog + 2.4f, 0.12f, 2.2f);
             frames(e, 4);
             save(out, ("tp_" + arma + ".png").c_str());
+            // de perto (pose de segurar a arma): de frente-lado e de lado, na altura do peito; primeiro com a arma
+            // baixa (o tiro deixa 1,5 s mirando), depois mirando
+            frames(e, 120);
+            for (const auto& [nome, giro] : {std::pair<const char*, float>{"frente", 3.14159f - 0.4f}, {"lado", 3.14159f + 1.35f}}) {
+                engine_set_camera(e, p[0], p[1] + 1.3f, p[2], yawJog + giro, 0.05f, 1.25f);
+                frames(e, 3);
+                save(out, ("pose_" + std::string(nome) + "_" + arma + ".png").c_str());
+            }
+            engine_set_camera(e, p[0], p[1] + 1.2f, p[2], yawJog + 2.4f, 0.12f, 2.2f);
+            frames(e, 3);
             engine_player_fire(e);  // de fora, no tiro: o fogo na boca do cano e a bala saindo
             frames(e, 2);
             save(out, ("tp_tiro_" + arma + ".png").c_str());

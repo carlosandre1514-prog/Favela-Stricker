@@ -84,6 +84,14 @@ class SoundManager(context: Context) {
         if (!rainOn && !paused) { try { p.start() } catch (_: Exception) {}; rainOn = true }
     }
 
+    // Saiu da partida: a chuva para na hora. No menu o motor não desenha, então o setRain (chamado depois de cada
+    // quadro) não vinha mais e a chuva continuava tocando no lobby
+    fun pararChuva() {
+        if (rainOn) { try { rain?.pause() } catch (_: Exception) {}; rainOn = false }
+        rainVolume = 0f
+        try { rain?.setVolume(0f, 0f) } catch (_: Exception) {}
+    }
+
     fun pause() {
         paused = true
         pool.autoPause()

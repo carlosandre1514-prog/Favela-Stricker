@@ -70,7 +70,9 @@ async function enviarMensagem(amigo, nomeAmigo, txt) {
   chat.ultimoEnvio = agora;
   const em = { '.sv': 'timestamp' };
   const r = await fb.post('conversas/' + idConversa(fb.uid, amigo), { de: fb.uid, txt, em });
-  if (!r.ok) return r.code === 401 || r.code === 403 ? 'Só dá para conversar com amigos (ou faltam as regras novas no Firebase — veja o README)' : 'Sem internet';
+  if (!r.ok) return r.code === 401 || r.code === 403
+    ? 'O Firebase recusou a mensagem: os dois precisam ser amigos, e as regras do banco (docs/regras_firebase.json) precisam estar publicadas no Firebase'
+    : 'Sem internet';
   // a caixa do amigo (com +1 não lida) e a minha (para a lista de conversas)
   fb.patch(`caixa/${amigo}/${fb.uid}`, { nome: conta.nome(), txt, em, nao: { '.sv': { increment: 1 } } }).catch(() => {});
   fb.patch(`caixa/${fb.uid}/${amigo}`, { nome: nomeAmigo, txt, em, nao: 0 }).catch(() => {});
@@ -181,11 +183,20 @@ async function socialApi(metodo, rota, corpo) {
     return { status: r.status, ...j };
   } catch (_) { return { status: 0, erro: 'sem internet' }; }
 }
+// O servidor faz presentes? Só guarda o "sim": antes um "não" (o servidor grátis do Render dormindo e demorando a
+// acordar, internet caindo) ficava guardado até fechar o jogo e os presentes nunca mais funcionavam
+async function presentesProntos() {
+  if (chat.presentesLigados) return true;
+  const e = await socialApi('GET', 'estado');
+  if (e.presentes) { chat.presentesLigados = true; return true; }
+  if (!e.status) janela('Presentes', 'Não consegui falar com o servidor do jogo (ele pode estar acordando: espere uns 30 segundos e tente de novo).');
+  else janela('Presentes', 'O servidor do jogo está sem a chave de administrador do Firebase (FIREBASE_SERVICE_ACCOUNT no Render). Sem ela, os presentes ficam desligados.');
+  return false;
+}
 // escolher o presente para um amigo: só skins pagas do mercado; mostra o que ele já tem
 async function escolherPresente(p) {
   if (fb.anonimo) { janela('Entre na sua conta', 'Convidado não manda presentes. Entre com e-mail e senha.'); return; }
-  if (chat.presentesLigados === null) { const e = await socialApi('GET', 'estado'); chat.presentesLigados = !!e.presentes; }
-  if (!chat.presentesLigados) { janela('Presentes', 'Os presentes ainda estão sendo ligados no servidor do jogo. Tente de novo mais tarde.'); return; }
+  if (!(await presentesProntos())) return;
   const el = html(`<div class="camada fixo"><div class="janela" style="width:min(640px,94%);max-height:88%">
     <div class="linha"><span class="t cresce">Presente para ${esc(p.nome)}</span><span class="linha" style="gap:4px;font-weight:800;color:#FCD34D">${ICONE.moeda(14)} ${fmt(conta.moedas)}</span>
       <button class="btn btn-fraco" id="pr-fechar" aria-label="Fechar">✕</button></div>
@@ -219,8 +230,7 @@ async function enviarPresente(p, item) {
 // mercado → ENVIAR: escolher o amigo que vai ganhar a skin
 async function escolherAmigoParaPresente(skin) {
   if (!fb || !fb.token || fb.anonimo) { janela('Entre na sua conta', 'Para mandar presentes, entre com a sua conta.'); return; }
-  if (chat.presentesLigados === null) { const e = await socialApi('GET', 'estado'); chat.presentesLigados = !!e.presentes; }
-  if (!chat.presentesLigados) { janela('Presentes', 'Os presentes ainda estão sendo ligados no servidor do jogo. Tente de novo mais tarde.'); return; }
+  if (!(await presentesProntos())) return;
   const amigos = social.pronto ? await meusAmigos() : [];
   if (!amigos.length) { janela('Mandar presente', 'Você ainda não tem amigos. Adicione pela tela Amigos (pelo ID ou pelo nick).'); return; }
   const item = `skin_arma:${skin.arma}:${skin.key}`;
