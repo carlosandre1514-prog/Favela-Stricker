@@ -63,6 +63,14 @@ struct CharacterInfo {
     glm::vec3 sight{0.f, 0.08f, 0.1f};
     glm::vec3 butt{0.f, 0.03f, -0.25f};  // meio da soleira da coronha (vai no bolso do ombro)
     glm::vec3 gripPt{0.f, -0.04f, 0.f}, guardPt{0.f, 0.01f, 0.25f};  // centro do cabo e do guarda-mão (espaço da arma)
+    // Doze (escopeta de bomba): a peça "bomba" desliza para trás e volta depois de cada tiro (a mão de apoio junto) e a
+    // recarga é cartucho por cartucho (a mão vai até a janela de baixo a cada um; atirar interrompe)
+    std::vector<Scene::Handle> bombaObjs;
+    std::vector<glm::vec3> bombaBase;
+    float bombaT = 0.f, bombaOff = 0.f;  // tempo restante do movimento / quanto está para trás agora (m)
+    bool bombaSom = false;               // o som da bomba já tocou neste movimento
+    bool cartucho = false;               // recarregando cartucho por cartucho
+    bool precisaBombear = false;         // esvaziou: depois do último cartucho, bombeia
     float adsW = 0.f;
     // primeira pessoa (só o jogador): inclinação do olhar (radianos, + para cima) e se a câmera está no olho
     float viewPitch = 0.f;
@@ -85,7 +93,7 @@ struct CharacterInfo {
 void playDeath(CharacterInfo& c);
 
 // Modelo reaproveitado várias vezes (árvores, casas do mundo infinito): instancing automático
-struct ProtoPart { MeshId mesh; MaterialId mat; float lodNear = 0.f, lodFar = 1e30f; glm::mat4 local{1.f}; };
+struct ProtoPart { MeshId mesh; MaterialId mat; float lodNear = 0.f, lodFar = 1e30f; glm::mat4 local{1.f}; bool bomba = false; };  // bomba: peça que desliza (Doze)
 struct Prototype {
     std::string name;
     std::vector<ProtoPart> parts;
@@ -361,6 +369,8 @@ struct WeaponLook {
     uint32_t accessories = 0;
 };
 int createWeapon(Engine* e, int kind, int character, const WeaponLook& look = {});
+void comecarBomba(CharacterInfo& c);         // Doze: bombeia (depois do tiro)
+void atualizarBombas(Engine* e, float dt);   // a bomba de cada Doze deslizando
 int holsterWeapon(Engine* e, int ch, int kind, const WeaponLook& look);  // guarda a arma no corpo (-1 tira)
 int attachGearMesh(Engine* e, int ch, int charJoint, Geo& g, const char* name);  // peça montada no espaço do personagem, presa ao osso
 std::string accessoriesList(uint32_t accessories);  // ["mira","coronha",...] em JSON   // character < 0: solto no chão

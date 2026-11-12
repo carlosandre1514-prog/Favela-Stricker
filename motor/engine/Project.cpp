@@ -753,7 +753,9 @@ bool modelParts(Engine* e, const std::string& path, const char* only, std::vecto
         if (names) names->push_back(chain);
         const glm::mat4* pal;
         glm::mat4 local = un * renderMatrix(e, g, &pal);
-        parts.push_back({g.meshRenderer->mesh, g.meshRenderer->material, 0.f, 1e30f, local});
+        ProtoPart pp{g.meshRenderer->mesh, g.meshRenderer->material, 0.f, 1e30f, local};
+        pp.bomba = chain.find("bomba") != std::string::npos;  // peça que desliza (a bomba da Doze)
+        parts.push_back(pp);
         AABB b = transformAABB(m->bounds, local);
         box.min = glm::min(box.min, b.min); box.max = glm::max(box.max, b.max);
     });

@@ -470,6 +470,7 @@ void botShoot(Engine* e, int fi, int ti) {
     if (GameObject* w = e->scene.get(c.weapon)) muzzle = glm::vec3(w->transform.world() * glm::vec4(c.muzzle, 1.f));
     playSound(e, c.shotSound.empty() ? "tiro_pistola" : c.shotSound.c_str(), muzzle, 1.f);
     c.aimTimer = 1.5f; c.fireAnim = 0.3f;
+    comecarBomba(c);  // (Doze)
     f.shotAgo = 0.f;
     ++c.shots;
     for (int p = 0; p < gun.pellets; ++p) {
@@ -1125,6 +1126,7 @@ bool teamDamage(Engine* e, GameObject* root, float dmg);
 
 // Tiro de um lutador de outro celular: só o efeito (clarão, som, traçante até onde bateria); o dano vem pela rede
 void remoteShotFx(Engine* e, Fighter& f, CharacterInfo& c, GameObject& g) {
+    comecarBomba(c);  // (Doze de outro celular: bombeia também)
     glm::vec3 fw = g.transform.rotation * glm::vec3(0, 0, 1);
     glm::vec3 dir = glm::normalize(fw * std::cos(f.netPitch) + glm::vec3(0, std::sin(f.netPitch), 0));
     glm::vec3 from = g.transform.position + glm::vec3(0, c.height * (c.crouch ? 0.55f : 0.85f), 0);

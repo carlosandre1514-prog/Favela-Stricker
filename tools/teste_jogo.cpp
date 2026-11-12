@@ -1287,6 +1287,26 @@ int main(int argc, char** argv) {
             engine_player_fire(e);
             frames(e, 2);
             save(out, ("fp_tiro_" + arma + ".png").c_str());
+            frames(e, 20);  // (Doze: a bomba para trás, ~0,33 s depois do tiro)
+            save(out, ("fp_bomba_" + arma + ".png").c_str());
+            {
+                eng::CharacterInfo& cc = E->characters[E->player];
+                std::printf("  %s: peças da bomba %zu · bomba para trás %.3f m\n", arma.c_str(), cc.bombaObjs.size(), cc.bombaOff);
+                if (arma == "doze" && (cc.bombaObjs.empty() || cc.bombaOff < 0.03f)) { std::printf("  [ERRO] a bomba não deslizou\n"); ++g_fail; }
+                if (arma == "doze") {  // recarga cartucho por cartucho
+                    const int antes = cc.ammo;
+                    cc.ammo = 2;
+                    engine_player_reload(e);
+                    frames(e, 3);
+                    const int um = cc.ammo;
+                    frames(e, 33);
+                    std::printf("  recarga: %d -> %d (1 cartucho) -> %d (0,55 s depois) · cartucho a cartucho %s\n", 2, um, cc.ammo, cc.cartucho ? "sim" : "não");
+                    if (um != 3 || cc.ammo != 4) { std::printf("  [ERRO] a recarga não foi cartucho por cartucho\n"); ++g_fail; }
+                    save(out, "fp_cartucho_doze.png");
+                    frames(e, 200);
+                    (void)antes;
+                }
+            }
             frames(e, 30);
             engine_set_first_person(e, 0);
             float p[3], r[3], sc[3];

@@ -135,6 +135,7 @@ void engine_frame(Engine* e, float dt) {
         for (auto& t : e->tracers) t.life = 0.f;
     }
     for (Animator* a : e->animators) a->update(dt, e->playing || e->previewAnim);
+    eng::atualizarBombas(e, dt);
     eng::updateDoors(e, dt);
     auto tw = std::chrono::steady_clock::now();
     auto ms = [](auto a, auto b) { return std::chrono::duration<float, std::milli>(b - a).count(); };

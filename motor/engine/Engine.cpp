@@ -537,7 +537,7 @@ static Scene::Handle spawnParts(Engine* e, const std::vector<ProtoPart>& parts, 
     for (const ProtoPart& pp : parts) {
         glm::vec3 sc, tr, skew; glm::vec4 persp; glm::quat rot;
         glm::decompose(fix * pp.local, sc, rot, tr, skew, persp);
-        Scene::Handle ch = e->scene.create("Peça", root);
+        Scene::Handle ch = e->scene.create(pp.bomba ? "Bomba" : "Peça", root);
         GameObject* c = e->scene.get(ch);
         if (!c) break;
         c->transform.setPosition(tr); c->transform.setRotation(rot); c->transform.setScale(sc);
@@ -775,6 +775,23 @@ int createWeapon(Engine* e, int kind, int ch, const WeaponLook& look) {
             c.sight = glm::vec3(0.f, wb.max.y - hgt * 0.03f, wb.min.z + len * 0.15f);
             c.gripPt = glm::vec3(0.f, wb.min.y + hgt * 0.35f, wb.min.z + len * 0.2f);
         }
+        // bomba (Doze): as peças que deslizam; a mão de apoio vai no meio delas
+        c.bombaObjs.clear(); c.bombaBase.clear(); c.bombaT = 0.f; c.bombaOff = 0.f; c.cartucho = false; c.precisaBombear = false;
+        AABB bb{glm::vec3(1e30f), glm::vec3(-1e30f)};
+        Scene::forEachInSubtree(*w, [&](GameObject& o) {
+            if (&o == w || std::strcmp(o.name, "Bomba") != 0) return;
+            c.bombaObjs.push_back(Scene::handleOf(o));
+            c.bombaBase.push_back(o.transform.position);
+            if (o.meshRenderer && o.meshRenderer->lodNear <= 0.f)
+                if (const Mesh* m = e->renderer.mesh(o.meshRenderer->mesh)) {
+                    const AABB pb = transformAABB(m->bounds, o.transform.local());
+                    bb.min = glm::min(bb.min, pb.min); bb.max = glm::max(bb.max, pb.max);
+                }
+        });
+        if (!c.bombaObjs.empty() && bb.min.x < 1e29f) {
+            c.support = glm::vec3((bb.min.x + bb.max.x) * 0.5f, bb.min.y + (bb.max.y - bb.min.y) * 0.45f, (bb.min.z + bb.max.z) * 0.5f);
+            c.guardPt = glm::vec3(0.f, bb.min.y + (bb.max.y - bb.min.y) * 0.6f, (bb.min.z + bb.max.z) * 0.5f);
+        }
         int base = armedClipBase(kind);
         if (c.anim && base >= 0 && c.clipMap[base + AP_Idle] >= 0) c.anim->setClip(c.clipMap[base + AP_Idle]);
         updateAttachments(e);
@@ -986,7 +1003,7 @@ void updateSupportHands(Engine* e, float dt) {
         // soltavam e os braços balançavam atravessando a arma) e a esquerda vai ao pente e volta
         const bool correndo = c.clipMap[CC_Rifle + AP_Run] >= 0 && a->clipIndex == c.clipMap[CC_Rifle + AP_Run];
         const bool recarregaCorrendo = c.reloadTimer > 0.f && correndo && !pistol;
-        bool want = armed && !c.dying && (c.reloadTimer <= 0.f || recarregaCorrendo);
+        bool want = armed && !c.dying && (c.reloadTimer <= 0.f || recarregaCorrendo || c.cartucho);
         c.supportW = want ? std::min(1.f, c.supportW + dt * 6.f) : std::max(0.f, c.supportW - dt * 6.f);
         // mirando com arma longa: a arma sobe até o olho (bochecha na coronha, coronha no ombro)
         // primeira pessoa: atirar sem mirar só aponta a arma (no ombro); mirar leva a alça de mira ao olho
@@ -1152,8 +1169,13 @@ void updateSupportHands(Engine* e, float dt) {
         }
         // mão esquerda no guarda-mão: palma por baixo, dedos subindo pelo lado direito, polegar pelo lado esquerdo
         {
-            glm::vec3 h = onGun(c.guardPt);
+            glm::vec3 h = onGun(c.guardPt - glm::vec3(0.f, 0.f, c.bombaOff));  // (Doze: a mão vai junto com a bomba)
             glm::vec3 wristL = h - wu * (0.06f * scale) + wl * (0.03f * scale) - wf * (0.05f * scale);
+            if (c.cartucho) {  // Doze: a mão vai até a janela de baixo, põe o cartucho e volta (a cada 0,5 s)
+                const float k = std::sin(std::clamp((0.5f - c.reloadTimer) / 0.5f, 0.f, 1.f) * 3.14159265f);
+                const glm::vec3 porta = onGun(glm::mix(c.gripPt, c.guardPt, 0.3f)) - wu * (0.07f * scale);
+                wristL = glm::mix(wristL, porta - wu * (0.03f * scale), k);
+            }
             if (recarregaCorrendo) {  // troca o pente: a mão desce até o pente e volta (no último 1,2 s da recarga)
                 const float k = c.reloadTimer >= 1.2f ? 0.f : std::sin(c.reloadTimer / 1.2f * 3.14159265f);
                 const glm::vec3 pente = onGun(glm::mix(c.gripPt, c.guardPt, 0.45f)) - wu * (0.09f * scale);
@@ -1321,6 +1343,33 @@ static glm::vec3 aimDirection(Engine* e) {
 
 // Tiro com arma da partida: dano da tabela (cabeça 2,5x), queda com a distância, bagos da escopeta, dispersão
 // menor mirando (sniper sem mirar é bem imprecisa)
+// Doze: depois do tiro a bomba vai para trás e volta (~0,46 s, começando 0,12 s depois do tiro), com o "tec-tec"
+constexpr float kBombaTotal = 0.62f, kBombaEspera = 0.12f, kBombaCurso = 0.085f;
+void comecarBomba(CharacterInfo& c) {
+    if (c.bombaObjs.empty()) return;
+    c.bombaT = kBombaTotal;
+    c.bombaSom = false;
+}
+void atualizarBombas(Engine* e, float dt) {
+    for (CharacterInfo& c : e->characters) {
+        if (c.bombaObjs.empty() || (c.bombaT <= 0.f && c.bombaOff == 0.f)) continue;
+        c.bombaT = std::max(0.f, c.bombaT - dt);
+        const float passou = kBombaTotal - c.bombaT;
+        float off = 0.f;
+        if (c.bombaT > 0.f && passou >= kBombaEspera) {
+            const float p = std::clamp((passou - kBombaEspera) / (kBombaTotal - kBombaEspera), 0.f, 1.f);
+            off = kBombaCurso * std::sin(p * 3.14159265f);
+            if (!c.bombaSom) {
+                c.bombaSom = true;
+                if (GameObject* g = e->scene.get(c.root)) playSound(e, "bomba", g->transform.position, 0.75f);
+            }
+        }
+        c.bombaOff = off;
+        for (size_t i = 0; i < c.bombaObjs.size(); ++i)
+            if (GameObject* o = e->scene.get(c.bombaObjs[i])) o->transform.setPosition(c.bombaBase[i] - glm::vec3(0.f, 0.f, off));
+    }
+}
+
 static void fireGun(Engine* e, CharacterInfo& c, GameObject& root, btRigidBody* self) {
     glm::vec3 aim = aimDirection(e), from = e->camera.position;
     if (!e->firstPerson) {
@@ -1362,6 +1411,7 @@ static void fireGun(Engine* e, CharacterInfo& c, GameObject& root, btRigidBody* 
             }
         damageAt(e, obj, dmg, from);
     }
+    comecarBomba(c);  // Doze: bombeia depois do tiro
 }
 
 static void fire(Engine* e, CharacterInfo& c, GameObject& root, btRigidBody* self) {
@@ -1557,7 +1607,7 @@ void animateCharacter(CharacterInfo& c, const glm::quat& rot, glm::vec3 v, bool 
                 else if (std::abs(local.x) > std::abs(local.z)) clip = local.x > 0.f ? CC_RifleLeft : CC_RifleRight;
             }
             if (aiming && hs < 0.4f && c.fireAnim > 0.f) clip = CC_RifleFire;
-            if (c.reloadTimer > 0.f && hs < 4.f) clip = CC_Reload;
+            if (c.reloadTimer > 0.f && hs < 4.f && !c.cartucho) clip = CC_Reload;  // (Doze: cartucho a cartucho é só a mão)
             if (c.crouch && c.reloadTimer <= 0.f) clip = CC_CrouchWalk;  // agachado: parado, andando e mirando
         }
         // Pulo (clip de 0,9 s): 0 a 0,1 s impulso, 0,1 a 0,53 s no ar, depois a aterrissagem. No ar a pose segura no fim
@@ -1805,6 +1855,15 @@ void updatePlayer(Engine* e, float dt) {
     auto startReload = [&]() {
         int n = c.reserve < 0 ? c.magSize - c.ammo : std::min(c.reserve, c.magSize - c.ammo);
         if (n <= 0) return;
+        if (!c.bombaObjs.empty()) {  // Doze: um cartucho por vez (0,5 s cada); atirar interrompe
+            if (c.ammo <= 0) c.precisaBombear = true;
+            c.ammo += 1;
+            if (c.reserve > 0) c.reserve -= 1;
+            c.reloadTimer = 0.5f;
+            c.cartucho = true;
+            playSound(e, "cartucho", go->transform.position, 0.8f);
+            return;
+        }
         c.ammo += n;
         if (c.reserve > 0) c.reserve -= n;
         const AnimationClip* rc = c.anim && c.clipMap[CC_Reload] >= 0 ? c.anim->clipAt(c.clipMap[CC_Reload]) : nullptr;
@@ -1814,6 +1873,13 @@ void updatePlayer(Engine* e, float dt) {
         if (c.anim && c.clipMap[CC_Reload] >= 0 && c.weaponKind != WK_Pistol) c.anim->setClip(c.clipMap[CC_Reload]);
     };
     if (c.gunDmg > 0.f) {
+        if (c.cartucho && c.reloadTimer <= 0.f) {  // Doze: próximo cartucho, ou acabou (e bombeia se tinha esvaziado)
+            const bool mais = c.ammo < c.magSize && c.reserve != 0 && alive;
+            if (mais) startReload();
+            else { c.cartucho = false; if (c.precisaBombear) { c.precisaBombear = false; comecarBomba(c); } }
+        }
+        // atirar no meio da recarga da Doze: para de pôr cartucho e atira
+        if (alive && e->fireRequest && c.cartucho && c.ammo > 0 && e->fireCooldown <= 0.f) { c.cartucho = false; c.reloadTimer = 0.f; c.precisaBombear = false; }
         if (alive && e->reloadRequest && c.reloadTimer <= 0.f) startReload();
         if (alive && e->fireRequest && e->fireCooldown <= 0.f && c.reloadTimer <= 0.f) {
             if (c.ammo > 0) {
