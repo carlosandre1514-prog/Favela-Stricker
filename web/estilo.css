@@ -1,0 +1,706 @@
+/* Favela Stricker: a interface do jogo (a mesma no site e no APK).
+   Desenhada sobre um palco de 844x390 (celular deitado) que é ampliado/reduzido para a tela. */
+@font-face { font-family: 'Bebas Neue'; font-weight: 400; font-display: swap; src: url(fontes/bebas-neue-latin.woff2) format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: 'Bebas Neue'; font-weight: 400; font-display: swap; src: url(fontes/bebas-neue-latin-ext.woff2) format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+@font-face { font-family: 'Inter'; font-weight: 100 900; font-display: swap; src: url(fontes/inter-latin.woff2) format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: 'Inter'; font-weight: 100 900; font-display: swap; src: url(fontes/inter-latin-ext.woff2) format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+
+:root {
+  --fundo: #0B0F17; --painel: #121826; --painel2: #1B2232; --ouro: #FBBF24; --ouro-claro: #FCD34D; --azul: #3B82F6; --azul-claro: #93C5FD;
+  --azul-medio: #60A5FA; --laranja: #F59E0B; --verde: #86EFAC; --verde-forte: #4ADE80; --vermelho: #F87171; --texto: #F3F4F6;
+  --apagado: #C3C8D2; --cinza: #9CA3AF; --escuro: rgba(11, 15, 23, 0.72); --borda: rgba(255, 255, 255, 0.18);
+  --pol-fundo: #0F1D36; --ban-fundo: #2A1C08;
+  --raro-comum: #9CA3AF; --raro-rara: #60A5FA; --raro-epica: #C084FC; --raro-lendaria: #FBBF24;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; height: 100%; overflow: hidden; background: var(--fundo); color: var(--texto);
+  font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; user-select: none; -webkit-user-select: none;
+  touch-action: none; overscroll-behavior: none; }
+/* APK: a página fica por cima do motor 3D, então html e body têm que ser transparentes (senão a tela fica escura) */
+html.android, html.android body, body.android { background: transparent; }
+canvas#tela { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; outline: none; }
+body.android canvas#tela { display: none; }
+#ui { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
+#palco { position: absolute; left: 0; top: 0; transform-origin: 0 0; pointer-events: none; }
+#palco > * { pointer-events: auto; }
+a, button { font: inherit; color: inherit; text-decoration: none; }
+button { border: none; background: none; padding: 0; cursor: pointer; }
+button:disabled { opacity: .5; cursor: default; }
+svg { flex: none; }
+
+.bebas { font-family: 'Bebas Neue', Impact, 'Arial Narrow', sans-serif; font-weight: 400; letter-spacing: 1px; line-height: 1; }
+.cresce { flex: 1 1 0; min-width: 0; min-height: 0; }
+.linha { display: flex; align-items: center; gap: 10px; }
+.coluna { display: flex; flex-direction: column; gap: 8px; }
+
+/* telas */
+.tela { position: absolute; inset: 0; display: flex; flex-direction: column; gap: 12px; padding: 18px 24px 18px; background: var(--fundo); overflow: hidden; }
+.tela.sobre-mapa { background: rgba(8, 11, 18, 0.72); }
+.topo { display: flex; align-items: center; gap: 14px; min-height: 44px; }
+.topo .titulo { font-family: 'Bebas Neue', sans-serif; font-size: 38px; letter-spacing: 1px; line-height: 1; white-space: nowrap; }
+.voltar { display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 12px;
+  background: rgba(255, 255, 255, 0.08); border: 1px solid var(--borda); flex: none; }
+.dica { font-size: 12px; color: var(--apagado); }
+
+/* botões */
+.btn { display: flex; align-items: center; justify-content: center; gap: 6px; height: 44px; padding: 0 16px; border-radius: 12px;
+  font-size: 13px; font-weight: 600; white-space: nowrap; }
+.btn-fraco { background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.22); }
+.btn-ouro { background: var(--ouro); color: #111827; font-weight: 800; }
+.btn-azul { background: var(--azul); font-weight: 800; }
+.btn-laranja { background: var(--laranja); color: #111827; font-weight: 800; }
+.btn-escuro { background: #1F2937; border: 1px solid rgba(255, 255, 255, 0.2); }
+.btn-grande { height: 58px; border-radius: 14px; font-family: 'Bebas Neue', sans-serif; font-size: 32px; letter-spacing: 2px; font-weight: 400; }
+.chip-moedas { display: flex; align-items: center; gap: 6px; height: 36px; padding: 0 6px 0 12px; border-radius: 18px; background: rgba(11, 15, 23, 0.85);
+  border: 1px solid rgba(252, 211, 77, 0.55); font-size: 14px; font-weight: 800; color: var(--ouro-claro); }
+.chip-moedas .mais { display: flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 13px; background: var(--ouro); color: #111827; font-size: 18px; line-height: 1; }
+.chip-moedas.sem-mais { padding-right: 14px; }
+.chip { display: flex; align-items: center; gap: 6px; height: 36px; padding: 0 12px; border-radius: 18px; background: rgba(11, 15, 23, 0.85);
+  border: 1px solid var(--borda); font-size: 12px; color: #E5E7EB; white-space: nowrap; }
+.etiqueta { font-size: 11px; font-weight: 800; letter-spacing: 1px; padding: 3px 8px; border-radius: 6px; }
+.raridade-comum { color: var(--raro-comum); } .raridade-rara { color: var(--raro-rara); } .raridade-epica { color: var(--raro-epica); } .raridade-lendaria { color: var(--raro-lendaria); }
+.fundo-comum { background: var(--raro-comum); color: #111827; } .fundo-rara { background: var(--raro-rara); color: #0B1220; }
+.fundo-epica { background: var(--raro-epica); color: #1A0B26; } .fundo-lendaria { background: var(--ouro); color: #111827; }
+.moeda { display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: var(--ouro-claro); flex: none; }
+
+/* entradas */
+input[type=text], input[type=email], input[type=password] { font: inherit; font-size: 14px; color: var(--texto); background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--borda); border-radius: 10px; padding: 10px 12px; width: 100%; outline: none; user-select: text; -webkit-user-select: text; }
+input:focus { border-color: var(--ouro); }
+.status { color: var(--ouro-claro); font-weight: 700; font-size: 12px; min-height: 16px; }
+.cartao { background: var(--painel); border-radius: 18px; padding: 14px 16px; border: 1px solid rgba(255, 255, 255, 0.08); }
+
+/* tela inicial */
+#inicio .esquerda { position: absolute; left: 30px; top: 22px; bottom: 20px; width: 300px; display: flex; flex-direction: column; gap: 10px; }
+#inicio .esquerda > .coluna { margin-bottom: 8px; }
+/* logo Favela Strike (o do ícone): FAVELA branco, STRIKE vermelho, coroa dourada */
+.logo-fs { position: relative; display: flex; flex-direction: column; line-height: .82; padding-top: 10px; }
+.logo-fs .favela { font-size: 58px; color: #F3F4F6; letter-spacing: 2px; text-shadow: 0 3px 0 rgba(0,0,0,.55), 0 6px 18px rgba(0,0,0,.5); transform: skewX(-6deg); }
+.logo-fs .strike { font-size: 58px; color: #EF2B2D; letter-spacing: 2px; text-shadow: 0 3px 0 rgba(0,0,0,.55), 0 6px 18px rgba(0,0,0,.5); transform: skewX(-6deg); margin-left: 10px; }
+.logo-fs .coroa { position: absolute; left: -10px; top: -6px; width: 36px; height: 24px; transform: rotate(-14deg); }
+.btn-medio { height: 44px; border-radius: 12px; font-family: 'Bebas Neue', sans-serif; font-size: 23px; letter-spacing: 2px; font-weight: 400; }
+#inicio .grade { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.chip.engrenagem { width: 36px; padding: 0; justify-content: center; }
+.chip.engrenagem svg { width: 20px; height: 20px; }
+/* cartão da conta: insígnia, nome, nível, patente e XP */
+.cartao-conta { display: flex; align-items: center; gap: 8px; padding: 5px 12px 5px 6px; border-radius: 14px; background: rgba(11, 15, 23, 0.85);
+  border: 1px solid rgba(255,255,255,.18); text-align: left; min-width: 0; }
+.cartao-conta .insignia { display: flex; width: 34px; height: 34px; align-items: center; justify-content: center; border-radius: 10px; background: rgba(255,255,255,.07); }
+.cartao-conta .dados { display: flex; flex-direction: column; gap: 2px; min-width: 112px; }
+.cartao-conta .linha1 { display: flex; align-items: baseline; gap: 6px; font-size: 13px; }
+.cartao-conta .nv { font-size: 10px; font-weight: 800; color: #111827; background: var(--ouro); border-radius: 5px; padding: 1px 5px; letter-spacing: .5px; }
+.cartao-conta .pat { font-size: 10px; font-weight: 700; color: #C3C8D2; letter-spacing: .4px; }
+.cartao-conta .xp { font-size: 9px; color: #9CA3AF; font-variant-numeric: tabular-nums; }
+.barra-xp { display: block; height: 5px; border-radius: 3px; background: rgba(255,255,255,.14); overflow: hidden; }
+.barra-xp i { display: block; height: 100%; border-radius: 3px; background: linear-gradient(90deg, #F59E0B, #FCD34D); }
+.fim-xp { gap: 12px; padding: 10px 14px; }
+.fim-xp .barra-xp { height: 7px; max-width: 320px; }
+#inicio .grade { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; width: 260px; }
+/* personagem da última partida segurando a arma (duas camadas empilhadas no mesmo lugar) */
+#inicio .boneco-inicio { position: absolute; left: 50%; bottom: 0; height: 84%; transform: translateX(-42%);
+  cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; filter: drop-shadow(0 10px 18px rgba(0, 0, 0, .55)); }
+#inicio .boneco-inicio:active { cursor: grabbing; }
+#inicio .boneco-inicio .boneco-camada { position: absolute; inset: 0; background-repeat: no-repeat; background-size: calc(var(--n) * 100%) 100%; }
+#inicio .boneco-inicio .dica-girar { position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); white-space: nowrap;
+  font-size: 11px; font-weight: 700; color: #E5E7EB; background: rgba(11, 15, 23, .7); padding: 3px 10px; border-radius: 999px;
+  pointer-events: none; transition: opacity .3s; }
+#inicio .boneco-inicio.girou .dica-girar { opacity: 0; }
+#inicio .direita-topo { position: absolute; right: 20px; top: 18px; display: flex; gap: 8px; align-items: center; }
+#inicio .destaque { position: absolute; right: 20px; bottom: 22px; width: 250px; display: flex; flex-direction: column; gap: 4px; padding: 10px 12px;
+  border-radius: 18px; background: rgba(11, 15, 23, 0.78); border: 1px solid rgba(252, 211, 77, 0.45); }
+#inicio .destaque img { width: 226px; height: 74px; object-fit: contain; }
+
+/* Ressurgência: modo, placar, meu time e aviso de fora da zona */
+.lado.modo-br { background: linear-gradient(160deg, #3B0D0D, #1A0B0B); border-color: rgba(248, 113, 113, .55); }
+#placar.placar-br .pol .num, #placar.placar-br .pol .rot { color: #FCA5A5; }
+#placar.placar-br .ban .num, #placar.placar-br .ban .rot { color: #86EFAC; }
+#placar .meta.alerta { color: #FCA5A5; font-weight: 800; animation: pisca-zona 1s ease-in-out infinite alternate; }
+@keyframes pisca-zona { from { opacity: 1; } to { opacity: .55; } }
+#meu-time { position: absolute; left: 14px; top: 46%; display: flex; flex-direction: column; gap: 4px; pointer-events: none; }
+#meu-time > div { display: flex; align-items: center; gap: 8px; min-width: 150px; padding: 4px 9px; border-radius: 9px;
+  background: rgba(11, 15, 23, .66); font-size: 12px; font-weight: 700; color: #E5E7EB; }
+#meu-time > div.voce { border-left: 3px solid #4ADE80; }
+#meu-time .n { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 90px; }
+#meu-time .vida-mini { width: 54px; height: 5px; border-radius: 3px; background: rgba(255, 255, 255, .15); overflow: hidden; }
+#meu-time .vida-mini b { display: block; height: 100%; }
+#meu-time i { font-style: normal; font-size: 11px; }
+#meu-time i.volta { color: #FCD34D; }
+#meu-time i.fora { color: #F87171; }
+#fora-zona { display: none; position: absolute; left: 50%; top: 92px; transform: translateX(-50%); padding: 7px 16px; border-radius: 10px;
+  background: rgba(127, 29, 29, .85); border: 1px solid #F87171; color: #FEE2E2; font-weight: 800; font-size: 13px; letter-spacing: .5px;
+  white-space: nowrap; animation: pisca-zona .6s ease-in-out infinite alternate; pointer-events: none; }
+
+/* amigos e grupo */
+.chip.amigos { gap: 6px; font-weight: 700; position: relative; }
+.chip.amigos svg { width: 18px; height: 18px; }
+.badge-amigos { position: absolute; top: -6px; right: -6px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px; background: #DC2626;
+  color: #fff; font-size: 11px; display: flex; align-items: center; justify-content: center; }
+.amigo { gap: 10px; padding: 8px 10px; border-radius: 10px; background: rgba(255,255,255,.05); }
+.amigo .ponto { width: 10px; height: 10px; border-radius: 50%; background: #6B7280; flex: none; }
+.amigo .ponto.on { background: #4ADE80; box-shadow: 0 0 8px #4ADE80; }
+.grupo-vagas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin-top: 8px; }
+.grupo-vagas .vaga { display: flex; flex-direction: column; justify-content: center; min-height: 44px; padding: 6px 10px; border-radius: 10px;
+  border: 1px dashed rgba(255,255,255,.3); background: rgba(0,0,0,.2); color: #FECACA; font-size: 12px; font-weight: 700; text-align: left; }
+.grupo-vagas .vaga.cheia { border-style: solid; border-color: rgba(134,239,172,.5); color: #F3F4F6; }
+
+/* escolha do lado */
+.lados { flex: 1 1 0; min-height: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.lado { display: flex; flex-direction: column; gap: 10px; padding: 18px 20px; border-radius: 18px; cursor: pointer; text-align: left; }
+.lado.pol { background: var(--pol-fundo); border: 2px solid var(--azul); }
+.lado.ban { background: var(--ban-fundo); border: 2px solid var(--laranja); }
+.lado .icone { display: flex; align-items: center; justify-content: center; width: 52px; height: 52px; border-radius: 14px; }
+.lado .nome { font-family: 'Bebas Neue', sans-serif; font-size: 44px; line-height: 1; }
+.lado .texto { font-size: 13px; line-height: 1.45; }
+.lado .tag { font-size: 11px; padding: 4px 9px; border-radius: 8px; }
+.lado .entrar { display: flex; align-items: center; height: 40px; padding: 0 18px; border-radius: 12px; font-weight: 800; font-size: 14px; letter-spacing: 1px; }
+
+/* grades de itens (roupas, mercado) */
+.grade-itens { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; align-content: start; overflow-y: auto; padding-right: 2px; }
+.item { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 6px 8px; border-radius: 14px; background: var(--painel);
+  border: 2px solid rgba(255, 255, 255, 0.12); cursor: pointer; min-width: 0; }
+.item.sel { border-color: var(--ouro); background: #16233D; }
+.item img { width: 100%; height: 64px; object-fit: contain; }
+/* arma girando (loja): tira com os ângulos lado a lado; arrastar troca o quadro */
+.giro-arma { height: 64px; max-width: 100%; background-size: calc(var(--n) * 100%) 100%; background-repeat: no-repeat; touch-action: pan-y; cursor: grab; }
+.giro-arma.grande { height: auto; width: 100%; max-width: 760px; }
+.ver360 { position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: none; border: 0; cursor: zoom-in; }
+.ver360 img { max-width: 92%; max-height: 92%; object-fit: contain; }
+.selo360 { position: absolute; right: 8px; bottom: 8px; font-size: 11px; font-weight: 800; letter-spacing: 1px; color: #111827; background: var(--ouro); border-radius: 999px; padding: 2px 8px; }
+.arma360 { position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; background: rgba(5, 8, 14, 0.82);
+  padding: calc(16px + env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) calc(16px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
+.arma360-caixa { display: flex; flex-direction: column; gap: 10px; width: min(820px, 100%); background: var(--painel); border: 1px solid rgba(252, 211, 77, 0.45); border-radius: 16px; padding: 14px; }
+.item .n { font-size: 11px; font-weight: 800; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.item .r { font-size: 10px; font-weight: 800; letter-spacing: .5px; }
+.item .p { display: flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 800; }
+.item.travado img { opacity: .5; }
+.detalhe { display: flex; flex-direction: column; gap: 8px; padding: 14px 16px; border-radius: 18px; background: var(--painel); border: 1px solid rgba(255, 255, 255, 0.1); min-height: 0; }
+.detalhe .previa { flex: 1 1 0; min-height: 0; border-radius: 12px; background: var(--painel2); display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.detalhe .previa img { max-width: 92%; max-height: 92%; object-fit: contain; }
+.abas { display: flex; gap: 6px; }
+.aba { height: 34px; padding: 0 12px; border-radius: 10px; background: rgba(255, 255, 255, 0.06); border: 1px solid var(--borda); font-size: 13px; font-weight: 700; }
+.aba.sel { background: rgba(251, 191, 36, 0.18); border-color: var(--ouro); color: var(--ouro-claro); }
+
+/* loja de moedas */
+.pacotes { flex: 1 1 0; min-height: 0; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; }
+.pacote { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 4px; padding: 12px 10px;
+  border-radius: 16px; background: var(--painel); border: 2px solid rgba(255, 255, 255, 0.1); }
+.pacote.popular { border-color: var(--azul-medio); } .pacote.melhor { border-color: var(--verde-forte); }
+.pacote .selo { position: absolute; top: -10px; left: 50%; transform: translateX(-50%); font-size: 10px; font-weight: 800; letter-spacing: 1px;
+  padding: 3px 8px; border-radius: 6px; white-space: nowrap; }
+.pacote .qtd { font-family: 'Bebas Neue', sans-serif; font-size: 34px; color: var(--ouro-claro); }
+.pacote .bonus { font-size: 11px; color: var(--apagado); min-height: 14px; }
+.pacote .preco { width: 100%; height: 38px; border-radius: 10px; background: var(--ouro); color: #111827; font-weight: 800; font-size: 14px; margin-top: 6px; }
+.moedas-desenho { flex: 1 1 0; display: flex; align-items: center; justify-content: center; }
+
+/* tabela de armas */
+.tabela { width: 100%; border-collapse: collapse; font-size: 13px; }
+.tabela th { font-size: 10px; letter-spacing: 1px; color: var(--cinza); font-weight: 800; text-align: right; padding: 6px 8px; }
+.tabela th:first-child, .tabela td:first-child { text-align: left; }
+.tabela td { padding: 7px 8px; text-align: right; }
+.tabela tr:nth-child(even) td { background: rgba(255, 255, 255, 0.035); }
+.tabela .cab { color: #FCA5A5; }
+
+/* configurações */
+.config { flex: 1 1 0; min-height: 0; display: flex; gap: 14px; }
+.config .menu { width: 170px; display: flex; flex-direction: column; gap: 6px; }
+.config .menu .aba { height: 40px; text-align: left; }
+.config .corpo { flex: 1 1 0; min-width: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding-right: 4px; }
+.ajuste { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 12px; background: var(--painel); }
+.ajuste .nome { width: 190px; font-size: 13px; font-weight: 700; }
+.ajuste .nome small { display: block; font-weight: 400; color: var(--cinza); font-size: 11px; }
+.ajuste .valor { width: 44px; text-align: right; font-weight: 800; font-size: 13px; color: var(--ouro-claro); }
+input[type=range] { -webkit-appearance: none; appearance: none; flex: 1 1 0; height: 6px; border-radius: 3px; background: rgba(255, 255, 255, 0.15); outline: none; }
+input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; border-radius: 50%; background: var(--ouro); border: 3px solid #111827; }
+input[type=range]::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%; background: var(--ouro); border: 3px solid #111827; }
+.niveis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.nivel { display: flex; flex-direction: column; gap: 4px; padding: 12px; border-radius: 14px; background: var(--painel); border: 2px solid rgba(255, 255, 255, 0.1); text-align: left; }
+.nivel.sel { border-color: var(--ouro); background: #16233D; }
+.nivel .n { font-family: 'Bebas Neue', sans-serif; font-size: 24px; }
+.nivel small { font-size: 11px; color: var(--apagado); line-height: 1.35; }
+.chave { width: 46px; height: 26px; border-radius: 13px; background: rgba(255, 255, 255, 0.18); position: relative; flex: none; }
+.chave::after { content: ''; position: absolute; left: 3px; top: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; transition: left .15s; }
+.chave.ligada { background: var(--ouro); } .chave.ligada::after { left: 23px; }
+
+/* editor do HUD */
+#editor-hud { position: absolute; inset: 0; background: rgba(8, 11, 18, 0.45); }
+#editor-hud .barra { position: absolute; left: 50%; top: 10px; transform: translateX(-50%); display: flex; align-items: center; gap: 8px; padding: 8px 10px;
+  border-radius: 14px; background: rgba(11, 15, 23, 0.92); border: 1px solid var(--borda); z-index: 3; }
+#editor-hud .barra input[type=range] { width: 120px; flex: none; }
+#editor-hud .peca { outline: 2px dashed rgba(255, 255, 255, 0.45); outline-offset: 3px; cursor: grab; }
+#editor-hud .peca.sel { outline-color: var(--ouro); }
+
+/* ---------- HUD ---------- */
+#hud { position: absolute; inset: 0; pointer-events: none; }
+#hud .toque, #hud button, #hud .peca { pointer-events: auto; }
+.caixa { background: var(--escuro); border-radius: 10px; }
+#vida { position: absolute; left: 14px; top: 10px; display: flex; align-items: center; gap: 8px; padding: 6px 10px; width: 196px; }
+#vida .trilho { flex-grow: 1; height: 9px; border-radius: 5px; background: rgba(255, 255, 255, 0.18); overflow: hidden; }
+#vida .barra { width: 100%; height: 9px; border-radius: 5px; background: var(--verde-forte); transition: width .15s; }
+#vida b { font-size: 13px; font-weight: 800; width: 24px; text-align: right; }
+#info { position: absolute; left: 14px; top: 46px; display: flex; gap: 6px; }
+#info span { padding: 4px 9px; border-radius: 9px; background: var(--escuro); font-size: 12px; }
+#dinheiro { font-weight: 800; color: var(--verde); }
+#placar { position: absolute; left: 50%; top: 8px; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 3px; }
+#placar .faixa { display: flex; align-items: stretch; height: 18px; min-width: 265px; border-radius: 8px; overflow: hidden; background: rgba(11, 15, 23, 0.8); }  /* fino: só a altura diminuiu */
+#placar .pol { flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 0 12px; background: #1D4ED8; }
+#placar .ban { flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 0 12px; background: #B45309; }
+#placar .rot { font-size: 10px; font-weight: 800; letter-spacing: 1px; }
+#placar .num { font-family: 'Bebas Neue', sans-serif; font-size: 18px; line-height: 1; }
+#placar .relogio { display: flex; align-items: center; padding: 0 12px; font-size: 13px; font-weight: 800; }
+#placar .meta { font-size: 11px; padding: 1px 8px; border-radius: 6px; background: rgba(11, 15, 23, 0.6); }
+.mic-aberto { position: absolute; left: 50%; top: 52px; transform: translateX(-50%); font-size: 11px; font-weight: 800; letter-spacing: 1px;
+  color: #FECACA; background: rgba(127, 29, 29, 0.85); border: 1px solid #F87171; border-radius: 999px; padding: 3px 10px; pointer-events: none; }
+#abates { position: absolute; right: 66px; top: 10px; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+#abates span { font-size: 12px; padding: 3px 9px; border-radius: 7px; background: var(--escuro); }
+/* abate com a AK-47 Dragão Azul: linha azul e dourada no quadro de abates */
+#abates span.abate-dragao { background: linear-gradient(90deg, rgba(12, 32, 84, 0.92), rgba(20, 60, 140, 0.88)); border: 1px solid rgba(232, 182, 72, 0.75);
+  box-shadow: 0 0 10px rgba(60, 140, 255, 0.55); }
+#abates span.abate-dragao i { color: #7cc0ff; font-style: normal; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; }
+#abates span.abate-dragao em { color: #f2c464; font-style: normal; font-weight: 700; }
+/* abate com a M4 Colt Vermelho Carmesim: linha vermelha e preta com borda dourada (a coroa da skin) */
+#abates span.abate-carmesim { background: linear-gradient(90deg, rgba(40, 6, 8, 0.94), rgba(120, 12, 18, 0.9)); border: 1px solid rgba(232, 182, 72, 0.75);
+  box-shadow: 0 0 10px rgba(229, 38, 47, 0.6); }
+#abates span.abate-carmesim i { color: #ff5a5f; font-style: normal; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; }
+#abates span.abate-carmesim i::before { content: "\265B  "; color: #f2c464; }
+#abates span.abate-carmesim em { color: #f2c464; font-style: normal; font-weight: 700; }
+/* abate com a AK-47 Energia Cósmica: linha roxa com brilho */
+#abates span.abate-cosmica { background: linear-gradient(90deg, rgba(30, 8, 60, 0.94), rgba(88, 28, 160, 0.9)); border: 1px solid rgba(196, 140, 255, 0.8);
+  box-shadow: 0 0 12px rgba(150, 70, 255, 0.65); }
+#abates span.abate-cosmica i { color: #d8b4fe; font-style: normal; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; }
+#abates span.abate-cosmica i::before { content: "\2726  "; color: #f2c464; }
+#abates span.abate-cosmica em { color: #f2c464; font-style: normal; font-weight: 700; }
+#pausar { position: absolute; right: 14px; top: 10px; width: 44px; height: 44px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.25);
+  background: var(--escuro); display: flex; align-items: center; justify-content: center; }
+#medidor { position: absolute; left: 14px; top: 76px; font-size: 10.5px; font-weight: 700; padding: 2px 7px; border-radius: 6px;
+  background: rgba(11, 15, 23, 0.55); color: #D1D5DB; pointer-events: none; font-variant-numeric: tabular-nums; white-space: nowrap; }
+#rede { position: absolute; left: 50%; top: 66px; transform: translateX(-50%); font-size: 11px; font-weight: 800; padding: 2px 8px; border-radius: 6px; background: rgba(11, 15, 23, 0.6); }
+#mira { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); }
+#luneta { position: absolute; inset: 0; width: 100%; height: 100%; display: none; }
+#dano { position: absolute; inset: 0; background: radial-gradient(ellipse at center, rgba(220, 38, 38, 0) 45%, rgba(220, 38, 38, 0.45) 100%); display: none; }
+#centro { position: absolute; left: 50%; top: 50%; transform: translate(-50%, 46px); text-align: center; font-size: 18px; font-weight: 800; padding: 10px 16px;
+  border-radius: 12px; background: rgba(11, 15, 23, 0.72); display: none; }
+#botao-loja { position: absolute; left: 50%; top: 226px; transform: translateX(-50%); display: none; align-items: center; gap: 8px; height: 40px; padding: 0 16px;
+  border-radius: 12px; background: var(--ouro); color: #111827; font-size: 13px; font-weight: 800; }
+#botao-loja.outro { background: rgba(11, 15, 23, 0.85); color: var(--texto); border: 1px solid var(--borda); }
+.peca { position: absolute; transform: translate(-50%, -50%); }
+.redondo { border-radius: 50%; border: 2px solid rgba(255, 255, 255, 0.55); background: rgba(11, 15, 23, 0.65); display: flex; flex-direction: column;
+  align-items: center; justify-content: center; color: var(--texto); font-weight: 800; }
+.redondo .r { font-size: 9px; font-weight: 800; }
+.redondo.ligado { border-color: var(--ouro); background: rgba(251, 191, 36, 0.35); }
+.tiro { border: 3px solid rgba(255, 255, 255, 0.75); background: rgba(220, 38, 38, 0.85); }
+.tiro.esq { border-width: 2px; border-color: rgba(255, 255, 255, 0.6); background: rgba(220, 38, 38, 0.7); }
+.contador { position: absolute; right: -4px; top: -4px; min-width: 20px; height: 20px; border-radius: 10px; background: var(--ouro); color: #111827;
+  font-size: 11px; font-weight: 800; display: flex; align-items: center; justify-content: center; }
+#armas { display: flex; gap: 6px; align-items: flex-end; }
+.slot { width: 110px; height: 58px; border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  background: var(--escuro); border: 2px solid rgba(255, 255, 255, 0.25); opacity: 0.75; }
+.slot.ativa { border-color: var(--ouro); opacity: 1; }
+.slot img { width: 92px; height: 34px; object-fit: contain; }
+.slot span { font-size: 11px; font-weight: 800; }
+.troca { width: 46px; height: 46px; border-radius: 12px; border: 2px solid rgba(255, 255, 255, 0.5); background: rgba(11, 15, 23, 0.7); display: flex; align-items: center; justify-content: center; }
+#minimapa { border-radius: 50%; }
+#analogico { border-radius: 50%; background: rgba(255, 255, 255, 0.12); border: 2px solid rgba(255, 255, 255, 0.35); display: flex; align-items: center; justify-content: center; }
+#analogico .bola { width: 43%; height: 43%; border-radius: 50%; background: rgba(255, 255, 255, 0.45); }
+#zona-andar, #zona-olhar { position: absolute; top: 0; height: 100%; }
+#zona-andar { left: 0; width: 50%; } #zona-olhar { right: 0; width: 50%; }
+#teclas { position: absolute; left: 14px; bottom: 10px; font-size: 11px; color: var(--apagado); line-height: 1.5; max-width: 220px; }
+.so-toque { display: none !important; }
+body.toque .so-toque { display: flex !important; }
+body.toque .so-teclado { display: none !important; }
+#zoom-luneta.editavel { visibility: visible !important; }  /* no editor do HUD aparece para posicionar */
+
+/* loja de armas da partida */
+#loja-partida { position: absolute; inset: 0; background: var(--fundo); display: flex; flex-direction: column; gap: 12px; padding: 16px 20px 16px; }
+.lista-armas { width: 300px; display: flex; flex-direction: column; gap: 6px; overflow-y: auto; }
+.linha-arma { display: flex; align-items: center; gap: 10px; height: 44px; padding: 0 12px 0 10px; border-radius: 12px; background: var(--painel);
+  border: 2px solid rgba(255, 255, 255, 0.08); font-size: 13px; font-weight: 800; cursor: pointer; flex: none; }
+.linha-arma.sel { border-color: var(--azul-medio); background: #16233D; }
+.linha-arma img { width: 68px; height: 32px; object-fit: contain; }
+.barras { display: grid; grid-template-columns: 80px 1fr; gap: 6px 10px; align-items: center; font-size: 12px; color: var(--apagado); }
+.barras .t { height: 8px; border-radius: 4px; background: rgba(255, 255, 255, 0.12); overflow: hidden; }
+.barras .t i { display: block; height: 100%; border-radius: 4px; }
+
+/* pausa, avisos */
+.camada { position: absolute; inset: 0; background: rgba(0, 0, 0, 0.6); display: flex; align-items: center; justify-content: center; z-index: 5; }
+.janela { width: 340px; display: flex; flex-direction: column; gap: 10px; padding: 18px; border-radius: 18px; background: var(--painel); border: 1px solid var(--borda); }
+.janela .t { font-family: 'Bebas Neue', sans-serif; font-size: 30px; }
+.janela .m { font-size: 13px; color: var(--apagado); line-height: 1.45; white-space: pre-line; }
+#aviso { position: absolute; left: 50%; bottom: 22px; transform: translateX(-50%); padding: 10px 16px; border-radius: 12px; background: rgba(17, 24, 39, 0.95);
+  border: 1px solid var(--borda); font-weight: 700; font-size: 13px; z-index: 20; pointer-events: none; max-width: 80%; text-align: center; }
+
+/* tela de carregamento (só no site) */
+#carregando { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; z-index: 10; text-align: center; padding: 20px;
+  background: linear-gradient(180deg, rgba(8,11,18,.55), rgba(8,11,18,.92)), #0B0F17 url(img/fundo_inicio.jpg) center / cover no-repeat; }
+#carregando .logo-fs.grande { align-items: center; font-family: 'Bebas Neue', Impact, sans-serif; }
+#carregando .logo-fs.grande .favela, #carregando .logo-fs.grande .strike { font-size: 72px; }
+#carregando .barra { width: min(440px, 80vw); height: 10px; border-radius: 6px; background: rgba(255, 255, 255, 0.12); overflow: hidden; box-shadow: 0 0 0 1px rgba(252,211,77,.25); }
+#progresso { height: 100%; width: 0; background: linear-gradient(90deg, #F59E0B, #FCD34D); transition: width .2s; }
+#status { font-weight: 700; letter-spacing: .5px; }
+#carregando .dica { color: #D1D5DB; font-size: 12px; max-width: 460px; }
+
+/* carregando a partida: foto da favela se aproximando, o modo em destaque, barra, dicas e o seu personagem */
+.carga { position: absolute; inset: 0; z-index: 30; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; padding: 26px 34px;
+  background: #0B0F17; isolation: isolate; }
+.carga::before { content: ""; position: absolute; inset: -4%; z-index: -2; background: url(img/fundo_inicio.jpg) center / cover no-repeat;
+  animation: carga-zoom 14s ease-out forwards; }
+.carga::after { content: ""; position: absolute; inset: 0; z-index: -1;
+  background: linear-gradient(90deg, rgba(8,11,18,.94) 0%, rgba(8,11,18,.7) 45%, rgba(8,11,18,.2) 75%), linear-gradient(0deg, rgba(8,11,18,.95) 0%, rgba(8,11,18,0) 45%); }
+.carga.modo-br::after { background: linear-gradient(90deg, rgba(36,6,6,.94) 0%, rgba(36,6,6,.7) 45%, rgba(36,6,6,.15) 75%), linear-gradient(0deg, rgba(14,4,4,.95) 0%, rgba(14,4,4,0) 45%); }
+@keyframes carga-zoom { from { transform: scale(1); } to { transform: scale(1.12) translate(-1%, 1%); } }
+.carga .logo-fs { position: absolute; left: 34px; top: 22px; transform: scale(.55); transform-origin: left top; }
+.carga .carga-modo { font-size: 12px; font-weight: 800; letter-spacing: 3px; color: #FCD34D; }
+.carga.modo-br .carga-modo { color: #FCA5A5; }
+.carga .carga-titulo { font-family: 'Bebas Neue', Impact, sans-serif; font-size: 64px; line-height: .9; color: #F9FAFB; text-shadow: 0 4px 18px rgba(0,0,0,.6); }
+.carga .carga-mapa { font-size: 13px; color: #D1D5DB; margin-top: 4px; letter-spacing: 1px; }
+.carga .carga-barra { width: min(520px, 62%); height: 8px; margin-top: 18px; border-radius: 5px; background: rgba(255,255,255,.14); overflow: hidden; }
+.carga .carga-barra i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #F59E0B, #FCD34D); transition: width .25s ease-out; }
+.carga.modo-br .carga-barra i { background: linear-gradient(90deg, #DC2626, #F87171); }
+.carga .carga-status { margin-top: 8px; font-size: 13px; font-weight: 700; color: #F3F4F6; }
+.carga .carga-dica { margin-top: 10px; max-width: 520px; font-size: 12px; color: #D1D5DB; min-height: 32px; transition: opacity .3s; }
+.carga .carga-dica b { color: #FCD34D; }
+.carga .carga-boneco { position: absolute; right: 6%; bottom: 0; height: 88%; aspect-ratio: 344 / 480; z-index: -1; filter: drop-shadow(0 10px 22px rgba(0,0,0,.6));
+  animation: carga-entra .6s ease-out both; }
+.carga .carga-boneco div { position: absolute; inset: 0; background-repeat: no-repeat; background-size: 2400% 100%; background-position: 0 0; }
+@keyframes carga-entra { from { opacity: 0; transform: translateX(30px); } to { opacity: 1; transform: none; } }
+.ouro { color: var(--ouro); } .azul { color: var(--azul-medio); } .verde { color: var(--verde); } .amarelo { color: var(--ouro-claro); } .vermelho { color: var(--vermelho); } .apagado { color: var(--apagado); }
+
+/* ---------- Ultra: acabamento extra da interface (só no nível Ultra, para não pesar nos outros) ---------- */
+body.ultra { text-rendering: optimizeLegibility; -webkit-font-smoothing: antialiased; }
+body.ultra .tela { animation: entrar .22s ease-out both; }
+body.ultra .camada { animation: aparecer .18s ease-out both; }
+body.ultra .camada .janela { animation: subir .22s cubic-bezier(.2, .9, .3, 1.2) both; }
+body.ultra .tela.sobre-mapa { background: rgba(8, 11, 18, 0.55); backdrop-filter: blur(6px) saturate(1.15); -webkit-backdrop-filter: blur(6px) saturate(1.15); }
+body.ultra .destaque, body.ultra .chip, body.ultra .chip-moedas, body.ultra .caixa, body.ultra #placar .faixa, body.ultra #abates span {
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+body.ultra .btn, body.ultra .item, body.ultra .lado, body.ultra .pacote, body.ultra .linha-arma, body.ultra .nivel, body.ultra .aba, body.ultra .redondo, body.ultra .slot {
+  transition: transform .12s ease, border-color .15s ease, background-color .15s ease, box-shadow .15s ease; }
+body.ultra .btn:active, body.ultra .item:active, body.ultra .lado:active, body.ultra .pacote:active, body.ultra .redondo:active { transform: scale(.96); }
+body.ultra .peca.redondo:active { transform: translate(-50%, -50%) scale(.94); }
+body.ultra .btn-ouro, body.ultra .tiro { box-shadow: 0 6px 22px rgba(251, 191, 36, 0.28); }
+body.ultra .tiro { box-shadow: 0 6px 22px rgba(220, 38, 38, 0.35); }
+body.ultra .item.sel, body.ultra .nivel.sel, body.ultra .slot.ativa { box-shadow: 0 0 0 1px var(--ouro), 0 8px 26px rgba(251, 191, 36, 0.22); }
+body.ultra .lado.pol:hover { box-shadow: 0 0 28px rgba(59, 130, 246, 0.35); }
+body.ultra .lado.ban:hover { box-shadow: 0 0 28px rgba(245, 158, 11, 0.35); }
+@keyframes entrar { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes aparecer { from { opacity: 0; } to { opacity: 1; } }
+@keyframes subir { from { opacity: 0; transform: translateY(14px) scale(.97); } to { opacity: 1; transform: none; } }
+
+.versao { position: absolute; left: 8px; bottom: 4px; font-size: 10px; color: rgba(255, 255, 255, 0.35); pointer-events: none; }
+
+/* tela inicial leve: imagem fixa da favela no fundo dos menus (o motor 3D fica parado) */
+body.menu-fundo, html.android body.menu-fundo { background: #0B0F17 url(img/fundo_menu.jpg) center / cover no-repeat; }
+body.menu-fundo canvas#tela { visibility: hidden; }
+
+/* tela inicial: a foto da favela vista de cima (fim de tarde, renderizada no motor) no lugar do mapa girando,
+   escurecida à esquerda (logo e botões) e embaixo; a foto se aproxima bem devagar */
+#inicio.tela.sobre-mapa { isolation: isolate; overflow: hidden; backdrop-filter: none; -webkit-backdrop-filter: none; background: transparent; }
+#inicio.tela.sobre-mapa::after { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  background: linear-gradient(90deg, rgba(8,11,18,.88) 0%, rgba(8,11,18,.62) 30%, rgba(8,11,18,.12) 58%, rgba(8,11,18,0) 75%),
+              linear-gradient(0deg, rgba(8,11,18,.7) 0%, rgba(8,11,18,0) 32%), linear-gradient(180deg, rgba(8,11,18,.45) 0%, rgba(8,11,18,0) 22%); }
+#inicio.tela.sobre-mapa::before { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; background: #0B0F17 url(img/fundo_inicio.jpg) center 55% / cover no-repeat;
+  transform: scale(1.06); animation: inicio-deriva 28s ease-in-out infinite alternate; }
+@keyframes inicio-deriva { from { transform: scale(1.06) translate(0, 0); } to { transform: scale(1.12) translate(-14px, 6px); } }
+@media (prefers-reduced-motion: reduce) { #inicio.tela.sobre-mapa::before { animation: none; } }
+
+/* conversas, chat global e presentes */
+.janela-chat { width: min(560px, 94%); height: min(340px, 88%); display: flex; flex-direction: column; gap: 6px; }
+.janela-chat .msgs { flex: 1; overflow: auto; display: flex; flex-direction: column; gap: 4px; padding: 6px; background: rgba(0,0,0,.25); border-radius: 8px; }
+.janela-chat .msg { align-self: flex-start; max-width: 78%; padding: 5px 9px; border-radius: 10px; background: rgba(255,255,255,.1); font-size: 13px; overflow-wrap: anywhere; }
+.janela-chat .msg.minha { align-self: flex-end; background: #1D4ED8; }
+.janela-chat .msg i { display: block; font-size: 9px; opacity: .6; font-style: normal; text-align: right; }
+.janela-chat .msg-g { font-size: 13px; padding: 3px 4px; border-bottom: 1px solid rgba(255,255,255,.06); overflow-wrap: anywhere; }
+.ponto-on { width: 10px; height: 10px; border-radius: 50%; background: #6B7280; flex: none; }
+.ponto-on.on { background: #4ADE80; }
+.badge-msg { min-width: 20px; height: 20px; padding: 0 5px; border-radius: 10px; background: #DC2626; color: #fff; font-size: 12px; display: inline-flex; align-items: center; justify-content: center; }
+.grade-presentes { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; overflow: auto; }
+.item-presente { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 8px; border-radius: 10px; border: 1px solid rgba(255,255,255,.12); color: #fff; font-size: 12px; cursor: pointer; }
+.item-presente img { width: 100%; height: 44px; object-fit: contain; }
+.item-presente span { display: inline-flex; gap: 4px; align-items: center; color: #FCD34D; font-weight: 800; }
+
+/* opacidade do HUD (configurações): vale para os controles e as informações, não para a mira, avisos e luneta */
+#hud > :not(#luneta):not(#dano):not(#centro):not(#mira):not(#zona-andar):not(#zona-olhar):not(#fora-zona):not(.camada) { filter: opacity(var(--hud-op, 1)); }
+
+/* login: cartão de vidro (transparente) por cima do mapa */
+.tela-login { flex-direction: row; align-items: center; justify-content: space-between; padding: 22px 34px; gap: 24px; }
+.login-marca { gap: 6px; }
+.login-lema { font-size: 12px; color: #E5E7EB; letter-spacing: 3px; font-weight: 700; }
+.login-sub { font-size: 12px; color: #9CA3AF; }
+.cartao-login { width: 340px; gap: 9px; padding: 16px 18px; border-radius: 18px; background: rgba(11,15,23,.42); border: 1px solid rgba(255,255,255,.14);
+  backdrop-filter: blur(14px) saturate(1.2); -webkit-backdrop-filter: blur(14px) saturate(1.2); box-shadow: 0 18px 40px rgba(0,0,0,.35); }
+.cartao-login input { background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.16); }
+.login-abas { gap: 6px; }
+.login-abas .aba { flex: 1; justify-content: center; }
+.btn-google { display: flex; align-items: center; justify-content: center; gap: 10px; background: #fff; color: #1F2937; font-weight: 700; height: 42px; border-radius: 10px; }
+.login-google-site { display: flex; justify-content: center; min-height: 44px; }
+.login-ou { display: flex; align-items: center; gap: 10px; color: #9CA3AF; font-size: 11px; letter-spacing: 1px; text-transform: uppercase; }
+.login-ou::before, .login-ou::after { content: ""; flex: 1; height: 1px; background: rgba(255,255,255,.15); }
+.login-esqueci { align-self: flex-end; }
+
+[hidden] { display: none !important; }
+
+/* Jogar: abas ONLINE / OFFLINE e os cartões dos modos */
+.segmento { display: flex; align-self: flex-start; gap: 4px; padding: 4px; border-radius: 12px; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.1); }
+.segmento button { display: flex; align-items: center; gap: 8px; padding: 8px 22px; border-radius: 9px; font-family: 'Bebas Neue', Impact, sans-serif; font-size: 22px; letter-spacing: 1px; color: #9CA3AF; }
+.segmento button.sel { background: #FBBF24; color: #111827; }
+.modos { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 14px; flex: 1; min-height: 0; }
+.modo-cartao { display: flex; flex-direction: column; gap: 8px; text-align: left; padding: 14px 16px; border-radius: 16px; color: #F9FAFB;
+  background: linear-gradient(160deg, color-mix(in srgb, var(--cor) 32%, #0B0F17), #0B0F17 75%); border: 1px solid color-mix(in srgb, var(--cor) 55%, transparent);
+  transition: transform .12s, border-color .12s; }
+.modo-cartao:hover, .modo-cartao:focus-visible { transform: translateY(-2px); border-color: var(--cor); outline: none; }
+.modo-cartao .icone { width: 42px; height: 42px; border-radius: 12px; display: flex; align-items: center; justify-content: center; }
+.modo-cartao .nome { font-family: 'Bebas Neue', Impact, sans-serif; font-size: 28px; letter-spacing: 1px; line-height: 1; }
+.modo-cartao .sub { font-size: 10px; font-weight: 800; letter-spacing: 2px; color: color-mix(in srgb, var(--cor) 45%, #fff); }
+.modo-cartao .texto { font-size: 12px; line-height: 1.45; color: #E5E7EB; }
+.modo-cartao .tag { background: color-mix(in srgb, var(--cor) 25%, transparent); color: #F3F4F6; font-size: 10px; padding: 3px 8px; border-radius: 999px; }
+.modo-cartao .rodape { font-size: 11px; color: #D1D5DB; }
+.modo-cartao .entrar { background: var(--cor); color: #fff; font-weight: 800; font-size: 13px; padding: 7px 16px; border-radius: 9px; }
+
+/* escolher o personagem: o escolhido grande à esquerda; na Ressurgência, o lado em cima */
+.tela-roupa { --lado: #3B82F6; }
+.tela-roupa.lado-ban { --lado: #F59E0B; }
+.roupa-palco { position: relative; width: 230px; flex: none; border-radius: 18px; overflow: hidden; display: flex; align-items: flex-end; justify-content: center;
+  background: radial-gradient(ellipse at 50% 70%, color-mix(in srgb, var(--lado) 45%, transparent), transparent 70%), linear-gradient(180deg, rgba(255,255,255,.04), rgba(0,0,0,.35));
+  border: 1px solid color-mix(in srgb, var(--lado) 50%, transparent); }
+.roupa-palco img { position: absolute; inset: 8px 0 54px; width: 100%; height: calc(100% - 62px); object-fit: contain; filter: drop-shadow(0 10px 18px rgba(0,0,0,.55)); }
+.roupa-nome { position: relative; width: 100%; padding: 8px 12px 10px; background: linear-gradient(0deg, rgba(0,0,0,.75), transparent); display: flex; flex-direction: column; }
+.roupa-nome .bebas { font-size: 32px; line-height: 1; }
+.lado-tag { font-size: 10px; font-weight: 800; letter-spacing: 2px; color: color-mix(in srgb, var(--lado) 55%, #fff); }
+.lados-roupa { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.lados-roupa button { display: flex; align-items: baseline; justify-content: center; gap: 10px; padding: 8px; border-radius: 12px; border: 1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.04); color: #D1D5DB; }
+.lados-roupa button .bebas { font-size: 26px; }
+.lados-roupa button small { font-size: 11px; color: #9CA3AF; }
+.lados-roupa button[data-lado="0"].sel { background: rgba(59,130,246,.22); border-color: #3B82F6; color: #DBEAFE; }
+.lados-roupa button[data-lado="1"].sel { background: rgba(245,158,11,.2); border-color: #F59E0B; color: #FEF3C7; }
+.grade-roupas { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; flex: 1; min-height: 0; }
+.roupa-item { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 2px; padding: 6px 4px 7px; border-radius: 12px; min-height: 0;
+  background: linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.07)); border: 1px solid rgba(255,255,255,.1); color: #F3F4F6; overflow: hidden; }
+.roupa-item img { flex: 1 1 0; min-height: 0; height: 0; width: 100%; object-fit: contain; }
+.roupa-item .n { font-size: 13px; font-weight: 800; }
+.roupa-item .p { font-size: 10px; font-weight: 700; color: #86EFAC; }
+.roupa-item.sel { border-color: var(--lado); background: color-mix(in srgb, var(--lado) 22%, transparent); box-shadow: 0 0 0 1px var(--lado) inset; }
+.roupa-item.sel .p { color: #FCD34D; }
+.coluna-time { text-align: left; align-items: flex-start; cursor: pointer; transition: transform .12s, box-shadow .12s; }
+.coluna-time:hover, .coluna-time:focus-visible { transform: translateY(-2px); outline: none; }
+.coluna-time.meu { box-shadow: 0 0 0 2px currentColor inset; }
+
+/* mercado: presente; arsenal: armas à esquerda, a equipada em destaque e as minhas skins */
+.btn-presente { background: linear-gradient(135deg, #DB2777, #9333EA); color: #fff; font-weight: 800; padding: 0 14px; }
+.arsenal-armas { width: 190px; flex: none; gap: 6px; overflow: auto; }
+.arsenal-arma { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; padding: 8px 12px; border-radius: 10px; text-align: left;
+  background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.1); color: #F3F4F6; }
+.arsenal-arma b { font-size: 15px; }
+.arsenal-arma.sel { border-color: #FBBF24; background: rgba(251,191,36,.14); }
+.arsenal-equipada { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 14px; border-radius: 14px; min-height: 110px;
+  background: linear-gradient(120deg, rgba(251,191,36,.16), rgba(255,255,255,.02)); border: 1px solid rgba(251,191,36,.35); }
+.arsenal-equipada img, .arsenal-equipada .ver360 { max-width: 55%; max-height: 100px; object-fit: contain; }
+.arsenal-padrao { flex: 1; display: flex; align-items: center; justify-content: center; font-size: 22px; color: #6B7280; }
+
+.filtro-armas { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; flex: none; }
+.filtro-armas button { flex: none; white-space: nowrap; padding: 5px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; color: #D1D5DB; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.1); }
+.filtro-armas button.sel { background: #FBBF24; color: #111827; border-color: #FBBF24; }
+.abas .aba { white-space: nowrap; }
+
+/* histórico de partidas */
+.hist-resumo { width: 236px; flex: none; gap: 8px; display: flex; flex-direction: column; padding: 10px; overflow-y: auto; min-height: 0; }
+.hist-titulo { font-size: 11px; font-weight: 800; letter-spacing: 2px; color: #FCD34D; }
+.hist-grade { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.hist-est { display: flex; flex-direction: column; gap: 1px; padding: 5px 9px; border-radius: 10px; background: rgba(255,255,255,.05); }
+.hist-est b { font-family: 'Bebas Neue', Impact, sans-serif; font-size: 21px; line-height: 1; color: #F9FAFB; letter-spacing: .5px; }
+.hist-est b small { font-family: Inter, system-ui, sans-serif; font-size: 11px; color: #86EFAC; letter-spacing: 0; }
+.hist-est span { font-size: 9px; font-weight: 800; letter-spacing: 1.5px; color: #9CA3AF; }
+.hist-lista { display: flex; flex-direction: column; gap: 6px; overflow-y: auto; min-height: 0; padding-right: 2px; }
+.hist-linha { --res: #6B7280; display: grid; grid-template-columns: 76px minmax(0, 1fr) repeat(4, 44px) 66px; align-items: center; gap: 6px; text-align: left;
+  padding: 7px 12px 7px 0; border-radius: 12px; color: #F3F4F6; flex: none;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--res) 26%, transparent), rgba(255,255,255,.035) 40%); border: 1px solid rgba(255,255,255,.08); border-left: 4px solid var(--res); }
+.hist-linha:hover, .hist-linha:focus-visible { border-color: color-mix(in srgb, var(--res) 60%, transparent); border-left-color: var(--res); outline: none; }
+.res-v { --res: #FBBF24; } .res-t { --res: #22C55E; } .res-d { --res: #EF4444; } .res-s { --res: #6B7280; }
+.hist-res { display: flex; flex-direction: column; align-items: center; line-height: 1; }
+.hist-res .bebas { font-size: 23px; color: color-mix(in srgb, var(--res) 70%, #fff); }
+.hist-res small { font-size: 10px; color: #D1D5DB; margin-top: 2px; }
+.hist-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.hist-info b { font-size: 13px; letter-spacing: .5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hist-info span { font-size: 11px; color: #9CA3AF; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hist-info .ponto-on { display: inline-block; vertical-align: middle; }
+.hist-num { display: flex; flex-direction: column; align-items: center; line-height: 1.05; }
+.hist-num b { font-size: 16px; }
+.hist-num small { font-size: 9px; color: #9CA3AF; text-transform: uppercase; letter-spacing: .5px; }
+.hist-xp { font-size: 11px; font-weight: 800; color: #FCD34D; text-align: right; }
+.hist-vazio { margin: auto; display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; }
+.hist-vazio .bebas { font-size: 30px; }
+.hist-detalhe { width: min(640px, calc(100vw - 32px)); max-height: calc(100vh - 16px); overflow-y: auto; gap: 7px; padding-top: 10px; padding-bottom: 10px; border-top: 4px solid var(--res); }
+.hist-detalhe .hist-grade { grid-template-columns: repeat(5, 1fr); display: grid; }
+.hist-grande { font-size: 32px; line-height: .95; color: color-mix(in srgb, var(--res) 70%, #fff); }
+.hist-retrato { width: 50px; height: 64px; object-fit: contain; border-radius: 10px; background: rgba(255,255,255,.05); }
+.hist-arma { width: 130px; height: 56px; object-fit: contain; }
+.hist-tab { display: flex; flex-direction: column; gap: 0; padding: 5px 8px; border-radius: 10px; background: rgba(255,255,255,.04); }
+.hist-jog { font-size: 12px; padding: 2px 6px; border-radius: 6px; gap: 6px; }
+.hist-jog > b, .hist-jog > span:not(.cresce) { width: 52px; text-align: right; }
+.hist-jog.cab { font-size: 10px; font-weight: 800; letter-spacing: 1px; }
+.hist-jog.eu { background: rgba(255,255,255,.12); font-weight: 800; }
+@media (max-width: 720px) { .hist-linha { grid-template-columns: 80px minmax(0, 1fr) repeat(2, 46px) 64px; } .hist-linha .hist-num:nth-of-type(n+5) { display: none; } }
+.hist-detalhe .hist-est b { font-size: 19px; }
+.hist-detalhe .hist-grade { gap: 6px; }
+
+/* Arsenal: todas as armas; tocar abre as skins */
+.arsenal-grade { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-auto-rows: minmax(0, 1fr); gap: 10px; }
+.arsenal-card { --c: rgba(255,255,255,.12); position: relative; display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-end; gap: 1px; padding: 8px 12px 10px;
+  border-radius: 14px; text-align: left; color: #F3F4F6; overflow: hidden; min-height: 0;
+  background: radial-gradient(ellipse at 70% 35%, color-mix(in srgb, var(--c) 40%, transparent), transparent 70%), linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.07));
+  border: 1px solid color-mix(in srgb, var(--c) 70%, rgba(255,255,255,.1)); transition: transform .12s; }
+.arsenal-card:hover, .arsenal-card:focus-visible { transform: translateY(-2px); outline: none; border-color: #FBBF24; }
+.arsenal-card img { position: absolute; inset: 6px 10px 46px; width: calc(100% - 20px); height: calc(100% - 52px); object-fit: contain; filter: drop-shadow(0 6px 10px rgba(0,0,0,.5)); }
+.arsenal-card .nome { position: relative; font-size: 24px; line-height: 1; }
+.arsenal-card .skin { position: relative; font-size: 12px; font-weight: 700; color: #FCD34D; }
+.arsenal-card .conta-skins { position: relative; font-size: 10px; color: #9CA3AF; }
+.arsenal-card.raro-lendaria { --c: #F59E0B; } .arsenal-card.raro-epica { --c: #A855F7; } .arsenal-card.raro-rara { --c: #3B82F6; } .arsenal-card.raro-comum { --c: #9CA3AF; }
+#ar-eq { width: 260px; flex: none; align-items: stretch; justify-content: flex-start; gap: 6px; min-height: 0; }
+#ar-eq > img, #ar-eq .ver360 { max-width: 100%; max-height: 120px; object-fit: contain; align-self: center; }
+.item.travado { opacity: .72; }
+.item.travado img { filter: grayscale(.6) brightness(.8); }
+
+/* aquecimento na partida */
+#aquec { position: absolute; left: 50%; top: 64px; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 6px; z-index: 5; pointer-events: none; }
+#aquec[hidden] { display: none !important; }
+#aquec .aq-faixa { display: flex; align-items: baseline; gap: 10px; padding: 5px 16px; border-radius: 999px; background: rgba(17,24,39,.78); border: 1px solid rgba(251,191,36,.6); }
+#aquec .aq-faixa .bebas { font-size: 22px; color: #FBBF24; letter-spacing: 1px; }
+#aquec .aq-faixa b { font-size: 18px; font-variant-numeric: tabular-nums; }
+#aquec .aq-faixa span:last-child { font-size: 11px; color: #D1D5DB; }
+#aquec button { pointer-events: auto; height: 36px; font-size: 13px; padding: 0 14px; display: flex; align-items: center; gap: 6px; }
+.equipamento { width: min(720px, calc(100vw - 32px)); max-height: calc(100vh - 16px); overflow-y: auto; gap: 8px; }
+.equip-grade { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+.equip-arma { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 6px; border-radius: 12px; color: #F3F4F6;
+  background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.12); }
+.equip-arma img { width: 100%; height: 58px; object-fit: contain; }
+.equip-arma b { font-size: 13px; }
+.equip-arma span { font-size: 10px; color: #9CA3AF; }
+.equip-arma.sel { border-color: #FBBF24; background: rgba(251,191,36,.16); box-shadow: 0 0 0 1px #FBBF24 inset; }
+.equip-arma.sel span { color: #FCD34D; font-weight: 800; }
+.equip-fixos { gap: 12px; align-items: center; font-size: 12px; color: #D1D5DB; }
+@media (max-width: 720px) { .equip-grade { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+
+/* avisos de abate (meio da tela, acima da mira) */
+#aviso-abate { position: absolute; left: 50%; top: 27%; transform: translate(-50%, 0) scale(.6); opacity: 0; pointer-events: none; z-index: 6;
+  display: flex; flex-direction: column; align-items: center; text-shadow: 0 2px 10px rgba(0,0,0,.7); transition: opacity .25s, transform .25s; }
+#aviso-abate .bebas { font-size: 38px; letter-spacing: 2px; color: #F9FAFB; line-height: 1; }
+#aviso-abate small { font-size: 12px; font-weight: 800; color: #FCD34D; letter-spacing: 1px; }
+#aviso-abate.cabeca .bebas { color: #F87171; }
+#aviso-abate.multi .bebas { color: #FBBF24; font-size: 46px; }
+#aviso-abate.seq .bebas { color: #A78BFA; font-size: 44px; }
+#aviso-abate.mostra { opacity: 1; transform: translate(-50%, 0) scale(1); animation: pulo-abate .32s ease-out; }
+@keyframes pulo-abate { 0% { transform: translate(-50%, 0) scale(1.45); } 100% { transform: translate(-50%, 0) scale(1); } }
+
+/* fim de partida: os seus números, MVP e títulos novos */
+.seus-numeros { gap: 6px; flex-wrap: wrap; flex: none; align-self: center; margin-right: 10px; justify-content: flex-end; max-width: 52%; }
+.seus-numeros > div { display: flex; flex-direction: column; padding: 4px 10px; border-radius: 10px; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.08); }
+.seus-numeros b { font-family: 'Bebas Neue', Impact, sans-serif; font-size: 20px; line-height: 1; }
+.seus-numeros span { font-size: 9px; font-weight: 800; letter-spacing: 1.5px; color: #9CA3AF; }
+.seus-numeros .titulo-novo { background: rgba(251,191,36,.16); border-color: rgba(251,191,36,.6); }
+.seus-numeros .titulo-novo b { color: #FCD34D; font-family: inherit; font-size: 14px; }
+.mvp { font-size: 9px; font-weight: 900; letter-spacing: 1px; color: #111827; background: #FBBF24; border-radius: 4px; padding: 1px 5px; vertical-align: middle; }
+
+/* perfil */
+.cartao-conta .titulo-conta { font-size: 10px; font-weight: 700; color: #FCD34D; letter-spacing: .5px; }
+.perfil-cartao { width: 300px; flex: none; display: flex; flex-direction: column; gap: 8px; padding: 16px; border-radius: 18px; overflow: hidden;
+  background: radial-gradient(ellipse at 85% 0%, color-mix(in srgb, var(--b) 70%, transparent), transparent 60%), linear-gradient(150deg, var(--a), color-mix(in srgb, var(--b) 45%, var(--a)));
+  border: 1px solid color-mix(in srgb, var(--b) 60%, transparent); box-shadow: 0 14px 30px rgba(0,0,0,.35); }
+.perfil-insignia { display: flex; width: 60px; height: 60px; align-items: center; justify-content: center; border-radius: 16px; background: rgba(0,0,0,.28); flex: none; }
+.perfil-nome { font-size: 34px; line-height: .95; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.perfil-titulo { font-size: 13px; font-weight: 800; color: #FCD34D; letter-spacing: .5px; }
+.nv-grande { font-size: 12px; font-weight: 900; color: #111827; background: var(--ouro); border-radius: 6px; padding: 2px 8px; }
+.perfil-pat { font-size: 13px; font-weight: 700; color: #F3F4F6; }
+.perfil-xp { font-size: 11px; color: #E5E7EB; }
+.perfil-id { font-family: 'Bebas Neue', Impact, sans-serif; font-size: 22px; letter-spacing: 3px; color: rgba(255,255,255,.85); }
+.perfil-corpo { overflow-y: auto; min-height: 0; }
+.perfil-numeros { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.perfil-titulos, .perfil-cores { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px; }
+.perfil-tit, .perfil-cor { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; padding: 10px 12px; border-radius: 12px; text-align: left; color: #F3F4F6;
+  background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.1); }
+.perfil-tit b, .perfil-cor b { font-size: 13px; }
+.perfil-tit span, .perfil-cor span { font-size: 11px; color: #9CA3AF; }
+.perfil-tit.sel, .perfil-cor.sel { border-color: #FBBF24; background: rgba(251,191,36,.14); }
+.perfil-tit.sel span, .perfil-cor.sel span { color: #FCD34D; font-weight: 800; }
+.perfil-tit.travado, .perfil-cor.travado { opacity: .55; }
+.perfil-cor i { width: 100%; height: 34px; border-radius: 8px; background: linear-gradient(120deg, var(--a), var(--b)); border: 1px solid rgba(255,255,255,.15); }
+@media (max-width: 720px) { .perfil-cartao { width: 240px; } }
+
+/* HUD compacto: o palco (844x390) é ampliado ~2,3x num celular deitado; tudo um número menor e menos coisa fixa */
+#vida { top: 6px; left: 10px; width: 150px; padding: 3px 8px; gap: 6px; }
+#vida svg { width: 12px; height: 12px; }
+#vida .trilho, #vida .barra { height: 6px; }
+#vida b { font-size: 11px; width: 22px; }
+#info { top: 31px; left: 10px; gap: 4px; }
+#info span { font-size: 9.5px; padding: 2px 6px; border-radius: 6px; }
+#placar { top: 5px; gap: 2px; }
+#placar .faixa { height: 15px; min-width: 200px; border-radius: 6px; }
+#placar .pol, #placar .ban { padding: 0 8px; gap: 5px; }
+#placar .rot { font-size: 8px; }
+#placar .num { font-size: 14px; }
+#placar .relogio { font-size: 10.5px; padding: 0 8px; }
+#placar .meta { font-size: 8.5px; padding: 1px 6px; }
+#abates { right: 52px; top: 6px; gap: 3px; }
+#abates span { font-size: 9.5px; padding: 2px 7px; border-radius: 6px; animation: abate-entra .2s ease-out; }
+@keyframes abate-entra { from { opacity: 0; transform: translateX(8px); } to { opacity: 1; transform: none; } }
+#pausar { right: 10px; top: 6px; width: 34px; height: 34px; border-radius: 10px; }
+#medidor { top: 50px; left: 10px; font-size: 8.5px; padding: 1px 5px; }
+#rede { top: 38px; font-size: 8.5px; padding: 1px 6px; }
+#centro { font-size: 14px; padding: 7px 12px; transform: translate(-50%, 40px); }
+#botao-loja { top: 240px; height: 30px; padding: 0 12px; gap: 6px; font-size: 12px; border-radius: 10px; }
+#botao-loja svg { width: 15px; height: 15px; }
+.slot { width: 84px; height: 44px; border-radius: 10px; }
+.slot img { width: 70px; height: 25px; }
+.slot span { font-size: 9.5px; }
+.redondo .r { font-size: 7.5px; }
+.redondo svg { width: 17px; height: 17px; }
+#b-tiro svg, #b-tiro2 svg { width: auto; height: auto; }
+/* Ressurgência: o time numa coluna fina ao lado do minimapa (não fica mais por baixo do botão de tiro) */
+#meu-time { top: 78px; left: 92px; gap: 2px; }
+#meu-time > div { min-width: 0; width: 104px; gap: 5px; padding: 1px 6px; border-radius: 6px; font-size: 9.5px; }
+#meu-time .n { max-width: 52px; }
+#meu-time .vida-mini { width: 34px; height: 4px; }
+#meu-time i { font-size: 8.5px; }
+#fora-zona { top: 56px; font-size: 10px; padding: 4px 10px; }
+#aquec { top: 40px; gap: 4px; }
+#aquec .aq-faixa { padding: 3px 12px; gap: 7px; }
+#aquec .aq-faixa .bebas { font-size: 16px; }
+#aquec .aq-faixa b { font-size: 13px; }
+#aquec .aq-faixa span:last-child { font-size: 9px; }
+#aquec button { height: 28px; font-size: 11px; padding: 0 10px; }
+/* (2ª passada: ainda menor; no celular deitado o palco é ampliado ~2,3x, então 8,5 px ainda ficam legíveis) */
+#vida { width: 122px; padding: 2px 6px; gap: 5px; }
+#vida svg { width: 10px; height: 10px; }
+#vida .trilho, #vida .barra { height: 5px; }
+#vida b { font-size: 9.5px; width: 18px; }
+#info { top: 25px; }
+#info span { font-size: 8.5px; padding: 1px 5px; }
+#medidor { top: 41px; font-size: 7.5px; }
+#placar .faixa { height: 13px; min-width: 168px; }
+#placar .rot { font-size: 7px; }
+#placar .num { font-size: 12px; }
+#placar .relogio { font-size: 9.5px; padding: 0 6px; }
+#placar .meta { font-size: 7.5px; }
+#rede { top: 32px; font-size: 7.5px; }
+#abates { right: 46px; }
+#abates span { font-size: 8.5px; padding: 1px 6px; }
+#pausar { width: 30px; height: 30px; }
+#meu-time { top: 74px; left: 90px; }
+#meu-time > div { width: 92px; font-size: 8.5px; padding: 1px 5px; }
+#meu-time .n { max-width: 46px; }
+#meu-time .vida-mini { width: 30px; }
+#meu-time i { font-size: 7.5px; }
+#aquec { top: 34px; }
+#aquec .aq-faixa .bebas { font-size: 13px; }
+#aquec .aq-faixa b { font-size: 11px; }
+#aquec .aq-faixa span:last-child { font-size: 8px; }
+#aquec button { height: 24px; font-size: 9.5px; padding: 0 9px; }
+#aquec button svg { width: 13px; height: 13px; }
+#botao-loja { height: 25px; font-size: 10px; padding: 0 10px; }
+#botao-loja svg { width: 13px; height: 13px; }
+.slot { width: 72px; height: 38px; }
+.slot img { width: 60px; height: 21px; }
+.slot span { font-size: 8.5px; }
+#centro { font-size: 12px; }
+#fora-zona { font-size: 9px; }
