@@ -127,6 +127,21 @@ async function tratar(req, res, url) {
   res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return true; }
+  // diagnóstico público (só sim/não, sem dado de ninguém): a chave de administrador está no servidor? as regras
+  // publicadas no Firebase têm as partes de conversas, caixa e presentes? (sem elas, mensagens e presentes falham)
+  if (req.method === 'GET' && url.pathname === '/api/social/saude') {
+    const r = { presentes: !!contaServico, chaveAceita: null, regras: null };
+    if (contaServico) {
+      try {
+        const t = await tokenAdmin();
+        r.chaveAceita = true;
+        const q = await fetch(`${DB}/.settings/rules.json?access_token=${encodeURIComponent(t)}`, { signal: AbortSignal.timeout(8000) });
+        const txt = q.ok ? await q.text() : '';
+        r.regras = txt ? { conversas: txt.includes('"conversas"'), caixa: txt.includes('"caixa"'), presentes: txt.includes('"presentes"'), amigos: txt.includes('"amigos"') } : 'não li';
+      } catch (e) { r.chaveAceita = false; }
+    }
+    return responder(res, 200, r), true;
+  }
   const eu = await conferirLogin(req);
   if (!eu) return responder(res, 401, { erro: 'faça login' }), true;
   if (!limite('social:' + eu.uid, 15)) return responder(res, 429, { erro: 'muitas tentativas, aguarde um minuto' }), true;
