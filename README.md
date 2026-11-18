@@ -172,6 +172,12 @@ Os mesmos textos estão em `docs/regras_firebase.json`.
   serviço → Gerar nova chave privada). Sem ela os **presentes** ficam desligados (o jogo avisa); o chat funciona.
 - `MODERADORES` (opcional): IDs de 9 dígitos de quem modera o chat global, separados por vírgula. No chat:
   `/calar ID minutos`, `/liberar ID`, `/apagar número`.
+- `PAINEL_CHAVE`: a chave do projeto no painel de métricas (painel → Apps conectados → a chave `pnl_…`). Sem ela as
+  métricas ficam desligadas e o jogo segue normal. O app e o site mandam os eventos para `POST /api/painel` e o
+  servidor envia ao painel em lotes (`servidor/painel.js`); a chave nunca vai para o app nem para o repositório.
+  Eventos: `instalar`, `abrir`, `ping`, `saiu`, `cadastro`/`login` (com o método), `partida`, `erro`, `feedback`
+  (Configurações → Conta → Mandar bug ou sugestão) vindos do jogo; `servidor` (a cada minuto), `servidor_parou`,
+  `entrou`, `presente` e `transacao` (compra em reais conferida pela loja) saem do próprio servidor.
 
 ## Testes no PC (sem celular)
 

@@ -246,9 +246,10 @@ class Firebase {
       return null;
     } catch (e) { return 'Sem internet (' + e.message + ')'; }
   }
-  criar(email, senha) { this.anonimo = false; return this.auth('signUp', { email, password: senha, returnSecureToken: true }); }
-  entrar(email, senha) { this.anonimo = false; return this.auth('signInWithPassword', { email, password: senha, returnSecureToken: true }); }
-  async convidado() { const e = await this.auth('signUp', { returnSecureToken: true }); this.anonimo = !e; return e; }
+  // (metodo/novaConta: só para o painel de métricas saber se foi cadastro ou login, e por onde)
+  criar(email, senha) { this.anonimo = false; this.metodo = 'email'; this.novaConta = true; return this.auth('signUp', { email, password: senha, returnSecureToken: true }); }
+  entrar(email, senha) { this.anonimo = false; this.metodo = 'email'; this.novaConta = false; return this.auth('signInWithPassword', { email, password: senha, returnSecureToken: true }); }
+  async convidado() { this.metodo = 'anonimo'; this.novaConta = true; const e = await this.auth('signUp', { returnSecureToken: true }); this.anonimo = !e; return e; }
   // login com Google: o token de identidade (do botão do Google no site ou da conta do celular no APK) entra no
   // Firebase do jogo; a mesma conta em qualquer aparelho. Devolve null ou o erro.
   async google(idToken) {
@@ -259,6 +260,7 @@ class Firebase {
       const j = await r.json();
       if (!r.ok) return /OPERATION_NOT_ALLOWED/.test((j.error && j.error.message) || '') ? 'O login com Google está desligado no Firebase (Authentication → Sign-in method → Google)' : Firebase.erro(j.error && j.error.message);
       this.pegar(j);
+      this.metodo = 'google'; this.novaConta = !!j.isNewUser;
       this.nomeGoogle = j.firstName || (j.displayName || '').split(' ')[0] || '';
       return null;
     } catch (e) { return 'Sem internet (' + e.message + ')'; }

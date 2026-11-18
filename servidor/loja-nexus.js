@@ -141,6 +141,11 @@ async function tratar(req, res, url) {
       const o = await nexus('GET', '/purchases/' + code);
       if (o.external_player_id !== jogador && o.external_player_id !== eu.uid) return responder(res, 403, { erro: 'esse pedido é de outro jogador' }), true;
       await nexus('POST', `/deliveries/${code}/ack`);
+      // painel: compra em reais (o valor vem do pedido conferido no site da loja, não do celular)
+      if (Number.isFinite(Number(o.total_cents))) {
+        const itens = Array.isArray(o.items) ? o.items.map((i) => (i && (i.name || i.title || i.sku)) || '').filter(Boolean).join(', ') : '';
+        require('./painel').evento('transacao', eu.uid, { valor: Number(o.total_cents) / 100, item: itens.slice(0, 120), tipo: 'compra', pedido: code });
+      }
       return responder(res, 200, { ok: true }), true;
     }
     if (rota === 'POST /api/loja/evento') {

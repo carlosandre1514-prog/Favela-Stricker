@@ -105,7 +105,8 @@ class JogoActivity : Activity() {
         super.onPause()
         diag.emUso(false)
         if (::motorView.isInitialized) motorView.onPause()
-        if (::web.isInitialized) web.onPause()
+        // painel de métricas: "saiu" antes de o WebView pausar a página
+        if (::web.isInitialized) { web.evaluateJavascript("window.painel && painel.saiu()", null); web.onPause() }
         sons.pause()
         ponte.atirando = false
     }
@@ -114,7 +115,7 @@ class JogoActivity : Activity() {
         super.onResume()
         diag.emUso(true)
         if (::motorView.isInitialized) motorView.onResume()
-        if (::web.isInitialized) web.onResume()
+        if (::web.isInitialized) { web.onResume(); web.evaluateJavascript("window.painel && painel.voltou()", null) }
         sons.resume()
     }
 

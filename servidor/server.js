@@ -20,6 +20,7 @@ const zlib = require('zlib');
 const { WebSocketServer } = require('ws');
 const loja = require('./loja-nexus');  // loja de moedas/skins do site NEXUS (Pix): /api/loja/...
 const social = require('./social');    // chat global (/chat) e presentes entre amigos (/api/social/...)
+const painel = require('./painel');    // painel de métricas (Supabase): POST /api/painel e eventos do servidor
 
 const PORT = process.env.PORT || 10000;
 const WEB = path.join(__dirname, '..', 'web');
@@ -45,6 +46,7 @@ const servidor = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x');
   if (await loja.tratar(req, res, url)) return;  // rotas da loja (o token do jogador é conferido lá)
   if (await social.tratar(req, res, url)) return;  // presentes (o servidor confere e faz a transferência)
+  if (await painel.tratar(req, res, url, loja.limite)) return;  // eventos do app/site para o painel de métricas
   if (url.pathname === '/saude') { res.writeHead(200, { 'Content-Type': 'text/plain' }); res.end('ok'); return; }
   if (url.pathname === '/api/estado') {  // quantas pessoas jogando agora (para acompanhar a carga)
     res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' });
@@ -171,6 +173,7 @@ wss.on('connection', (ws, req) => {
   while (usadas.has(vaga)) vaga++;
   const eu = { ws, time, vaga, id, estado: null, novo: false, plat };
   sala.set(id, eu);
+  painel.evento('entrou', id, { modo: q.get('modo') === 'br' ? 'ressurgencia' : 'policia_x_bandidos', sala: codigo }, { plataforma: plat });
   avisarVagas(sala);
   ws.vivo = true;
   ws.on('pong', () => { ws.vivo = true; });
@@ -255,3 +258,5 @@ setInterval(() => {
 }, 15000);
 
 servidor.listen(PORT, () => console.log(`Favela Stricker no ar na porta ${PORT}`));
+// painel: sinal de vida a cada minuto (jogadores em partidas ao vivo) e o "parou" ao desligar
+painel.ligarServidor(() => { let n = 0; for (const s of salas.values()) n += s.size; return n; });

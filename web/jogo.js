@@ -69,6 +69,7 @@ function telaLogin() {
     if (e) { st.textContent = e; return; }
     fb = f;
     guardado.set('login_refresh', f.refresh || '');
+    if (typeof painel !== 'undefined') painel.ev(f.novaConta ? 'cadastro' : 'login', { metodo: f.metodo || 'email' });
     await carregarConta();
     if (f.nomeGoogle && conta.nome() === 'Jogador') guardado.set('nome', f.nomeGoogle.slice(0, 16));  // conta nova pelo Google: o primeiro nome
     garantirIdentidade().then(() => { if (typeof lojaAoEntrar === 'function') lojaAoEntrar(); });  // loja do site: com o ID de 9 dígitos
@@ -727,7 +728,9 @@ function telaConfig(aba = 'sens') {
       <div class="ajuste"><span class="nome">Moedas</span><span class="cresce amarelo" style="font-weight:800">${fmt(conta.moedas)}</span></div>
       <div class="ajuste"><span class="nome">Nível</span>${insignia(nivelDe(conta.xp).patente, 26)}<span class="cresce" style="font-size:13px"><b>${nivelDe(conta.xp).nivel}</b> · ${esc(nivelDe(conta.xp).patente.nome)} ${nivelDe(conta.xp).divisao} · ${fmt(conta.xp)} XP no total</span></div>
       <div class="ajuste" style="flex-wrap:wrap;gap:8px"><span class="nome">Patentes</span>${PATENTES.map((p) => `<span class="linha" style="gap:4px;font-size:11px;color:#C3C8D2">${insignia(p, 20)}${esc(p.nome)} <span class="apagado">(nv ${p.de})</span></span>`).join('')}</div>
-      <button class="btn btn-fraco" id="c-sair" style="align-self:flex-start">Sair da conta</button>`;
+      <div class="linha" style="gap:8px"><button class="btn btn-ouro" id="c-feedback">Mandar bug ou sugestão</button>
+        <button class="btn btn-fraco" id="c-sair">Sair da conta</button></div>`;
+    $('#c-feedback', c).onclick = abrirFeedback;
     $('#c-salvar-nome', c).onclick = async () => {
       const n = $('#c-nome', c).value.trim().slice(0, 16);
       if (!n) return;
@@ -745,6 +748,33 @@ function telaConfig(aba = 'sens') {
       telaLogin();
     };
   }
+}
+
+// bug ou sugestão: vai para o painel de métricas (sem e-mail: o nome no jogo identifica)
+function abrirFeedback() {
+  let tipo = 'bug';
+  const el = html(`<div class="camada fixo"><div class="janela" style="min-width:min(420px,90vw);gap:10px">
+    <div class="linha"><span class="t cresce">Bug ou sugestão</span><button class="btn btn-fraco" id="fb-fechar" aria-label="Fechar">✕</button></div>
+    <div class="segmento" role="radiogroup" aria-label="Tipo"><button role="radio" data-tipo="bug" class="sel" aria-checked="true">BUG</button>
+      <button role="radio" data-tipo="sugestao" aria-checked="false">SUGESTÃO</button></div>
+    <textarea id="fb-txt" maxlength="1000" rows="5" placeholder="Conte o que aconteceu (onde, qual modo, o que você estava fazendo)" style="resize:none"></textarea>
+    <span class="dica">Não coloque senha nem e-mail. A versão do jogo vai junto.</span>
+    <button class="btn btn-ouro" id="fb-enviar">Enviar</button></div></div>`);
+  palco.appendChild(el);
+  for (const b of $$('[data-tipo]', el)) b.onclick = () => {
+    tipo = b.dataset.tipo;
+    for (const o of $$('[data-tipo]', el)) { o.classList.toggle('sel', o === b); o.setAttribute('aria-checked', String(o === b)); }
+  };
+  $('#fb-fechar', el).onclick = () => el.remove();
+  $('#fb-enviar', el).onclick = () => {
+    const txt = $('#fb-txt', el).value.trim();
+    if (txt.length < 5) { aviso('Escreva um pouco mais'); return; }
+    painel.ev('feedback', { tipo, mensagem: txt.slice(0, 1000), versao: VERSAO, plataforma: PLATAFORMA });
+    painel.enviar();
+    el.remove();
+    aviso('Obrigado! Recebemos sua mensagem');
+  };
+  setTimeout(() => $('#fb-txt', el).focus(), 50);
 }
 
 // ---------------- multiplayer ----------------
@@ -1225,6 +1255,11 @@ function registrarPartida(j, { xp = 0, online = false, saiu = false } = {}) {
     const sc = j.placar || [0, 0];
     p.placar = [sc[0] | 0, sc[1] | 0];
     p.res = saiu ? 's' : sc[0] === sc[1] ? 'e' : (sc[0] > sc[1] ? 0 : 1) === (partida.time | 0) ? 'v' : 'd';
+  }
+  if (typeof painel !== 'undefined') {
+    painel.ev('partida', { abates: p.abates, mortes: p.mortes, cabecas: p.cabecas, vitoria: p.res === 'v', saiu: p.res === 's',
+      minutos: Math.round(dur / 6) / 10, modo: br ? 'Ressurgência' + (partida.formato ? ' ' + partida.formato : '') : 'Polícia x Bandidos',
+      online: p.online, lugar: br ? p.lugar : undefined, arma: p.arma });
   }
   // carreira (vida inteira) e os títulos que esta partida liberou
   const antes = new Set(conta.titulosLiberados().map((x) => x.k));

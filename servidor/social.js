@@ -25,6 +25,7 @@
 const crypto = require('crypto');
 const { conferirLogin, limite } = require('./loja-nexus');
 const { presenteavel } = require('../web/catalogo.js');
+const painel = require('./painel');
 
 const PROJECT = process.env.FIREBASE_PROJECT_ID || 'navegador-f06a8';
 const DB = (process.env.FIREBASE_DB_URL || `https://${PROJECT}-default-rtdb.firebaseio.com`).replace(/\/$/, '');
@@ -117,6 +118,7 @@ async function presente(eu, corpo) {
       await bancoAdmin('PATCH', `usuarios/${eu.uid}`, { moedas: { '.sv': { increment: skin.preco } } });
       return [502, { erro: 'não consegui entregar, suas moedas voltaram' }];
     }
+    painel.evento('presente', eu.uid, { para: String(pp.nome || 'Amigo').slice(0, 16), item: skin.nome, moedas: skin.preco, valor: 0 });
     return [200, { ok: true, id, moedas }];
   } finally { emAndamento.delete(trava); }
 }
