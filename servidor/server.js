@@ -246,7 +246,8 @@ setInterval(() => {
 }, TICK_MS);
 
 // erro inesperado numa mensagem não derruba as partidas de todo mundo
-process.on('uncaughtException', (e) => console.error('erro inesperado:', e && e.stack));
+process.on('uncaughtException', (e) => { console.error('erro inesperado:', e && e.stack); painel.erro(e, 'uncaughtException'); });
+process.on('unhandledRejection', (e) => { console.error('promessa rejeitada:', e && (e.stack || e)); painel.erro(e, 'unhandledRejection'); });
 
 // conexões caídas (celular sem sinal) saem depois de 30 s sem resposta
 setInterval(() => {

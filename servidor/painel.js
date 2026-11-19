@@ -10,7 +10,10 @@
 //   entrou         alguém conectou numa partida ao vivo (marca ONLINE)
 //   presente       presente entregue (moedas do jogo, não reais)
 //   transacao      compra em reais confirmada pela loja (o valor vem do pedido, não do celular)
-// Eventos do app/site aceitos em /api/painel: instalar, abrir, ping, saiu, cadastro, login, partida, erro, feedback.
+//   erro           erro inesperado no próprio servidor (no máximo 20 por hora)
+// Eventos do app/site aceitos em /api/painel: instalar, abrir, ping, saiu, cadastro, login, partida, erro, feedback,
+//   compra_moedas (skin comprada com moedas do jogo, não reais) e nivel_subiu.
+// Plataforma no formato do painel: Android, iOS, PC (navegador do computador).
 // Nunca vão senha, e-mail, CPF ou cartão: o "usuario" é o uid do Firebase (ou um id do aparelho antes do login).
 'use strict';
 
@@ -19,8 +22,10 @@ const APIKEY = process.env.PAINEL_APIKEY || 'sb_publishable_URNeHmQn-EuIyqXbkbMS
 const CHAVE = process.env.PAINEL_CHAVE || '';
 const VERSAO = (process.env.RENDER_GIT_COMMIT || '').slice(0, 7) || require('./package.json').version;
 
-const DO_APP = new Set(['instalar', 'abrir', 'ping', 'saiu', 'cadastro', 'login', 'partida', 'erro', 'feedback']);
-const PLATAFORMAS = new Set(['android', 'pc', 'ios']);
+const DO_APP = new Set(['instalar', 'abrir', 'ping', 'saiu', 'cadastro', 'login', 'partida', 'erro', 'feedback', 'compra_moedas', 'nivel_subiu']);
+// o jogo usa android/pc/ios; o painel entende Android | iOS | Web | PC
+const PLATAFORMAS = { android: 'Android', pc: 'PC', ios: 'iOS', web: 'Web' };
+const plataforma = (p) => PLATAFORMAS[String(p || '').toLowerCase()] || '';
 const fila = [];
 let enviando = false, avisouChave = false;
 
@@ -32,7 +37,7 @@ function evento(tipo, usuario, dados = {}, extra = {}) {
   if (fila.length >= 5000) fila.shift();
   const ev = { tipo, usuario: String(usuario || '').slice(0, 100), dados: dados && typeof dados === 'object' ? dados : {}, em: extra.em || new Date().toISOString() };
   if (extra.nome) ev.nome = String(extra.nome).slice(0, 60);
-  if (extra.plataforma) ev.plataforma = String(extra.plataforma).slice(0, 30);
+  if (plataforma(extra.plataforma)) ev.plataforma = plataforma(extra.plataforma);
   fila.push(ev);
 }
 
@@ -64,7 +69,7 @@ function limpar(ev) {
   const em = Date.parse(ev.em);
   return {
     tipo, usuario: String(ev.usuario || '').slice(0, 100), dados,
-    nome: String(ev.nome || '').slice(0, 60), plataforma: PLATAFORMAS.has(ev.plataforma) ? ev.plataforma : '',
+    nome: String(ev.nome || '').slice(0, 60), plataforma: plataforma(ev.plataforma),
     em: Number.isFinite(em) ? new Date(em).toISOString() : undefined,
   };
 }
@@ -114,4 +119,13 @@ function ligarServidor(contarOnline) {
   }
 }
 
-module.exports = { evento, tratar, ligarServidor, ligado, limpar };
+// erro inesperado do servidor (no máximo 20 por hora, para não inundar o painel se algo entrar em loop)
+let errosHora = 0, horaErros = 0;
+function erro(e, onde = 'servidor') {
+  const h = Math.floor(Date.now() / 3600000);
+  if (h !== horaErros) { horaErros = h; errosHora = 0; }
+  if (++errosHora > 20) return;
+  evento('erro', 'servidor', { mensagem: String((e && e.message) || e || 'erro').slice(0, 300), onde, versao: VERSAO });
+}
+
+module.exports = { evento, tratar, ligarServidor, ligado, limpar, erro, plataforma };

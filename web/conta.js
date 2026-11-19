@@ -186,7 +186,12 @@ const conta = {
   nome() { return guardado.get('nome', 'Jogador'); },
   get xp() { return guardado.get('xp', 0); },
   // soma XP e devolve como estava e como ficou (para a tela do fim da partida mostrar o nível novo)
-  ganharXp(q) { const antes = nivelDe(this.xp); guardado.set('xp', this.xp + Math.max(0, Math.round(q))); salvarConta(); return { antes, depois: nivelDe(this.xp) }; },
+  ganharXp(q) {
+    const antes = nivelDe(this.xp); guardado.set('xp', this.xp + Math.max(0, Math.round(q))); salvarConta();
+    const depois = nivelDe(this.xp);
+    if (depois.nivel > antes.nivel && typeof painel !== 'undefined') painel.ev('nivel_subiu', { nivel: depois.nivel, de: antes.nivel, patente: depois.patente && depois.patente.nome || '' });
+    return { antes, depois };
+  },
   skinArma(arma) { return guardado.get('skin_arma_' + arma, ''); },
   usarSkinArma(arma, key) { guardado.set('skin_arma_' + arma, key || ''); },
   roupa(time) {
