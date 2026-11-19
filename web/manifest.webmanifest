@@ -1,0 +1,10 @@
+{
+  "name": "Favela Strike",
+  "short_name": "Favela Strike",
+  "start_url": "./",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#0B0F17",
+  "theme_color": "#0B0F17",
+  "icons": [{ "src": "img/icone.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }]
+}

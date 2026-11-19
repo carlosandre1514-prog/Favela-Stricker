@@ -1,0 +1,12 @@
+# Render (render.com): um serviço web grátis que entrega o site do jogo e faz as partidas ao vivo (WebSocket).
+# O GitHub Actions compila a versão site e publica tudo no ramo "site"; o Render publica sozinho a cada envio.
+services:
+  - type: web
+    name: favela-stricker
+    runtime: node
+    plan: free
+    branch: site
+    buildCommand: cd servidor && npm install
+    startCommand: node servidor/server.js
+    healthCheckPath: /saude
+    autoDeploy: true
