@@ -4,6 +4,7 @@
 // com a chave guardada lá (servidor/painel.js). Tudo em segundo plano: se falhar, o jogo segue igual.
 //   instalar (1ª vez no aparelho) · abrir · ping (60 s com o jogo na tela) · saiu (minimizou/fechou)
 //   cadastro / login (com o método) · partida (abates, vitória, minutos, modo) · erro (não tratados) · feedback
+//   compra_moedas (skin comprada com moedas do jogo) · nivel_subiu (passou de nível)
 // Nunca manda e-mail, senha ou dados pessoais: o usuário é o uid do Firebase (antes do login, um id do aparelho).
 'use strict';
 const painel = (() => {
@@ -55,7 +56,9 @@ const painel = (() => {
 
   // começo: instalar (só a primeira vez) e abrir
   if (!guardado.get('painel_instalado', false)) { ev('instalar'); guardado.set('painel_instalado', true); }
-  ev('abrir');
+  // ícone publicado no site (o servidor do Render entrega a pasta web/): o painel mostra o ícone original
+  const icone = typeof SERVIDOR === 'string' && /^https:/.test(SERVIDOR) ? SERVIDOR + '/img/icone.png' : '';
+  ev('abrir', icone ? { icone } : {});
   setTimeout(() => enviar(), 4000);  // (dá tempo do login salvo voltar)
   setInterval(() => enviar(), 2500);
   setInterval(() => { if (!document.hidden && !fora) ev('ping'); }, 60000);

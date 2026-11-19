@@ -417,6 +417,7 @@ async function comprarComMoedas(nome, preco, id) {
   if (!(await confirmar('Comprar ' + nome + '?', `Custa ${fmt(preco)} moedas. Você tem ${fmt(tem)}.`, 'Comprar'))) return false;
   conta.moedas = tem - preco;
   conta.ganhar(id);
+  if (typeof painel !== 'undefined') painel.ev('compra_moedas', { item: nome, moedas: preco, id: String(id).slice(0, 60) });
   aviso('Comprado: ' + nome);
   return true;
 }
